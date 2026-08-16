@@ -1,47 +1,12 @@
 # -*- coding: utf-8 -*-
 
-"""
-六合彩预测模块 V1.2
-
-核心流程：
-
-49码评分
-    ↓
-TOP10
-    ↓
-TOP5
-    ↓
-TOP3
-    ↓
-第一推荐
-
-同时计算：
-
-大小
-单双
-波色
-生肖
-平特生肖
-
-注意：
-
-特码来自 numbers 第7个号码。
-"""
-
 from collections import defaultdict
 
 from .strategies import combine_strategies
 
-from .features import (
-    get_special,
-    get_size,
-    get_odd_even,
-    get_wave,
-)
-
 
 # =========================================================
-# 2026 生肖号码
+# 2026 年生肖号码
 # =========================================================
 
 ZODIAC_MAP_2026 = {
@@ -72,6 +37,10 @@ ZODIAC_MAP_2026 = {
 }
 
 
+# =========================================================
+# 号码 → 生肖
+# =========================================================
+
 NUMBER_TO_ZODIAC = {}
 
 for zodiac, numbers in ZODIAC_MAP_2026.items():
@@ -82,7 +51,7 @@ for zodiac, numbers in ZODIAC_MAP_2026.items():
 
 
 # =========================================================
-# 波色
+# 2026 波色
 # =========================================================
 
 WAVE_MAP = {
@@ -106,9 +75,13 @@ WAVE_MAP = {
         21, 22, 27, 28,
         32, 33, 38, 39,
         43, 44, 49
-    ],
+    ]
 }
 
+
+# =========================================================
+# 号码 → 波色
+# =========================================================
 
 NUMBER_TO_WAVE = {}
 
@@ -120,27 +93,244 @@ for wave, numbers in WAVE_MAP.items():
 
 
 # =========================================================
-# 概率：大小
+# 工具：Min-Max
+# =========================================================
+
+def minmax_normalize(scores):
+
+    if not scores:
+
+        return {}
+
+    values = list(
+        scores.values()
+    )
+
+    low = min(values)
+
+    high = max(values)
+
+    if high == low:
+
+        return {
+            key: 0.5
+            for key in scores
+        }
+
+    return {
+
+        key:
+            (
+                value - low
+            )
+            /
+            (
+                high - low
+            )
+
+        for key, value in scores.items()
+    }
+
+
+# =========================================================
+# Softmax
+# =========================================================
+
+def softmax(
+    scores,
+    temperature=1.0
+):
+
+    if not scores:
+
+        return {}
+
+    temperature = max(
+        float(temperature),
+        0.0001
+    )
+
+    maximum = max(
+        scores.values()
+    )
+
+    import math
+
+    exp_values = {}
+
+    total = 0.0
+
+    for key, value in scores.items():
+
+        x = (
+            value - maximum
+        ) / temperature
+
+        e = math.exp(x)
+
+        exp_values[key] = e
+
+        total += e
+
+    if total <= 0:
+
+        return {
+            key: 0.0
+            for key in scores
+        }
+
+    return {
+
+        key:
+            value / total
+
+        for key, value
+        in exp_values.items()
+    }
+
+
+# =========================================================
+# 安全获取特码
+# =========================================================
+
+def _get_special_from_row(row):
+
+    # -----------------------------------------------------
+    # 优先使用 features.py
+    # -----------------------------------------------------
+
+    try:
+
+        from .features import get_special
+
+        number = get_special(row)
+
+        number = int(number)
+
+        if 1 <= number <= 49:
+
+            return number
+
+    except Exception:
+
+        pass
+
+    # -----------------------------------------------------
+    # fallback：special
+    # -----------------------------------------------------
+
+    if "special" in row:
+
+        try:
+
+            number = int(
+                row["special"]
+            )
+
+            if 1 <= number <= 49:
+
+                return number
+
+        except Exception:
+
+            pass
+
+    # -----------------------------------------------------
+    # fallback：numbers
+    # -----------------------------------------------------
+
+    numbers = row.get(
+        "numbers"
+    )
+
+    if numbers:
+
+        if isinstance(
+            numbers,
+            str
+        ):
+
+            parts = [
+                x.strip()
+                for x in numbers.split(",")
+                if x.strip()
+            ]
+
+        elif isinstance(
+            numbers,
+            (list, tuple)
+        ):
+
+            parts = list(
+                numbers
+            )
+
+        else:
+
+            parts = []
+
+        if len(parts) >= 7:
+
+            try:
+
+                number = int(
+                    parts[6]
+                )
+
+                if 1 <= number <= 49:
+
+                    return number
+
+            except Exception:
+
+                pass
+
+    raise ValueError(
+        f"无法获取有效特码：{row}"
+    )
+
+
+# =========================================================
+# 大小概率
 # =========================================================
 
 def calculate_size_probability(rows):
 
+    if not rows:
+
+        return {
+            "大": 0.5,
+            "小": 0.5
+        }
+
     big = 0
+
     small = 0
 
     for row in rows:
 
-        number = get_special(row)
+        try:
 
-        if not 1 <= number <= 49:
+            number = _get_special_from_row(
+                row
+            )
+
+        except Exception:
+
             continue
 
         if number >= 25:
+
             big += 1
+
         else:
+
             small += 1
 
-    total = big + small
+    total = (
+        big +
+        small
+    )
 
     if total == 0:
 
@@ -155,32 +345,51 @@ def calculate_size_probability(rows):
             big / total,
 
         "小":
-            small / total,
+            small / total
     }
 
 
 # =========================================================
-# 概率：单双
+# 单双概率
 # =========================================================
 
 def calculate_parity_probability(rows):
 
+    if not rows:
+
+        return {
+            "单": 0.5,
+            "双": 0.5
+        }
+
     odd = 0
+
     even = 0
 
     for row in rows:
 
-        number = get_special(row)
+        try:
 
-        if not 1 <= number <= 49:
+            number = _get_special_from_row(
+                row
+            )
+
+        except Exception:
+
             continue
 
         if number % 2:
+
             odd += 1
+
         else:
+
             even += 1
 
-    total = odd + even
+    total = (
+        odd +
+        even
+    )
 
     if total == 0:
 
@@ -195,12 +404,12 @@ def calculate_parity_probability(rows):
             odd / total,
 
         "双":
-            even / total,
+            even / total
     }
 
 
 # =========================================================
-# 概率：波色
+# 波色概率
 # =========================================================
 
 def calculate_wave_probability(rows):
@@ -208,13 +417,23 @@ def calculate_wave_probability(rows):
     counts = {
 
         "红": 0,
+
         "蓝": 0,
-        "绿": 0,
+
+        "绿": 0
     }
 
     for row in rows:
 
-        number = get_special(row)
+        try:
+
+            number = _get_special_from_row(
+                row
+            )
+
+        except Exception:
+
+            continue
 
         wave = NUMBER_TO_WAVE.get(
             number
@@ -232,26 +451,109 @@ def calculate_wave_probability(rows):
 
         return {
 
-            "红": 1 / 3,
-            "蓝": 1 / 3,
-            "绿": 1 / 3,
+            "红":
+                1 / 3,
+
+            "蓝":
+                1 / 3,
+
+            "绿":
+                1 / 3
         }
 
     return {
 
-        wave:
-            counts[wave] / total
+        key:
+            value / total
 
-        for wave in (
-            "红",
-            "蓝",
-            "绿",
-        )
+        for key, value
+        in counts.items()
     }
 
 
 # =========================================================
-# 49码综合评分
+# 波色多窗口综合概率
+#
+# 30期：50%
+# 60期：30%
+# 100期：20%
+#
+# 不直接使用300期，
+# 避免长期历史把近期状态冲淡。
+# =========================================================
+
+def calculate_wave_probability_multi_window(
+    rows
+):
+
+    recent30 = calculate_wave_probability(
+        rows[:30]
+    )
+
+    recent60 = calculate_wave_probability(
+        rows[:60]
+    )
+
+    recent100 = calculate_wave_probability(
+        rows[:100]
+    )
+
+    result = {}
+
+    for wave in [
+        "红",
+        "蓝",
+        "绿"
+    ]:
+
+        result[wave] = (
+
+            recent30.get(
+                wave,
+                1 / 3
+            )
+            * 0.50
+
+            +
+
+            recent60.get(
+                wave,
+                1 / 3
+            )
+            * 0.30
+
+            +
+
+            recent100.get(
+                wave,
+                1 / 3
+            )
+            * 0.20
+        )
+
+    total = sum(
+        result.values()
+    )
+
+    if total <= 0:
+
+        return {
+            "红": 1 / 3,
+            "蓝": 1 / 3,
+            "绿": 1 / 3
+        }
+
+    return {
+
+        key:
+            value / total
+
+        for key, value in result.items()
+    }
+
+
+# =========================================================
+# 号码综合评分
 # =========================================================
 
 def calculate_number_scores(rows):
@@ -260,7 +562,12 @@ def calculate_number_scores(rows):
         combine_strategies(rows)
     )
 
+    base = minmax_normalize(
+        combined_scores
+    )
+
     recent = rows[:30]
+
     medium = rows[:100]
 
     recent_size = calculate_size_probability(
@@ -289,9 +596,12 @@ def calculate_number_scores(rows):
 
     scores = {}
 
-    for number in range(1, 50):
+    for number in range(
+        1,
+        50
+    ):
 
-        base = combined_scores.get(
+        score = base.get(
             number,
             0.5
         )
@@ -303,17 +613,27 @@ def calculate_number_scores(rows):
         if number >= 25:
 
             size_score = (
-                recent_size["大"] * 0.7
+
+                recent_size["大"]
+                * 0.7
+
                 +
-                medium_size["大"] * 0.3
+
+                medium_size["大"]
+                * 0.3
             )
 
         else:
 
             size_score = (
-                recent_size["小"] * 0.7
+
+                recent_size["小"]
+                * 0.7
+
                 +
-                medium_size["小"] * 0.3
+
+                medium_size["小"]
+                * 0.3
             )
 
         # -------------------------------------------------
@@ -323,17 +643,27 @@ def calculate_number_scores(rows):
         if number % 2:
 
             parity_score = (
-                recent_parity["单"] * 0.7
+
+                recent_parity["单"]
+                * 0.7
+
                 +
-                medium_parity["单"] * 0.3
+
+                medium_parity["单"]
+                * 0.3
             )
 
         else:
 
             parity_score = (
-                recent_parity["双"] * 0.7
+
+                recent_parity["双"]
+                * 0.7
+
                 +
-                medium_parity["双"] * 0.3
+
+                medium_parity["双"]
+                * 0.3
             )
 
         # -------------------------------------------------
@@ -349,35 +679,41 @@ def calculate_number_scores(rows):
             recent_wave.get(
                 wave,
                 1 / 3
-            ) * 0.7
+            )
+            * 0.7
 
             +
 
             medium_wave.get(
                 wave,
                 1 / 3
-            ) * 0.3
+            )
+            * 0.3
         )
 
         # -------------------------------------------------
-        # 最终评分
+        # 综合
         # -------------------------------------------------
 
         final_score = (
 
-            base * 0.60
+            score
+            * 0.60
 
             +
 
-            size_score * 0.15
+            size_score
+            * 0.15
 
             +
 
-            parity_score * 0.10
+            parity_score
+            * 0.10
 
             +
 
-            wave_score * 0.15
+            wave_score
+            * 0.15
         )
 
         scores[number] = final_score
@@ -386,19 +722,27 @@ def calculate_number_scores(rows):
 
 
 # =========================================================
-# 排名
+# Top 号码
 # =========================================================
 
-def get_ranked_numbers(scores):
+def get_top_numbers(
+    scores,
+    count=10
+):
 
-    return sorted(
+    ranking = sorted(
+
         scores.items(),
+
         key=lambda x: (
             x[1],
             -x[0]
         ),
+
         reverse=True
     )
+
+    return ranking[:count]
 
 
 # =========================================================
@@ -409,7 +753,9 @@ def calculate_zodiac_scores(
     number_scores
 ):
 
-    zodiac_scores = defaultdict(float)
+    zodiac_scores = defaultdict(
+        float
+    )
 
     for number, score in number_scores.items():
 
@@ -421,21 +767,26 @@ def calculate_zodiac_scores(
 
             zodiac_scores[zodiac] += score
 
-    return dict(zodiac_scores)
+    return dict(
+        zodiac_scores
+    )
 
 
 # =========================================================
-# 生肖排名
+# Top 5 生肖
 # =========================================================
 
 def get_top_zodiacs(
     zodiac_scores,
-    count
+    count=5
 ):
 
     ranking = sorted(
+
         zodiac_scores.items(),
+
         key=lambda x: x[1],
+
         reverse=True
     )
 
@@ -443,7 +794,7 @@ def get_top_zodiacs(
 
 
 # =========================================================
-# 平特生肖
+# 平特生肖评分
 # =========================================================
 
 def calculate_pingte_zodiac_scores(
@@ -451,11 +802,25 @@ def calculate_pingte_zodiac_scores(
     number_scores
 ):
 
-    history_count = defaultdict(int)
+    zodiac_scores = defaultdict(
+        float
+    )
+
+    history_count = defaultdict(
+        int
+    )
 
     for row in rows[:300]:
 
-        number = get_special(row)
+        try:
+
+            number = _get_special_from_row(
+                row
+            )
+
+        except Exception:
+
+            continue
 
         zodiac = NUMBER_TO_ZODIAC.get(
             number
@@ -470,19 +835,22 @@ def calculate_pingte_zodiac_scores(
         1
     )
 
-    result = {}
+    for zodiac in ZODIAC_MAP_2026:
 
-    for zodiac, numbers in ZODIAC_MAP_2026.items():
+        numbers = ZODIAC_MAP_2026[
+            zodiac
+        ]
 
-        number_score = sum(
+        number_score = 0.0
 
-            number_scores.get(
-                n,
-                0.0
+        for number in numbers:
+
+            number_score += (
+                number_scores.get(
+                    number,
+                    0.0
+                )
             )
-
-            for n in numbers
-        )
 
         number_score /= max(
             len(numbers),
@@ -491,89 +859,24 @@ def calculate_pingte_zodiac_scores(
 
         history_score = (
             history_count[zodiac]
-            / total
+            /
+            total
         )
 
-        result[zodiac] = (
+        zodiac_scores[zodiac] = (
 
-            number_score * 0.70
+            number_score
+            * 0.70
 
             +
 
-            history_score * 0.30
+            history_score
+            * 0.30
         )
 
-    return result
-
-
-# =========================================================
-# 当前属性预测
-# =========================================================
-
-def get_attribute_prediction(rows):
-
-    size_probability = calculate_size_probability(
-        rows[:100]
+    return dict(
+        zodiac_scores
     )
-
-    parity_probability = calculate_parity_probability(
-        rows[:100]
-    )
-
-    wave_probability = calculate_wave_probability(
-        rows[:100]
-    )
-
-    return {
-
-        "size": {
-
-            "prediction":
-                max(
-                    size_probability,
-                    key=size_probability.get
-                ),
-
-            "probability":
-                {
-                    k: round(v, 6)
-                    for k, v
-                    in size_probability.items()
-                },
-        },
-
-        "parity": {
-
-            "prediction":
-                max(
-                    parity_probability,
-                    key=parity_probability.get
-                ),
-
-            "probability":
-                {
-                    k: round(v, 6)
-                    for k, v
-                    in parity_probability.items()
-                },
-        },
-
-        "wave": {
-
-            "prediction":
-                max(
-                    wave_probability,
-                    key=wave_probability.get
-                ),
-
-            "probability":
-                {
-                    k: round(v, 6)
-                    for k, v
-                    in wave_probability.items()
-                },
-        },
-    }
 
 
 # =========================================================
@@ -585,36 +888,22 @@ def generate_prediction(rows):
     if not rows:
 
         return {
-            "error": "没有历史数据"
+            "error":
+                "没有历史数据"
         }
 
     # =====================================================
-    # 49码评分
+    # 号码
     # =====================================================
 
     number_scores = calculate_number_scores(
         rows
     )
 
-    ranking = get_ranked_numbers(
-        number_scores
+    top10 = get_top_numbers(
+        number_scores,
+        10
     )
-
-    # =====================================================
-    # TOP
-    # =====================================================
-
-    top10 = ranking[:10]
-
-    top5 = ranking[:5]
-
-    top3 = ranking[:3]
-
-    first = top3[0] if top3 else None
-
-    second = top3[1] if len(top3) > 1 else None
-
-    third = top3[2] if len(top3) > 2 else None
 
     # =====================================================
     # 生肖
@@ -633,9 +922,11 @@ def generate_prediction(rows):
     # 平特
     # =====================================================
 
-    pingte_scores = calculate_pingte_zodiac_scores(
-        rows,
-        number_scores
+    pingte_scores = (
+        calculate_pingte_zodiac_scores(
+            rows,
+            number_scores
+        )
     )
 
     top2_pingte = get_top_zodiacs(
@@ -644,146 +935,117 @@ def generate_prediction(rows):
     )
 
     # =====================================================
-    # 属性
+    # 大小
     # =====================================================
 
-    attributes = get_attribute_prediction(
-        rows
+    size_probability = (
+        calculate_size_probability(
+            rows[:100]
+        )
     )
+
+    size_prediction = max(
+        size_probability,
+        key=size_probability.get
+    )
+
+    # =====================================================
+    # 单双
+    # =====================================================
+
+    parity_probability = (
+        calculate_parity_probability(
+            rows[:100]
+        )
+    )
+
+    parity_prediction = max(
+        parity_probability,
+        key=parity_probability.get
+    )
+
+    # =====================================================
+    # ⭐ 波色
+    # =====================================================
+
+    wave_probability = (
+        calculate_wave_probability_multi_window(
+            rows
+        )
+    )
+
+    # -----------------------------------------------------
+    # 波色排名
+    # -----------------------------------------------------
+
+    wave_ranking = sorted(
+
+        wave_probability.items(),
+
+        key=lambda x: (
+            x[1],
+            x[0]
+        ),
+
+        reverse=True
+    )
+
+    # -----------------------------------------------------
+    # 波色单推
+    # -----------------------------------------------------
+
+    wave_prediction = (
+        wave_ranking[0][0]
+    )
+
+    # -----------------------------------------------------
+    # ⭐ 波色双推
+    # -----------------------------------------------------
+
+    top2_wave = wave_ranking[:2]
 
     # =====================================================
     # 输出
     # =====================================================
 
-    result = {
+    return {
 
         # -------------------------------------------------
-        # 第一推荐
-        # -------------------------------------------------
-
-        "recommendation": {
-
-            "first": (
-                {
-                    "number": first[0],
-                    "score": round(
-                        first[1],
-                        6
-                    ),
-                }
-                if first
-                else None
-            ),
-
-            "second": (
-                {
-                    "number": second[0],
-                    "score": round(
-                        second[1],
-                        6
-                    ),
-                }
-                if second
-                else None
-            ),
-
-            "third": (
-                {
-                    "number": third[0],
-                    "score": round(
-                        third[1],
-                        6
-                    ),
-                }
-                if third
-                else None
-            ),
-        },
-
-        # -------------------------------------------------
-        # TOP10
+        # 特码10码
         # -------------------------------------------------
 
         "top10_numbers": [
 
             {
-                "rank": rank,
-                "number": number,
-                "score": round(
-                    score,
-                    6
-                ),
+                "number":
+                    number,
+
+                "score":
+                    round(
+                        score,
+                        6
+                    )
             }
 
-            for rank, (
-                number,
-                score
-            ) in enumerate(
-                top10,
-                1
-            )
+            for number, score
+            in top10
         ],
 
         # -------------------------------------------------
-        # TOP5
-        # -------------------------------------------------
-
-        "top5_numbers": [
-
-            {
-                "rank": rank,
-                "number": number,
-                "score": round(
-                    score,
-                    6
-                ),
-            }
-
-            for rank, (
-                number,
-                score
-            ) in enumerate(
-                top5,
-                1
-            )
-        ],
-
-        # -------------------------------------------------
-        # TOP3
-        # -------------------------------------------------
-
-        "top3_numbers": [
-
-            {
-                "rank": rank,
-                "number": number,
-                "score": round(
-                    score,
-                    6
-                ),
-            }
-
-            for rank, (
-                number,
-                score
-            ) in enumerate(
-                top3,
-                1
-            )
-        ],
-
-        # -------------------------------------------------
-        # 生肖
+        # 生肖5肖
         # -------------------------------------------------
 
         "top5_zodiac": [
 
             {
-                "zodiac": zodiac,
-                "score": round(
-                    score,
-                    6
-                ),
+                "zodiac":
+                    zodiac,
+
+                "score":
+                    round(
+                        score,
+                        6
+                    )
             }
 
             for zodiac, score
@@ -791,17 +1053,20 @@ def generate_prediction(rows):
         ],
 
         # -------------------------------------------------
-        # 平特
+        # 平特2肖
         # -------------------------------------------------
 
         "top2_pingte_zodiac": [
 
             {
-                "zodiac": zodiac,
-                "score": round(
-                    score,
-                    6
-                ),
+                "zodiac":
+                    zodiac,
+
+                "score":
+                    round(
+                        score,
+                        6
+                    )
             }
 
             for zodiac, score
@@ -809,10 +1074,115 @@ def generate_prediction(rows):
         ],
 
         # -------------------------------------------------
-        # 属性
+        # 大小
         # -------------------------------------------------
 
-        **attributes,
+        "size": {
+
+            "prediction":
+                size_prediction,
+
+            "probability": {
+
+                key:
+                    round(
+                        value,
+                        6
+                    )
+
+                for key, value
+                in size_probability.items()
+            }
+        },
+
+        # -------------------------------------------------
+        # 单双
+        # -------------------------------------------------
+
+        "parity": {
+
+            "prediction":
+                parity_prediction,
+
+            "probability": {
+
+                key:
+                    round(
+                        value,
+                        6
+                    )
+
+                for key, value
+                in parity_probability.items()
+            }
+        },
+
+        # -------------------------------------------------
+        # ⭐ 波色
+        # -------------------------------------------------
+
+        "wave": {
+
+            # 单推
+            "prediction":
+                wave_prediction,
+
+            # 双推
+            "top2": [
+
+                {
+                    "wave":
+                        wave,
+
+                    "probability":
+                        round(
+                            probability,
+                            6
+                        )
+                }
+
+                for wave, probability
+                in top2_wave
+            ],
+
+            # 完整概率
+            "probability": {
+
+                key:
+                    round(
+                        value,
+                        6
+                    )
+
+                for key, value
+                in wave_probability.items()
+            }
+        }
     }
 
-    return result
+
+# =========================================================
+# 测试
+# =========================================================
+
+if __name__ == "__main__":
+
+    print("=" * 70)
+
+    print(
+        "predictor.py 测试"
+    )
+
+    print("=" * 70)
+
+    print()
+
+    print(
+        "2026生肖映射：",
+        len(NUMBER_TO_ZODIAC)
+    )
+
+    print(
+        "波色映射：",
+        len(NUMBER_TO_WAVE)
+    )
