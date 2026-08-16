@@ -12,7 +12,6 @@ from core.config import (
 from core.database import (
     init_database,
     get_draws,
-    count_draws,
 )
 
 from core.data_source import (
@@ -22,6 +21,7 @@ from core.data_source import (
 from core.predictor import (
     generate_prediction,
 )
+
 
 from core.backtest import (
     multi_window_backtest,
@@ -54,6 +54,200 @@ def save_json(path, data):
 
 
 # =========================================================
+# 计算下一期推荐
+# =========================================================
+
+def calculate_recommendation(
+    prediction,
+    count=3
+):
+    """
+    从已经经过49码综合评分的 Top10 中，
+    进一步提取下一期重点关注号码。
+
+    注意：
+    这里只是模型排序，不是真实中奖概率。
+    """
+
+    numbers = prediction.get(
+        "top10_numbers",
+        []
+    )
+
+    if not numbers:
+
+        return {
+            "numbers": [],
+            "confidence": 0.0,
+            "status": "无数据"
+        }
+
+    # -----------------------------------------------------
+    # Top10 已经是按照综合评分排序
+    # -----------------------------------------------------
+
+    top_numbers = numbers[:count]
+
+    # -----------------------------------------------------
+    # 获取 Top10 分数
+    # -----------------------------------------------------
+
+    scores = []
+
+    for item in numbers:
+
+        try:
+
+            score = float(
+                item.get(
+                    "score",
+                    0
+                )
+            )
+
+            scores.append(score)
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            continue
+
+    # -----------------------------------------------------
+    # 计算推荐置信度
+    #
+    # 这里不是概率。
+    #
+    # 主要看：
+    #
+    # Top3平均评分
+    # +
+    # Top10整体评分
+    #
+    # -----------------------------------------------------
+
+    if not scores:
+
+        confidence = 0.0
+
+    else:
+
+        top3_scores = []
+
+        for item in top_numbers:
+
+            try:
+
+                top3_scores.append(
+                    float(
+                        item.get(
+                            "score",
+                            0
+                        )
+                    )
+                )
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                pass
+
+        if top3_scores:
+
+            top3_average = (
+                sum(top3_scores)
+                / len(top3_scores)
+            )
+
+        else:
+
+            top3_average = 0.0
+
+        top10_average = (
+            sum(scores)
+            / len(scores)
+        )
+
+        # -------------------------------------------------
+        # 综合
+        # -------------------------------------------------
+
+        confidence = (
+
+            top3_average * 0.70
+
+            +
+
+            top10_average * 0.30
+
+        ) * 100
+
+    confidence = max(
+        0.0,
+        min(
+            100.0,
+            confidence
+        )
+    )
+
+    # -----------------------------------------------------
+    # 状态
+    # -----------------------------------------------------
+
+    if confidence >= 70:
+
+        status = "高关注"
+
+    elif confidence >= 50:
+
+        status = "重点关注"
+
+    elif confidence >= 40:
+
+        status = "一般关注"
+
+    else:
+
+        status = "观察"
+
+    return {
+
+        "numbers": [
+
+            {
+                "number":
+                    int(item["number"]),
+
+                "score":
+                    round(
+                        float(
+                            item.get(
+                                "score",
+                                0
+                            )
+                        ),
+                        6
+                    )
+            }
+
+            for item in top_numbers
+        ],
+
+        "confidence":
+            round(
+                confidence,
+                2
+            ),
+
+        "status":
+            status,
+    }
+
+
+# =========================================================
 # 打印预测
 # =========================================================
 
@@ -76,9 +270,73 @@ def print_prediction(
         "=" * 60
     )
 
-    # -----------------------------------------------------
+    # =====================================================
+    # 下一期重点推荐
+    # =====================================================
+
+    recommendation = calculate_recommendation(
+        prediction,
+        count=3
+    )
+
+    print()
+    print(
+        "【下一期重点推荐】"
+    )
+
+    recommended_numbers = (
+        recommendation.get(
+            "numbers",
+            []
+        )
+    )
+
+    if recommended_numbers:
+
+        print(
+            " ".join(
+                f"{item['number']:02d}"
+                for item in recommended_numbers
+            )
+        )
+
+        for index, item in enumerate(
+            recommended_numbers,
+            start=1
+        ):
+
+            print(
+                f"  {index}. "
+                f"{item['number']:02d} "
+                f"评分："
+                f"{item['score']:.4f}"
+            )
+
+    else:
+
+        print(
+            "暂无推荐"
+        )
+
+    # =====================================================
+    # 推荐置信度
+    # =====================================================
+
+    print()
+
+    print(
+        "【模型置信度】"
+        f"{recommendation['confidence']:.2f}/100"
+    )
+
+    print(
+        "【模型状态】"
+        f"{recommendation['status']}"
+    )
+
+    # =====================================================
     # 特码10码
-    # -----------------------------------------------------
+    # =====================================================
 
     numbers = prediction.get(
         "top10_numbers",
@@ -97,9 +355,29 @@ def print_prediction(
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
+    # 同时显示10码评分
+    # =====================================================
+
+    print()
+    print(
+        "【10码综合评分】"
+    )
+
+    for index, item in enumerate(
+        numbers,
+        start=1
+    ):
+
+        print(
+            f"{index:02d}. "
+            f"{int(item['number']):02d} "
+            f"{float(item.get('score', 0)):.4f}"
+        )
+
+    # =====================================================
     # 特码生肖5肖
-    # -----------------------------------------------------
+    # =====================================================
 
     zodiacs = prediction.get(
         "top5_zodiac",
@@ -118,9 +396,9 @@ def print_prediction(
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # 平特生肖2肖
-    # -----------------------------------------------------
+    # =====================================================
 
     pingte = prediction.get(
         "top2_pingte_zodiac",
@@ -139,9 +417,9 @@ def print_prediction(
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # 大小
-    # -----------------------------------------------------
+    # =====================================================
 
     size = prediction.get(
         "size",
@@ -157,9 +435,9 @@ def print_prediction(
         f"{size.get('probability', '-')}"
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # 单双
-    # -----------------------------------------------------
+    # =====================================================
 
     parity = prediction.get(
         "parity",
@@ -173,9 +451,9 @@ def print_prediction(
         f"{parity.get('probability', '-')}"
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # 波色
-    # -----------------------------------------------------
+    # =====================================================
 
     wave = prediction.get(
         "wave",
@@ -248,29 +526,58 @@ def print_backtest(
             )
         )
 
+        # -------------------------------------------------
+        # 特码10码
+        # -------------------------------------------------
+
         print(
             "特码10码命中率：",
             f"{result.get('number_top10_hit_rate', 0):.2%}"
         )
+
+        # -------------------------------------------------
+        # 生肖5肖
+        # -------------------------------------------------
 
         print(
             "生肖5肖命中率：",
             f"{result.get('zodiac_top5_hit_rate', 0):.2%}"
         )
 
+        # -------------------------------------------------
+        # 平特2肖
+        # -------------------------------------------------
+
         print(
             "平特2肖命中率：",
             f"{result.get('pingte_top2_hit_rate', 0):.2%}"
         )
+
+        # -------------------------------------------------
+        # 大小
+        # -------------------------------------------------
 
         print(
             "大小命中率：",
             f"{result.get('size_hit_rate', 0):.2%}"
         )
 
+        # -------------------------------------------------
+        # 单双
+        # -------------------------------------------------
+
         print(
             "单双命中率：",
             f"{result.get('parity_hit_rate', 0):.2%}"
+        )
+
+        # -------------------------------------------------
+        # ⭐ 波色
+        # -------------------------------------------------
+
+        print(
+            "波色命中率：",
+            f"{result.get('wave_hit_rate', 0):.2%}"
         )
 
 
@@ -287,7 +594,7 @@ def main():
     )
 
     print(
-        "六合彩综合预测系统 V1.1"
+        "六合彩综合预测系统 V1.2"
     )
 
     print(
@@ -360,7 +667,7 @@ def main():
         )
 
         # -------------------------------------------------
-        # 获取历史
+        # 获取历史数据
         # -------------------------------------------------
 
         rows = get_draws(
@@ -391,6 +698,17 @@ def main():
                 rows
             )
 
+            # -------------------------------------------------
+            # 推荐结果也保存进 JSON
+            # -------------------------------------------------
+
+            recommendation = (
+                calculate_recommendation(
+                    prediction,
+                    count=3
+                )
+            )
+
             predictions[lottery_key] = {
 
                 "name":
@@ -404,6 +722,9 @@ def main():
 
                 "prediction":
                     prediction,
+
+                "recommendation":
+                    recommendation,
             }
 
             print_prediction(
@@ -436,7 +757,9 @@ def main():
         try:
 
             backtest_result = (
-                multi_window_backtest(rows)
+                multi_window_backtest(
+                    rows
+                )
             )
 
             backtests[lottery_key] = {
