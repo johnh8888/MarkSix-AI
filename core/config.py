@@ -2,9 +2,9 @@
 
 """
 六合彩 AI V3.0
-全局配置
+核心配置
 
-V3.0 核心：
+V3.0 特点：
 
 1. 动态 12 / 36 / 120 窗口
 2. Walk-Forward
@@ -12,6 +12,7 @@ V3.0 核心：
 4. 动态模块权重
 5. 波色转移模型
 6. 概率校准
+7. 防止未来数据泄漏
 """
 
 from pathlib import Path
@@ -24,6 +25,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DATA_DIR = BASE_DIR / "data"
+
 OUTPUT_DIR = BASE_DIR / "output"
 
 DATA_DIR.mkdir(
@@ -38,7 +40,7 @@ OUTPUT_DIR.mkdir(
 
 
 # =========================================================
-# 数据库
+# SQLite
 # =========================================================
 
 DB_FILE = DATA_DIR / "lottery.db"
@@ -49,13 +51,8 @@ DB_FILE = DATA_DIR / "lottery.db"
 # =========================================================
 
 API_BASE_URL = (
-    "https://marksix6.net/"
-    "api/lottery_api.php"
-)
-
-HISTORY_API_URL = (
-    "https://marksix6.net/"
-    "index.php?api=1"
+    "https://api3.marksix6.net/"
+    "lottery_api.php"
 )
 
 
@@ -63,43 +60,45 @@ API_SOURCES = {
 
     "hk": {
 
-        "name": "香港六合彩",
+        "name":
+            "香港六合彩",
 
         "url":
-            API_BASE_URL
-            + "?type=hk",
+            API_BASE_URL + "?type=hk",
 
         "wave_field":
             "wave",
-
     },
 
     "newMacau": {
 
-        "name": "新澳门六合彩",
+        "name":
+            "新澳门六合彩",
 
         "url":
-            API_BASE_URL
-            + "?type=newMacau",
+            API_BASE_URL + "?type=newMacau",
 
         "wave_field":
             "wave",
-
     },
 
     "oldMacau": {
 
-        "name": "老澳门六合彩",
+        "name":
+            "老澳门六合彩",
 
         "url":
-            API_BASE_URL
-            + "?type=oldMacau",
+            API_BASE_URL + "?type=oldMacau",
 
         "wave_field":
             "waveColors",
     },
 }
 
+
+# =========================================================
+# 彩种
+# =========================================================
 
 LOTTERIES = {
 
@@ -118,48 +117,26 @@ LOTTERIES = {
 
 
 # =========================================================
-# 动态分析窗口
+# 历史 API
 # =========================================================
 
-SHORT_WINDOW = 12
-
-MEDIUM_WINDOW = 36
-
-LONG_WINDOW = 120
-
-
-# =========================================================
-# 最大历史
-# =========================================================
-
-MAX_HISTORY = 5000
-
-
-# =========================================================
-# 号码范围
-# =========================================================
-
-MIN_NUMBER = 1
-
-MAX_NUMBER = 49
-
-NUMBERS = range(
-    MIN_NUMBER,
-    MAX_NUMBER + 1
+HISTORY_API_URL = (
+    "https://api3.marksix6.net/"
+    "lottery_api.php?type=history"
 )
 
 
-# =========================================================
-# 输出数量
-# =========================================================
+HISTORY_CODE_MAP = {
 
-TOP10_NUMBERS = 10
+    "hk":
+        "hk",
 
-TOP3_NUMBERS = 3
+    "newMacau":
+        "newMacau",
 
-TOP5_ZODIACS = 5
-
-TOP2_PINGTE_ZODIACS = 2
+    "oldMacau":
+        "oldMacau",
+}
 
 
 # =========================================================
@@ -185,24 +162,64 @@ ALLOW_SSL_FALLBACK = True
 
 
 # =========================================================
+# 最大历史数据
+# =========================================================
+
+MAX_HISTORY = 5000
+
+
+# =========================================================
+# V3 动态窗口
+# =========================================================
+
+SHORT_WINDOW = 12
+
+MEDIUM_WINDOW = 36
+
+LONG_WINDOW = 120
+
+
+# =========================================================
+# 最低历史要求
+# =========================================================
+
+MIN_HISTORY_FOR_PREDICTION = 40
+
+MIN_HISTORY_FOR_BACKTEST = 80
+
+
+# =========================================================
+# 输出数量
+# =========================================================
+
+TOP10_NUMBERS = 10
+
+TOP3_NUMBERS = 3
+
+TOP5_ZODIACS = 5
+
+TOP2_PINGTE_ZODIACS = 2
+
+
+# =========================================================
 # Walk Forward
 # =========================================================
 
-# 最少训练数据
-WF_MIN_TRAIN = 80
+# 每次至少使用多少期历史
+WALK_FORWARD_MIN_TRAIN = 60
+
+# 每隔多少期测试一次
+WALK_FORWARD_STEP = 1
 
 # 最大测试次数
-WF_MAX_TESTS = 120
-
-# 每次向前移动多少期
-WF_STEP = 1
+WALK_FORWARD_MAX_TESTS = 500
 
 
 # =========================================================
-# Walk Forward 测试项目
+# 回测目标
 # =========================================================
 
-WF_MODULES = [
+BACKTEST_TARGETS = [
 
     "number",
 
@@ -221,25 +238,22 @@ WF_MODULES = [
 
 
 # =========================================================
-# 权重学习
+# 概率
 # =========================================================
 
-WEIGHT_MIN = 0.04
+# 防止出现 0 / 1 极端概率
+PROBABILITY_FLOOR = 0.02
 
-WEIGHT_MAX = 0.30
-
-WEIGHT_SMOOTHING = 0.65
-
-WEIGHT_FLOOR = 0.02
+PROBABILITY_CEILING = 0.98
 
 
 # =========================================================
-# 概率校准
+# 动态权重
 # =========================================================
 
-CALIBRATION_MIN = 0.03
+WEIGHT_FLOOR = 0.03
 
-CALIBRATION_MAX = 0.97
+WEIGHT_CEILING = 0.30
 
 
 # =========================================================
@@ -254,6 +268,11 @@ PREDICTION_FILE = (
 BACKTEST_FILE = (
     OUTPUT_DIR /
     "backtest.json"
+)
+
+MODEL_FILE = (
+    OUTPUT_DIR /
+    "model_state.json"
 )
 
 
