@@ -1,15 +1,19 @@
-name: MarkSix AI Prediction
+name: 香港六合彩AI智能预测
 
 on:
+
   workflow_dispatch:
 
   schedule:
+
     # 每天 UTC 14:00
-    # 北京 / 香港时间 22:00
+    # 北京/香港时间 22:00
     - cron: "0 14 * * *"
+
 
 permissions:
   contents: write
+
 
 jobs:
 
@@ -20,60 +24,45 @@ jobs:
     steps:
 
       # =====================================================
-      # 1. Checkout
+      # 1. 拉取项目代码
       # =====================================================
 
-      - name: Checkout
+      - name: 拉取项目代码
         uses: actions/checkout@v4
 
 
       # =====================================================
-      # 2. Setup Python
+      # 2. 配置 Python
       # =====================================================
 
-      - name: Setup Python
+      - name: 配置 Python 3.11
         uses: actions/setup-python@v5
+
         with:
           python-version: "3.11"
 
 
       # =====================================================
-      # 3. Install dependencies
+      # 3. 安装依赖
       # =====================================================
 
-      - name: Install dependencies
+      - name: 安装 Python 依赖
         run: |
+
           python -m pip install --upgrade pip
+
           pip install -r requirements.txt
 
 
       # =====================================================
-      # 4. 检查 Python / 项目
+      # 4. 检查开奖 API
       # =====================================================
 
-      - name: Check Project
+      - name: 检查开奖 API
         run: |
-          echo "=========================================="
-          echo "Python版本"
-          echo "=========================================="
 
-          python --version
+          python - <<'PY'
 
-          echo ""
-          echo "=========================================="
-          echo "项目文件"
-          echo "=========================================="
-
-          find . -maxdepth 3 -type f | sort
-
-
-      # =====================================================
-      # 5. 测试 API
-      # =====================================================
-
-      - name: Test API
-        run: |
-          python -c "
           import requests
           import urllib3
 
@@ -82,118 +71,204 @@ jobs:
           )
 
           urls = {
-              'HK': 'https://marksix6.net/api/lottery_api.php?type=hk',
-              'newMacau': 'https://marksix6.net/api/lottery_api.php?type=newMacau',
-              'oldMacau': 'https://marksix6.net/api/lottery_api.php?type=oldMacau',
-              'history': 'https://marksix6.net/index.php?api=1'
+
+              "香港六合彩":
+                  "https://marksix6.net/api/lottery_api.php?type=hk",
+
+              "新澳门六合彩":
+                  "https://marksix6.net/api/lottery_api.php?type=newMacau",
+
+              "老澳门六合彩":
+                  "https://marksix6.net/api/lottery_api.php?type=oldMacau",
+
           }
 
           for name, url in urls.items():
 
               print()
-              print('=' * 70)
-              print('API:', name)
+              print("=" * 70)
+              print(f"检查：{name}")
               print(url)
-              print('=' * 70)
+              print("=" * 70)
 
               try:
 
                   response = requests.get(
                       url,
                       timeout=30,
-                      verify=False
+                      verify=False,
+                      allow_redirects=True
                   )
 
-                  print('HTTP:', response.status_code)
-                  print('Content-Type:', response.headers.get('content-type'))
+                  print(
+                      "HTTP状态码：",
+                      response.status_code
+                  )
 
                   response.raise_for_status()
 
                   data = response.json()
 
-                  if name == 'history':
+                  print(
+                      "API请求成功"
+                  )
 
-                      lottery_data = data.get('lottery_data', [])
-
-                      print(
-                          '历史彩种数量:',
-                          len(lottery_data)
-                      )
-
-                      for item in lottery_data:
-
-                          print(
-                              item.get('name'),
-                              item.get('code'),
-                              item.get('expect')
-                          )
-
-                  else:
-
-                      print(
-                          '期号:',
-                          data.get('expect')
-                      )
-
-                      print(
-                          '开奖号码:',
-                          data.get('openCode')
-                      )
+                  print(
+                      "返回类型：",
+                      type(data).__name__
+                  )
 
               except Exception as e:
 
                   print(
-                      'API错误:',
+                      f"❌ {name} API检查失败：",
                       repr(e)
                   )
-          "
+
+          PY
 
 
       # =====================================================
-      # 6. 初始化 / 更新 / 预测
+      # 5. 检查历史数据 API
       # =====================================================
 
-      - name: Run prediction
+      - name: 检查历史数据 API
         run: |
+
+          python - <<'PY'
+
+          import requests
+          import urllib3
+
+          urllib3.disable_warnings(
+              urllib3.exceptions.InsecureRequestWarning
+          )
+
+          url = (
+              "https://marksix6.net/index.php?api=1"
+          )
+
+          print()
+          print("=" * 70)
+          print("检查历史开奖 API")
+          print(url)
+          print("=" * 70)
+
+          try:
+
+              response = requests.get(
+                  url,
+                  timeout=30,
+                  verify=False,
+                  allow_redirects=True
+              )
+
+              print(
+                  "HTTP状态码：",
+                  response.status_code
+              )
+
+              response.raise_for_status()
+
+              data = response.json()
+
+              print(
+                  "历史 API 请求成功"
+              )
+
+              print(
+                  "返回类型：",
+                  type(data).__name__
+              )
+
+          except Exception as e:
+
+              print(
+                  "❌ 历史 API 检查失败：",
+                  repr(e)
+              )
+
+          PY
+
+
+      # =====================================================
+      # 6. 检查项目文件
+      # =====================================================
+
+      - name: 检查项目文件
+        run: |
+
           echo "=========================================="
-          echo "开始运行六合彩综合预测系统"
+          echo "项目文件"
+          echo "=========================================="
+
+          find . -maxdepth 3 -type f | sort
+
+          echo ""
+          echo "=========================================="
+          echo "Python版本"
+          echo "=========================================="
+
+          python --version
+
+
+      # =====================================================
+      # 7. 运行预测系统
+      # =====================================================
+
+      - name: 运行六合彩AI预测系统
+        run: |
+
+          echo "=========================================="
+          echo "开始运行六合彩AI智能预测系统"
           echo "=========================================="
 
           python main.py
 
 
       # =====================================================
-      # 7. Show database
+      # 8. 显示数据库
       # =====================================================
 
-      - name: Show Data
+      - name: 显示开奖数据库
         run: |
+
           echo "=========================================="
-          echo "Data目录"
+          echo "开奖数据库"
           echo "=========================================="
 
           if [ -d data ]; then
+
             find data -maxdepth 2 -type f -print
+
           else
+
             echo "data目录不存在"
+
           fi
 
 
       # =====================================================
-      # 8. Show prediction
+      # 9. 显示预测和回测
       # =====================================================
 
-      - name: Show Prediction
+      - name: 显示预测与回测结果
         run: |
+
           echo "=========================================="
-          echo "预测结果"
+          echo "AI预测结果"
           echo "=========================================="
 
           if [ -f output/prediction.json ]; then
+
             cat output/prediction.json
+
           else
-            echo "⚠️ output/prediction.json 不存在"
+
+            echo "⚠️ prediction.json 不存在"
+
           fi
+
 
           echo ""
           echo "=========================================="
@@ -201,39 +276,54 @@ jobs:
           echo "=========================================="
 
           if [ -f output/backtest.json ]; then
+
             cat output/backtest.json
+
           else
-            echo "⚠️ output/backtest.json 不存在"
+
+            echo "⚠️ backtest.json 不存在"
+
           fi
 
 
       # =====================================================
-      # 9. Git Status
+      # 10. Git 状态
       # =====================================================
 
-      - name: Git Status
+      - name: 检查 Git 更新
         run: |
+
           echo "=========================================="
-          echo "Git Status"
+          echo "Git 状态"
           echo "=========================================="
 
           git status --short
 
 
       # =====================================================
-      # 10. Commit results
+      # 11. 自动保存结果
       # =====================================================
 
-      - name: Commit results
+      - name: 自动保存预测与回测结果
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git config user.name \
+            "github-actions[bot]"
+
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/ output/
 
           if git diff --cached --quiet; then
+
             echo "没有新的文件需要提交"
+
           else
-            git commit -m "auto: update prediction"
+
+            git commit \
+              -m "自动更新：六合彩预测与回测结果"
+
             git push
+
           fi
