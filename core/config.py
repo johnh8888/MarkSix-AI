@@ -31,39 +31,76 @@ DB_FILE = DATA_DIR / "lottery.db"
 
 
 # =========================================================
+# API
+# =========================================================
+
+API_BASE_URL = (
+    "https://marksix6.net/api/lottery_api.php"
+)
+
+
+# =========================================================
 # 三个真实数据源
+# =========================================================
+#
+# 香港：
+# https://marksix6.net/api/lottery_api.php?type=hk
+#
+# 新澳门：
+# https://marksix6.net/api/lottery_api.php?type=newMacau
+#
+# 老澳门：
+# https://marksix6.net/api/lottery_api.php?type=oldMacau
+#
 # =========================================================
 
 API_SOURCES = {
 
+    # -----------------------------------------------------
+    # 香港六合彩
+    # -----------------------------------------------------
+
     "hk": {
-        "name": "香港六合彩",
+
+        "name":
+            "香港六合彩",
 
         "url":
-            "https://api3.marksix6.net/"
-            "lottery_api.php?type=hk",
+            f"{API_BASE_URL}?type=hk",
 
         "wave_field":
             "wave",
     },
+
+
+    # -----------------------------------------------------
+    # 新澳门六合彩
+    # -----------------------------------------------------
 
     "newMacau": {
-        "name": "新澳门六合彩",
+
+        "name":
+            "新澳门六合彩",
 
         "url":
-            "https://api3.marksix6.net/"
-            "lottery_api.php?type=newMacau",
+            f"{API_BASE_URL}?type=newMacau",
 
         "wave_field":
             "wave",
     },
 
+
+    # -----------------------------------------------------
+    # 老澳门六合彩
+    # -----------------------------------------------------
+
     "oldMacau": {
-        "name": "老澳门六合彩",
+
+        "name":
+            "老澳门六合彩",
 
         "url":
-            "https://api3.marksix6.net/"
-            "lottery_api.php?type=oldMacau",
+            f"{API_BASE_URL}?type=oldMacau",
 
         "wave_field":
             "waveColors",
@@ -78,15 +115,21 @@ API_SOURCES = {
 LOTTERIES = {
 
     "hk": {
-        "name": "香港六合彩",
+
+        "name":
+            "香港六合彩",
     },
 
     "newMacau": {
-        "name": "新澳门六合彩",
+
+        "name":
+            "新澳门六合彩",
     },
 
     "oldMacau": {
-        "name": "老澳门六合彩",
+
+        "name":
+            "老澳门六合彩",
     },
 }
 
@@ -106,11 +149,10 @@ RETRY_SLEEP = 2
 # SSL
 # =========================================================
 
-# 正常情况下必须验证证书
+# 正常情况下验证 HTTPS 证书
 SSL_VERIFY = True
 
-# 如果目标 API 证书临时异常，
-# 是否允许进入受控 fallback
+# 如果证书异常，允许进入 fallback
 ALLOW_SSL_FALLBACK = True
 
 
@@ -159,6 +201,10 @@ BACKTEST_WINDOWS = [
 # 输出文件
 # =========================================================
 
-PREDICTION_FILE = OUTPUT_DIR / "prediction.json"
+PREDICTION_FILE = (
+    OUTPUT_DIR / "prediction.json"
+)
 
-BACKTEST_FILE = OUTPUT_DIR / "backtest.json"
+BACKTEST_FILE = (
+    OUTPUT_DIR / "backtest.json"
+)
