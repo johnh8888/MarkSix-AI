@@ -4,618 +4,775 @@
 六合彩 AI V3.0
 状态识别引擎
 
-状态：
+功能：
 
-normal  正常
-trend   趋势
-chaos   混沌
+1. 当前数据质量检查
+2. 12期短期状态
+3. 36期中期状态
+4. 120期长期状态
+5. 大小偏离
+6. 单双偏离
+7. 波色偏离
+8. 数字波动
+9. 趋势强度
+10. 混沌程度
+11. 自动决定 12/36/120 窗口权重
 
 注意：
-状态识别只使用当前预测时刻以前的数据。
+
+本模块只用于统计建模、回测和概率分析。
+开奖结果具有随机性，不能保证预测结果。
 """
 
 from collections import Counter
-import math
+from math import log
 
-from .features import (
-    NUMBERS,
-    WAVES,
-    safe_special,
+from core.features import (
+    get_special,
     get_size,
     get_odd_even,
     get_wave,
-    special_frequency,
-    wave_entropy,
 )
 
 
 # =========================================================
-# 基础概率
+# 常量
 # =========================================================
 
-def _distribution(
-    rows,
-    classifier
-):
+SHORT_WINDOW = 12
+MEDIUM_WINDOW = 36
+LONG_WINDOW = 120
 
-    counter = Counter()
+
+# =========================================================
+# 基础工具
+# =========================================================
+
+def safe_special(row):
+
+    try:
+
+        n = int(
+            get_special(row)
+        )
+
+        if 1 <= n <= 49:
+            return n
+
+    except Exception:
+        pass
+
+    return None
+
+
+def valid_numbers(rows):
+
+    result = []
 
     for row in rows:
 
-        number = safe_special(row)
+        n = safe_special(row)
 
-        if number is None:
-            continue
-
-        value = classifier(
-            number
-        )
-
-        counter[value] += 1
-
-    total = sum(
-        counter.values()
-    )
-
-    if total <= 0:
-        return {}
-
-    return {
-        key:
-            value / total
-        for key, value
-        in counter.items()
-    }
-
-
-# =========================================================
-# 熵
-# =========================================================
-
-def _entropy(values):
-
-    if not values:
-        return 0.0
-
-    result = 0.0
-
-    for value in values:
-
-        if value <= 0:
-            continue
-
-        result -= (
-            value
-            * math.log(
-                value,
-                2
-            )
-        )
+        if n is not None:
+            result.append(n)
 
     return result
 
 
 # =========================================================
-# 分布偏离
+# 数据质量
 # =========================================================
 
-def _imbalance(
-    distribution,
-    expected
-):
+def data_quality(rows):
 
-    if not distribution:
-        return 0.0
+    if not rows:
 
-    return max(
-        abs(
-            distribution.get(
-                key,
-                0
-            )
-            - expected
-        )
-        for key in distribution
+        return {
+            "valid": False,
+            "count": 0,
+            "quality": 0.0,
+        }
+
+    valid = 0
+
+    for row in rows:
+
+        if safe_special(row) is not None:
+            valid += 1
+
+    ratio = (
+        valid / len(rows)
+        if rows
+        else 0.0
     )
 
+    return {
+        "valid": ratio >= 0.80,
+        "count": valid,
+        "quality": ratio,
+    }
+
 
 # =========================================================
-# 数字集中度
+# 窗口数据
 # =========================================================
 
-def number_concentration(
-    rows,
-    window=36
-):
+def get_windows(rows):
 
-    data = rows[:window]
+    return {
 
-    frequency = special_frequency(
-        data
+        "short":
+            rows[:SHORT_WINDOW],
+
+        "medium":
+            rows[:MEDIUM_WINDOW],
+
+        "long":
+            rows[:LONG_WINDOW],
+
+    }
+
+
+# =========================================================
+# 大小偏离
+# =========================================================
+
+def size_distribution(rows):
+
+    numbers = valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "big": 0.5,
+            "small": 0.5,
+            "deviation": 0.0,
+        }
+
+    big = sum(
+        n >= 25
+        for n in numbers
     )
+
+    small = len(numbers) - big
+
+    big_rate = big / len(numbers)
+    small_rate = small / len(numbers)
+
+    deviation = abs(
+        big_rate - 0.5
+    )
+
+    return {
+        "big": big_rate,
+        "small": small_rate,
+        "deviation": deviation,
+    }
+
+
+# =========================================================
+# 单双偏离
+# =========================================================
+
+def parity_distribution(rows):
+
+    numbers = valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "odd": 0.5,
+            "even": 0.5,
+            "deviation": 0.0,
+        }
+
+    odd = sum(
+        n % 2 == 1
+        for n in numbers
+    )
+
+    even = len(numbers) - odd
+
+    odd_rate = odd / len(numbers)
+    even_rate = even / len(numbers)
+
+    deviation = abs(
+        odd_rate - 0.5
+    )
+
+    return {
+        "odd": odd_rate,
+        "even": even_rate,
+        "deviation": deviation,
+    }
+
+
+# =========================================================
+# 波色分布
+# =========================================================
+
+def wave_distribution(rows):
+
+    numbers = valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "红": 1 / 3,
+            "蓝": 1 / 3,
+            "绿": 1 / 3,
+            "deviation": 0.0,
+        }
+
+    counter = Counter()
+
+    for n in numbers:
+
+        wave = get_wave(n)
+
+        if wave in (
+            "红",
+            "蓝",
+            "绿",
+        ):
+
+            counter[wave] += 1
 
     total = sum(
-        frequency.values()
+        counter.values()
     )
 
-    if total <= 0:
-        return 0.0
+    if total == 0:
 
-    top = sorted(
-        frequency.values(),
-        reverse=True
-    )[:5]
+        return {
+            "红": 1 / 3,
+            "蓝": 1 / 3,
+            "绿": 1 / 3,
+            "deviation": 0.0,
+        }
 
-    return sum(top) / total
+    probs = {
 
+        wave:
+            counter.get(wave, 0)
+            / total
 
-# =========================================================
-# 数字趋势
-# =========================================================
-
-def number_trend_strength(
-    rows
-):
-
-    short = rows[:12]
-
-    medium = rows[:36]
-
-    if len(short) < 5:
-        return 0.0
-
-    if len(medium) < 12:
-        return 0.0
-
-
-    short_freq = special_frequency(
-        short
-    )
-
-    medium_freq = special_frequency(
-        medium
-    )
-
-
-    short_total = sum(
-        short_freq.values()
-    )
-
-    medium_total = sum(
-        medium_freq.values()
-    )
-
-
-    if (
-        short_total <= 0
-        or medium_total <= 0
-    ):
-        return 0.0
-
-
-    differences = []
-
-
-    for number in NUMBERS:
-
-        short_rate = (
-            short_freq.get(
-                number,
-                0
-            )
-            / short_total
+        for wave in (
+            "红",
+            "蓝",
+            "绿",
         )
+    }
 
-        medium_rate = (
-            medium_freq.get(
-                number,
-                0
-            )
-            / medium_total
+    deviation = max(
+        abs(
+            probs[wave] - 1 / 3
         )
-
-
-        differences.append(
-            abs(
-                short_rate
-                - medium_rate
-            )
-        )
-
-
-    # 平均偏离程度
-    value = sum(
-        differences
-    ) / len(
-        differences
+        for wave in probs
     )
 
+    probs["deviation"] = deviation
 
-    # 压缩到 0~1
-    return min(
-        value * 20,
-        1.0
-    )
+    return probs
 
 
 # =========================================================
-# 大小趋势
+# 波色熵
 # =========================================================
 
-def size_trend(
-    rows
-):
+def wave_entropy(rows):
 
-    short = _distribution(
-        rows[:12],
-        get_size
+    distribution = wave_distribution(
+        rows
     )
 
-    medium = _distribution(
-        rows[:36],
-        get_size
-    )
+    entropy = 0.0
 
-
-    if not short or not medium:
-        return 0.0
-
-
-    difference = 0.0
-
-
-    for key in (
-        "大",
-        "小",
+    for wave in (
+        "红",
+        "蓝",
+        "绿",
     ):
 
-        difference += abs(
-            short.get(
-                key,
-                0
-            )
-            -
-            medium.get(
-                key,
-                0
-            )
+        p = distribution.get(
+            wave,
+            0
         )
 
+        if p > 0:
+
+            entropy -= (
+                p * log(p)
+            )
+
+    max_entropy = log(3)
+
+    if max_entropy <= 0:
+        return 0.0
+
+    return entropy / max_entropy
+
+
+# =========================================================
+# 数字平均值
+# =========================================================
+
+def average_number(rows):
+
+    numbers = valid_numbers(rows)
+
+    if not numbers:
+        return 24.5
+
+    return sum(numbers) / len(numbers)
+
+
+# =========================================================
+# 趋势强度
+# =========================================================
+
+def trend_strength(rows):
+
+    numbers = valid_numbers(rows)
+
+    if len(numbers) < 8:
+        return 0.0
+
+    half = len(numbers) // 2
+
+    first = numbers[
+        :half
+    ]
+
+    second = numbers[
+        half:
+    ]
+
+    if not first or not second:
+        return 0.0
+
+    first_avg = (
+        sum(first)
+        / len(first)
+    )
+
+    second_avg = (
+        sum(second)
+        / len(second)
+    )
+
+    difference = (
+        second_avg
+        - first_avg
+    )
+
+    # 归一化
+    strength = abs(
+        difference
+    ) / 24.5
 
     return min(
-        difference,
+        strength,
         1.0
     )
 
 
 # =========================================================
-# 单双趋势
+# 趋势方向
 # =========================================================
 
-def parity_trend(
-    rows
-):
+def trend_direction(rows):
 
-    short = _distribution(
-        rows[:12],
-        get_odd_even
+    numbers = valid_numbers(rows)
+
+    if len(numbers) < 8:
+
+        return "neutral"
+
+    half = len(numbers) // 2
+
+    first = numbers[:half]
+    second = numbers[half:]
+
+    first_avg = (
+        sum(first)
+        / len(first)
     )
 
-    medium = _distribution(
-        rows[:36],
-        get_odd_even
+    second_avg = (
+        sum(second)
+        / len(second)
     )
 
+    difference = (
+        second_avg
+        - first_avg
+    )
 
-    if not short or not medium:
-        return 0.0
+    if difference > 2.5:
+        return "up"
+
+    if difference < -2.5:
+        return "down"
+
+    return "neutral"
 
 
-    difference = 0.0
+# =========================================================
+# 波色连续状态
+# =========================================================
 
+def wave_streak(rows):
 
-    for key in (
-        "单",
-        "双",
+    numbers = valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "wave": None,
+            "length": 0,
+        }
+
+    first_wave = get_wave(
+        numbers[0]
+    )
+
+    if first_wave not in (
+        "红",
+        "蓝",
+        "绿",
     ):
 
-        difference += abs(
-            short.get(
-                key,
-                0
-            )
-            -
-            medium.get(
-                key,
-                0
-            )
-        )
+        return {
+            "wave": None,
+            "length": 0,
+        }
 
+    length = 0
 
-    return min(
-        difference,
-        1.0
-    )
+    for n in numbers:
 
+        if get_wave(n) == first_wave:
+            length += 1
+        else:
+            break
 
-# =========================================================
-# 波色趋势
-# =========================================================
-
-def wave_trend(
-    rows
-):
-
-    short = _distribution(
-        rows[:12],
-        get_wave
-    )
-
-    medium = _distribution(
-        rows[:36],
-        get_wave
-    )
-
-
-    if not short or not medium:
-        return 0.0
-
-
-    difference = 0.0
-
-
-    for wave in WAVES:
-
-        difference += abs(
-            short.get(
-                wave,
-                0
-            )
-            -
-            medium.get(
-                wave,
-                0
-            )
-        )
-
-
-    return min(
-        difference,
-        1.0
-    )
+    return {
+        "wave": first_wave,
+        "length": length,
+    }
 
 
 # =========================================================
-# 综合趋势强度
+# 综合状态
 # =========================================================
 
-def calculate_trend_strength(
-    rows
-):
+def detect_state(rows):
 
-    number_score = (
-        number_trend_strength(
-            rows
-        )
-    )
-
-    size_score = (
-        size_trend(
-            rows
-        )
-    )
-
-    parity_score = (
-        parity_trend(
-            rows
-        )
-    )
-
-    wave_score = (
-        wave_trend(
-            rows
-        )
-    )
-
-
-    result = (
-
-        number_score * 0.40
-
-        +
-
-        size_score * 0.20
-
-        +
-
-        parity_score * 0.20
-
-        +
-
-        wave_score * 0.20
-
-    )
-
-
-    return min(
-        max(
-            result,
-            0.0
-        ),
-        1.0
-    )
-
-
-# =========================================================
-# 混沌程度
-# =========================================================
-
-def calculate_chaos_score(
-    rows
-):
-
-    if len(rows) < 12:
-        return 0.5
-
-
-    wave_e = wave_entropy(
-        rows[:36]
-    )
-
-
-    concentration = (
-        number_concentration(
-            rows,
-            36
-        )
-    )
-
-
-    # 波色越接近均匀，
-    # 熵越高，结构越弱。
-    #
-    # 数字越分散，
-    # 集中度越低，结构越弱。
-
-    wave_chaos = wave_e
-
-    number_chaos = (
-        1.0
-        - min(
-            concentration * 2.5,
-            1.0
-        )
-    )
-
-
-    result = (
-
-        wave_chaos * 0.45
-
-        +
-
-        number_chaos * 0.55
-
-    )
-
-
-    return min(
-        max(
-            result,
-            0.0
-        ),
-        1.0
-    )
-
-
-# =========================================================
-# 状态
-# =========================================================
-
-def detect_state(
-    rows
-):
-
-    if len(rows) < 12:
+    if not rows:
 
         return {
 
-            "state":
-                "unknown",
+            "state": "unknown",
 
-            "label":
-                "数据不足",
+            "confidence": 0.0,
 
-            "confidence":
-                0.0,
+            "trend_strength": 0.0,
 
-            "trend_strength":
-                0.0,
+            "trend_direction": "neutral",
 
-            "chaos_score":
-                1.0,
+            "chaos": 1.0,
+
+            "short_weight": 1 / 3,
+
+            "medium_weight": 1 / 3,
+
+            "long_weight": 1 / 3,
 
         }
 
-
-    trend_strength = (
-        calculate_trend_strength(
-            rows
-        )
+    windows = get_windows(
+        rows
     )
 
+    short_rows = windows[
+        "short"
+    ]
 
-    chaos_score = (
-        calculate_chaos_score(
-            rows
-        )
+    medium_rows = windows[
+        "medium"
+    ]
+
+    long_rows = windows[
+        "long"
+    ]
+
+    quality = data_quality(
+        long_rows
     )
 
+    # -----------------------------------------------------
+    # 趋势
+    # -----------------------------------------------------
+
+    short_trend = trend_strength(
+        short_rows
+    )
+
+    medium_trend = trend_strength(
+        medium_rows
+    )
+
+    long_trend = trend_strength(
+        long_rows
+    )
+
+    trend = (
+        short_trend * 0.55
+        + medium_trend * 0.30
+        + long_trend * 0.15
+    )
+
+    direction = trend_direction(
+        short_rows
+    )
 
     # -----------------------------------------------------
-    # 趋势优先
+    # 大小偏离
     # -----------------------------------------------------
 
-    if (
-        trend_strength >= 0.42
-        and trend_strength > chaos_score
-    ):
+    short_size = size_distribution(
+        short_rows
+    )
+
+    medium_size = size_distribution(
+        medium_rows
+    )
+
+    size_deviation = (
+        short_size["deviation"]
+        * 0.60
+        +
+        medium_size["deviation"]
+        * 0.40
+    )
+
+    # -----------------------------------------------------
+    # 单双偏离
+    # -----------------------------------------------------
+
+    short_parity = parity_distribution(
+        short_rows
+    )
+
+    medium_parity = parity_distribution(
+        medium_rows
+    )
+
+    parity_deviation = (
+        short_parity["deviation"]
+        * 0.60
+        +
+        medium_parity["deviation"]
+        * 0.40
+    )
+
+    # -----------------------------------------------------
+    # 波色偏离
+    # -----------------------------------------------------
+
+    short_wave = wave_distribution(
+        short_rows
+    )
+
+    medium_wave = wave_distribution(
+        medium_rows
+    )
+
+    wave_deviation = (
+        short_wave["deviation"]
+        * 0.60
+        +
+        medium_wave["deviation"]
+        * 0.40
+    )
+
+    # -----------------------------------------------------
+    # 波色熵
+    # -----------------------------------------------------
+
+    entropy = wave_entropy(
+        short_rows
+    )
+
+    # -----------------------------------------------------
+    # 混沌度
+    #
+    # 越接近1：
+    # 越均匀、越难形成明显结构
+    #
+    # 越接近0：
+    # 越容易发现结构
+    # -----------------------------------------------------
+
+    structure = (
+        trend * 0.40
+        +
+        size_deviation * 0.20
+        +
+        parity_deviation * 0.20
+        +
+        wave_deviation * 0.20
+    )
+
+    chaos = 1.0 - min(
+        structure,
+        1.0
+    )
+
+    # 波色熵高时，提高混沌程度
+    chaos = (
+        chaos * 0.70
+        +
+        entropy * 0.30
+    )
+
+    chaos = min(
+        max(
+            chaos,
+            0.0
+        ),
+        1.0
+    )
+
+    # -----------------------------------------------------
+    # 状态识别
+    # -----------------------------------------------------
+
+    if trend >= 0.18:
 
         state = "trend"
 
-        label = "趋势增强"
-
         confidence = min(
             0.55
-            + trend_strength * 0.45,
+            + trend * 1.8,
             0.95
         )
 
-
-    elif chaos_score >= 0.62:
+    elif chaos >= 0.72:
 
         state = "chaos"
 
-        label = "混沌"
-
         confidence = min(
             0.55
-            + chaos_score * 0.40,
-            0.95
+            + (
+                chaos - 0.72
+            ) * 1.5,
+            0.90
         )
-
 
     else:
 
         state = "normal"
 
-        label = "正常"
-
         confidence = (
-            1.0
-            - abs(
-                trend_strength
-                - 0.30
-            )
+            0.55
+            +
+            (
+                1 - abs(
+                    chaos - 0.50
+                )
+            ) * 0.20
         )
 
-
         confidence = min(
-            max(
-                confidence,
-                0.50
-            ),
+            confidence,
             0.90
         )
 
+    # -----------------------------------------------------
+    # 动态窗口权重
+    # -----------------------------------------------------
+
+    if state == "trend":
+
+        short_weight = 0.50
+        medium_weight = 0.30
+        long_weight = 0.20
+
+    elif state == "chaos":
+
+        short_weight = 0.20
+        medium_weight = 0.35
+        long_weight = 0.45
+
+    else:
+
+        short_weight = 0.35
+        medium_weight = 0.35
+        long_weight = 0.30
+
+    # -----------------------------------------------------
+    # 数据不足时自动降低长期权重
+    # -----------------------------------------------------
+
+    if len(long_rows) < LONG_WINDOW:
+
+        short_weight += 0.10
+        medium_weight += 0.05
+        long_weight -= 0.15
+
+    if len(medium_rows) < MEDIUM_WINDOW:
+
+        short_weight += 0.05
+        medium_weight -= 0.05
+
+    # 防止负数
+    short_weight = max(
+        short_weight,
+        0.0
+    )
+
+    medium_weight = max(
+        medium_weight,
+        0.0
+    )
+
+    long_weight = max(
+        long_weight,
+        0.0
+    )
+
+    total = (
+        short_weight
+        + medium_weight
+        + long_weight
+    )
+
+    if total <= 0:
+
+        short_weight = 1 / 3
+        medium_weight = 1 / 3
+        long_weight = 1 / 3
+
+    else:
+
+        short_weight /= total
+        medium_weight /= total
+        long_weight /= total
+
+    # -----------------------------------------------------
+    # 波色连续
+    # -----------------------------------------------------
+
+    streak = wave_streak(
+        short_rows
+    )
 
     return {
 
         "state":
             state,
-
-        "label":
-            label,
 
         "confidence":
             round(
@@ -623,15 +780,69 @@ def detect_state(
                 4
             ),
 
+        "quality":
+            round(
+                quality["quality"],
+                4
+            ),
+
         "trend_strength":
             round(
-                trend_strength,
+                trend,
                 4
             ),
 
-        "chaos_score":
+        "trend_direction":
+            direction,
+
+        "size_deviation":
             round(
-                chaos_score,
+                size_deviation,
+                4
+            ),
+
+        "parity_deviation":
+            round(
+                parity_deviation,
+                4
+            ),
+
+        "wave_deviation":
+            round(
+                wave_deviation,
+                4
+            ),
+
+        "wave_entropy":
+            round(
+                entropy,
+                4
+            ),
+
+        "chaos":
+            round(
+                chaos,
+                4
+            ),
+
+        "wave_streak":
+            streak,
+
+        "short_weight":
+            round(
+                short_weight,
+                4
+            ),
+
+        "medium_weight":
+            round(
+                medium_weight,
+                4
+            ),
+
+        "long_weight":
+            round(
+                long_weight,
                 4
             ),
 
@@ -639,84 +850,45 @@ def detect_state(
 
 
 # =========================================================
-# 动态窗口权重
+# 测试
 # =========================================================
 
-def dynamic_window_weights(
-    state
-):
+if __name__ == "__main__":
 
-    if state == "trend":
+    rows = []
 
-        return {
+    test_numbers = [
+        23, 13, 27, 43,
+        34, 8, 45, 46,
+        49, 29, 12, 18,
+        31, 7, 22, 40,
+        15, 26, 38, 4,
+    ]
 
-            "short":
-                0.50,
+    for index, number in enumerate(
+        test_numbers
+    ):
 
-            "medium":
-                0.30,
+        rows.append({
 
-            "long":
-                0.20,
+            "numbers":
+                f"01,02,03,04,05,06,{number:02d}",
 
-        }
+            "issue":
+                str(2026000 + index),
 
+        })
 
-    if state == "chaos":
+    print("=" * 70)
+    print("六合彩 AI V3.0 状态识别引擎")
+    print("=" * 70)
 
-        return {
-
-            "short":
-                0.20,
-
-            "medium":
-                0.35,
-
-            "long":
-                0.45,
-
-        }
-
-
-    # normal
-
-    return {
-
-        "short":
-            0.35,
-
-        "medium":
-            0.35,
-
-        "long":
-            0.30,
-
-    }
-
-
-# =========================================================
-# 状态完整报告
-# =========================================================
-
-def build_state_report(
-    rows
-):
-
-    state = detect_state(
+    result = detect_state(
         rows
     )
 
+    for key, value in result.items():
 
-    windows = dynamic_window_weights(
-        state["state"]
-    )
-
-
-    return {
-
-        **state,
-
-        "windows":
-            windows,
-
-    }
+        print(
+            f"{key:<20}: {value}"
+        )
