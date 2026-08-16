@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
+import json
 from typing import Any, Dict, List, Optional
 
 from core.config import DB_FILE
@@ -37,7 +38,6 @@ def init_database():
 
     cursor = conn.cursor()
 
-
     # -----------------------------------------------------
     # 开奖数据表
     # -----------------------------------------------------
@@ -72,7 +72,6 @@ def init_database():
         """
     )
 
-
     # -----------------------------------------------------
     # 索引
     # -----------------------------------------------------
@@ -85,7 +84,6 @@ def init_database():
         """
     )
 
-
     cursor.execute(
         """
         CREATE INDEX IF NOT EXISTS
@@ -94,10 +92,139 @@ def init_database():
         """
     )
 
-
     conn.commit()
 
     conn.close()
+
+
+# =========================================================
+# numbers 解析
+# =========================================================
+
+def parse_numbers(value) -> List[int]:
+
+    """
+    将数据库中的 numbers 统一转换为：
+
+        [33, 27, 16, 28, 4, 25, 14]
+
+    支持：
+
+        "33,27,16,28,04,25,14"
+
+        ["33", "27", "16", "28", "04", "25", "14"]
+
+        "[33,27,16,28,4,25,14]"
+    """
+
+    if value is None:
+        return []
+
+    # -----------------------------------------------------
+    # 已经是 list / tuple
+    # -----------------------------------------------------
+
+    if isinstance(value, (list, tuple)):
+
+        result = []
+
+        for item in value:
+
+            try:
+
+                number = int(str(item).strip())
+
+                if 1 <= number <= 49:
+                    result.append(number)
+
+            except (
+                TypeError,
+                ValueError
+            ):
+                continue
+
+        return result
+
+    # -----------------------------------------------------
+    # 字符串
+    # -----------------------------------------------------
+
+    if isinstance(value, str):
+
+        text = value.strip()
+
+        if not text:
+            return []
+
+        # ---------------------------------------------
+        # JSON 数组
+        # ---------------------------------------------
+
+        if text.startswith("["):
+
+            try:
+
+                data = json.loads(text)
+
+                return parse_numbers(data)
+
+            except Exception:
+                pass
+
+        # ---------------------------------------------
+        # 逗号 / 空格 / | 分隔
+        # ---------------------------------------------
+
+        text = (
+            text
+            .replace("，", ",")
+            .replace("|", ",")
+            .replace(" ", ",")
+        )
+
+        parts = [
+            x.strip()
+            for x in text.split(",")
+            if x.strip()
+        ]
+
+        result = []
+
+        for item in parts:
+
+            try:
+
+                number = int(item)
+
+                if 1 <= number <= 49:
+                    result.append(number)
+
+            except (
+                TypeError,
+                ValueError
+            ):
+                continue
+
+        return result
+
+    return []
+
+
+# =========================================================
+# 获取特码
+# =========================================================
+
+def get_special_from_numbers(
+    numbers
+) -> Optional[int]:
+
+    parsed = parse_numbers(numbers)
+
+    if len(parsed) >= 7:
+
+        return parsed[-1]
+
+    return None
 
 
 # =========================================================
@@ -124,7 +251,6 @@ def insert_draw(
     conn = get_connection()
 
     cursor = conn.cursor()
-
 
     cursor.execute(
         """
@@ -158,11 +284,9 @@ def insert_draw(
         )
     )
 
-
     inserted = (
         cursor.rowcount > 0
     )
-
 
     conn.commit()
 
@@ -196,7 +320,6 @@ def upsert_draw(
 
     cursor = conn.cursor()
 
-
     cursor.execute(
         """
         SELECT id
@@ -212,9 +335,7 @@ def upsert_draw(
         )
     )
 
-
     existing = cursor.fetchone()
-
 
     if existing:
 
@@ -248,9 +369,7 @@ def upsert_draw(
             )
         )
 
-
         changed = True
-
 
     else:
 
@@ -286,15 +405,116 @@ def upsert_draw(
             )
         )
 
-
         changed = True
-
 
     conn.commit()
 
     conn.close()
 
     return changed
+
+
+# =========================================================
+# 标准化数据库记录
+# =========================================================
+
+def normalize_draw(
+    row: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    """
+    将 SQLite 原始记录转换成预测器统一格式。
+
+    原始数据库：
+
+        numbers = "33,27,16,28,04,25,14"
+
+    输出：
+
+        numbers = [33,27,16,28,4,25,14]
+        special = 14
+
+    同时保留原始字段。
+    """
+
+    result = dict(row)
+
+    # -----------------------------------------------------
+    # numbers
+    # -----------------------------------------------------
+
+    numbers = parse_numbers(
+        result.get("numbers")
+    )
+
+    result["numbers"] = numbers
+
+    # -----------------------------------------------------
+    # special
+    # -----------------------------------------------------
+
+    special = get_special_from_numbers(
+        numbers
+    )
+
+    result["special"] = special
+
+    # -----------------------------------------------------
+    # openCode
+    # -----------------------------------------------------
+
+    if numbers:
+
+        result["openCode"] = ",".join(
+            f"{n:02d}"
+            for n in numbers
+        )
+
+    else:
+
+        result["openCode"] = ""
+
+    # -----------------------------------------------------
+    # 生肖
+    # -----------------------------------------------------
+
+    zodiac = result.get("zodiac")
+
+    if isinstance(zodiac, str):
+
+        result["zodiac"] = [
+            x.strip()
+            for x in zodiac
+            .replace("，", ",")
+            .split(",")
+            if x.strip()
+        ]
+
+    elif zodiac is None:
+
+        result["zodiac"] = []
+
+    # -----------------------------------------------------
+    # 波色
+    # -----------------------------------------------------
+
+    wave = result.get("wave")
+
+    if isinstance(wave, str):
+
+        result["wave"] = [
+            x.strip()
+            for x in wave
+            .replace("，", ",")
+            .split(",")
+            if x.strip()
+        ]
+
+    elif wave is None:
+
+        result["wave"] = []
+
+    return result
 
 
 # =========================================================
@@ -309,7 +529,6 @@ def get_draws(
     conn = get_connection()
 
     cursor = conn.cursor()
-
 
     cursor.execute(
         """
@@ -344,23 +563,16 @@ def get_draws(
         )
     )
 
-
     rows = cursor.fetchall()
 
     conn.close()
 
-
-    result = []
-
-
-    for row in rows:
-
-        result.append(
+    return [
+        normalize_draw(
             dict(row)
         )
-
-
-    return result
+        for row in rows
+    ]
 
 
 # =========================================================
@@ -374,7 +586,6 @@ def get_all_draws(
     conn = get_connection()
 
     cursor = conn.cursor()
-
 
     cursor.execute(
         """
@@ -408,14 +619,14 @@ def get_all_draws(
         )
     )
 
-
     rows = cursor.fetchall()
 
     conn.close()
 
-
     return [
-        dict(row)
+        normalize_draw(
+            dict(row)
+        )
         for row in rows
     ]
 
@@ -432,7 +643,6 @@ def count_draws(
 
     cursor = conn.cursor()
 
-
     cursor.execute(
         """
         SELECT COUNT(*)
@@ -445,11 +655,9 @@ def count_draws(
         )
     )
 
-
     result = cursor.fetchone()[0]
 
     conn.close()
-
 
     return int(result)
 
@@ -463,7 +671,6 @@ def count_all_draws():
     conn = get_connection()
 
     cursor = conn.cursor()
-
 
     cursor.execute(
         """
@@ -484,11 +691,9 @@ def count_all_draws():
         """
     )
 
-
     rows = cursor.fetchall()
 
     conn.close()
-
 
     return [
 
@@ -520,11 +725,8 @@ def get_latest_draw(
         limit=1
     )
 
-
     if not rows:
-
         return None
-
 
     return rows[0]
 
@@ -541,7 +743,6 @@ def clear_lottery(
 
     cursor = conn.cursor()
 
-
     cursor.execute(
         """
         DELETE FROM draws
@@ -552,7 +753,6 @@ def clear_lottery(
             lottery,
         )
     )
-
 
     conn.commit()
 
@@ -598,3 +798,53 @@ if __name__ == "__main__":
     print(
         database_status()
     )
+
+    # -----------------------------------------------------
+    # 测试最新三彩种
+    # -----------------------------------------------------
+
+    for lottery in (
+        "hk",
+        "newMacau",
+        "oldMacau"
+    ):
+
+        try:
+
+            row = get_latest_draw(
+                lottery
+            )
+
+            if row:
+
+                print()
+                print(
+                    f"{lottery} 最新记录"
+                )
+
+                print(
+                    "期号：",
+                    row.get("issue")
+                )
+
+                print(
+                    "号码：",
+                    row.get("numbers")
+                )
+
+                print(
+                    "特码：",
+                    row.get("special")
+                )
+
+                print(
+                    "openCode：",
+                    row.get("openCode")
+                )
+
+        except Exception as e:
+
+            print(
+                f"{lottery} 测试失败：",
+                repr(e)
+            )
