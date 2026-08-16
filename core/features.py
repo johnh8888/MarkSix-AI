@@ -4,7 +4,7 @@
 六合彩 AI V3.0
 特征计算模块
 
-数据库：
+数据库结构：
 
 draws:
     lottery
@@ -18,12 +18,12 @@ draws:
     created_at
 
 特码：
-    numbers 第 7 个号码
+    numbers 第7个号码
 """
 
 
-from collections import Counter, defaultdict
-from typing import Any, Dict, List, Optional
+from collections import Counter
+from typing import Dict, List, Any
 import math
 
 
@@ -31,13 +31,13 @@ import math
 # 常量
 # =========================================================
 
-NUMBERS = list(range(1, 50))
+NUMBERS = range(1, 50)
 
-WAVES = [
+WAVES = (
     "红",
     "蓝",
     "绿",
-]
+)
 
 
 # =========================================================
@@ -45,42 +45,57 @@ WAVES = [
 # =========================================================
 
 RED = {
-    1, 2, 7, 8, 12, 13,
-    18, 19, 23, 24, 29,
-    30, 34, 35, 40, 45,
-    46
+    1, 2, 7, 8,
+    12, 13,
+    18, 19,
+    23, 24,
+    29, 30,
+    34, 35,
+    40,
+    45, 46,
 }
 
 
 BLUE = {
-    3, 4, 9, 10, 14, 15,
-    20, 25, 26, 31, 36,
-    37, 41, 42, 47, 48
+    3, 4,
+    9, 10,
+    14, 15,
+    20,
+    25, 26,
+    31,
+    36, 37,
+    41, 42,
+    47, 48,
 }
 
 
 GREEN = {
-    5, 6, 11, 16, 17,
-    21, 22, 27, 28, 32,
-    33, 38, 39, 43, 44,
-    49
+    5, 6,
+    11,
+    16, 17,
+    21, 22,
+    27, 28,
+    32, 33,
+    38, 39,
+    43, 44,
+    49,
 }
 
 
 NUMBER_TO_WAVE = {}
 
-for n in RED:
-    NUMBER_TO_WAVE[n] = "红"
+for number in RED:
+    NUMBER_TO_WAVE[number] = "红"
 
-for n in BLUE:
-    NUMBER_TO_WAVE[n] = "蓝"
+for number in BLUE:
+    NUMBER_TO_WAVE[number] = "蓝"
 
-for n in GREEN:
-    NUMBER_TO_WAVE[n] = "绿"
+for number in GREEN:
+    NUMBER_TO_WAVE[number] = "绿"
 
 
 # =========================================================
-# 基础解析
+# 解析号码
 # =========================================================
 
 def parse_numbers(row) -> List[int]:
@@ -89,7 +104,7 @@ def parse_numbers(row) -> List[int]:
         return []
 
     # -----------------------------------------------------
-    # row 可能已经是 list
+    # row 可能已经是 numbers list
     # -----------------------------------------------------
 
     if isinstance(row, (list, tuple)):
@@ -100,53 +115,52 @@ def parse_numbers(row) -> List[int]:
 
             try:
 
-                n = int(
+                number = int(
                     str(item).strip()
                 )
 
-                if 1 <= n <= 49:
-                    result.append(n)
+                if 1 <= number <= 49:
+                    result.append(number)
 
             except Exception:
                 continue
 
         return result
+
 
     # -----------------------------------------------------
     # row 字典
     # -----------------------------------------------------
 
-    try:
-        value = row["numbers"]
-    except Exception:
-        return []
+    if isinstance(row, dict):
+
+        value = row.get(
+            "numbers"
+        )
+
+    else:
+
+        try:
+            value = row["numbers"]
+
+        except Exception:
+            return []
+
 
     if value is None:
         return []
 
+
     # -----------------------------------------------------
-    # list
+    # numbers 本身是 list
     # -----------------------------------------------------
 
     if isinstance(value, (list, tuple)):
 
-        result = []
+        return parse_numbers(
+            value
+        )
 
-        for item in value:
-
-            try:
-
-                n = int(
-                    str(item).strip()
-                )
-
-                if 1 <= n <= 49:
-                    result.append(n)
-
-            except Exception:
-                continue
-
-        return result
 
     # -----------------------------------------------------
     # 字符串
@@ -157,6 +171,7 @@ def parse_numbers(row) -> List[int]:
     if not text:
         return []
 
+
     text = (
         text
         .replace("，", ",")
@@ -165,9 +180,12 @@ def parse_numbers(row) -> List[int]:
         .replace(" ", ",")
     )
 
+
+    parts = text.split(",")
+
     result = []
 
-    for item in text.split(","):
+    for item in parts:
 
         item = item.strip()
 
@@ -176,13 +194,14 @@ def parse_numbers(row) -> List[int]:
 
         try:
 
-            n = int(item)
+            number = int(item)
 
-            if 1 <= n <= 49:
-                result.append(n)
+            if 1 <= number <= 49:
+                result.append(number)
 
         except Exception:
             continue
+
 
     return result
 
@@ -196,58 +215,257 @@ def get_special(row) -> int:
     numbers = parse_numbers(row)
 
     if len(numbers) >= 7:
+
         return numbers[6]
+
+
+    # 兼容 future special 字段
+
+    try:
+
+        value = row.get(
+            "special"
+        )
+
+        if value is not None:
+
+            number = int(value)
+
+            if 1 <= number <= 49:
+                return number
+
+    except Exception:
+        pass
+
 
     return 0
 
 
 # =========================================================
-# 所有号码
+# 全部号码
 # =========================================================
 
-def get_all_numbers(row) -> List[int]:
+def get_all_numbers(row):
 
     return parse_numbers(row)
+
+
+# =========================================================
+# 安全获取特码
+# =========================================================
+
+def safe_special(row):
+
+    number = get_special(row)
+
+    if 1 <= number <= 49:
+        return number
+
+    return None
+
+
+# =========================================================
+# 频率
+# =========================================================
+
+def special_frequency(
+    rows,
+    limit=None
+) -> Dict[int, int]:
+
+    if limit is not None:
+
+        rows = rows[:limit]
+
+
+    counter = Counter()
+
+    for row in rows:
+
+        number = safe_special(row)
+
+        if number is not None:
+
+            counter[number] += 1
+
+
+    return dict(counter)
+
+
+# =========================================================
+# 频率概率
+# =========================================================
+
+def special_frequency_probability(
+    rows,
+    limit=None
+):
+
+    frequency = special_frequency(
+        rows,
+        limit
+    )
+
+
+    total = sum(
+        frequency.values()
+    )
+
+
+    if total <= 0:
+
+        return {
+            n: 1 / 49
+            for n in NUMBERS
+        }
+
+
+    return {
+
+        n:
+            frequency.get(n, 0)
+            / total
+
+        for n in NUMBERS
+
+    }
+
+
+# =========================================================
+# 遗漏
+# =========================================================
+
+def special_omission(
+    rows,
+    limit=120
+):
+
+    rows = rows[:limit]
+
+
+    result = {
+
+        n: len(rows)
+
+        for n in NUMBERS
+
+    }
+
+
+    for index, row in enumerate(rows):
+
+        number = safe_special(row)
+
+        if number is not None:
+
+            # 最新数据 index = 0
+            if result[number] == len(rows):
+
+                result[number] = index
+
+
+    return result
+
+
+# =========================================================
+# 遗漏概率
+# =========================================================
+
+def omission_score(
+    rows,
+    limit=120
+):
+
+    omission = special_omission(
+        rows,
+        limit
+    )
+
+
+    values = list(
+        omission.values()
+    )
+
+
+    if not values:
+
+        return {
+            n: 0.5
+            for n in NUMBERS
+        }
+
+
+    low = min(values)
+
+    high = max(values)
+
+
+    if high == low:
+
+        return {
+            n: 0.5
+            for n in NUMBERS
+        }
+
+
+    # 遗漏不能无限线性增加权重
+    #
+    # 使用 sqrt 压缩极端遗漏
+
+    result = {}
+
+    for number in NUMBERS:
+
+        value = omission[number]
+
+        normalized = (
+            value - low
+        ) / (
+            high - low
+        )
+
+
+        result[number] = math.sqrt(
+            max(normalized, 0)
+        )
+
+
+    return result
 
 
 # =========================================================
 # 大小
 # =========================================================
 
-def get_size(number: int) -> str:
+def get_size(number):
 
-    try:
-        number = int(number)
-    except Exception:
-        return "未知"
-
-    return "大" if number >= 25 else "小"
+    return (
+        "大"
+        if int(number) >= 25
+        else "小"
+    )
 
 
 # =========================================================
 # 单双
 # =========================================================
 
-def get_odd_even(number: int) -> str:
+def get_odd_even(number):
 
-    try:
-        number = int(number)
-    except Exception:
-        return "未知"
-
-    return "单" if number % 2 else "双"
+    return (
+        "单"
+        if int(number) % 2
+        else "双"
+    )
 
 
 # =========================================================
 # 波色
 # =========================================================
 
-def get_wave(number: int) -> str:
+def get_wave(number):
 
-    try:
-        number = int(number)
-    except Exception:
-        return "未知"
+    number = int(number)
 
     return NUMBER_TO_WAVE.get(
         number,
@@ -259,25 +477,16 @@ def get_wave(number: int) -> str:
 # 尾数
 # =========================================================
 
-def get_tail(number: int) -> int:
+def get_tail(number):
 
     return int(number) % 10
-
-
-# =========================================================
-# MOD7
-# =========================================================
-
-def get_mod7(number: int) -> int:
-
-    return int(number) % 7
 
 
 # =========================================================
 # 分区
 # =========================================================
 
-def get_zone(number: int) -> int:
+def get_zone(number):
 
     number = int(number)
 
@@ -300,191 +509,91 @@ def get_zone(number: int) -> int:
 
 
 # =========================================================
-# 特码频率
+# 分类统计
 # =========================================================
 
-def special_frequency(
-    rows,
-    limit: Optional[int] = None
-) -> Dict[int, int]:
-
-    if limit is not None:
-        rows = rows[:limit]
+def special_size_frequency(rows):
 
     counter = Counter()
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
-            counter[n] += 1
-
-    return dict(counter)
-
-
-# =========================================================
-# 特码遗漏
-# =========================================================
-
-def special_omission(
-    rows,
-    limit: int = 120
-) -> Dict[int, int]:
-
-    rows = rows[:limit]
-
-    omission = {
-        n: len(rows)
-        for n in NUMBERS
-    }
-
-    for index, row in enumerate(rows):
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-
-            # 最新出现的距离
-            omission[n] = index
-
-    return omission
-
-
-# =========================================================
-# 特码大小统计
-# =========================================================
-
-def special_size_frequency(
-    rows
-) -> Dict[str, int]:
-
-    counter = Counter()
-
-    for row in rows:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
+        if number is not None:
 
             counter[
-                get_size(n)
+                get_size(number)
             ] += 1
 
     return dict(counter)
 
 
-# =========================================================
-# 特码单双统计
-# =========================================================
-
-def special_parity_frequency(
-    rows
-) -> Dict[str, int]:
+def special_parity_frequency(rows):
 
     counter = Counter()
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
+        if number is not None:
 
             counter[
-                get_odd_even(n)
+                get_odd_even(number)
             ] += 1
 
     return dict(counter)
 
 
-# =========================================================
-# 特码波色统计
-# =========================================================
-
-def special_wave_frequency(
-    rows
-) -> Dict[str, int]:
+def special_wave_frequency(rows):
 
     counter = Counter()
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
+        if number is not None:
 
-            wave = get_wave(n)
+            wave = get_wave(number)
 
             if wave in WAVES:
+
                 counter[wave] += 1
 
     return dict(counter)
 
 
-# =========================================================
-# 尾数统计
-# =========================================================
-
-def special_tail_frequency(
-    rows
-) -> Dict[int, int]:
+def special_tail_frequency(rows):
 
     counter = Counter()
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
+        if number is not None:
 
             counter[
-                get_tail(n)
+                get_tail(number)
             ] += 1
 
     return dict(counter)
 
 
-# =========================================================
-# MOD7
-# =========================================================
-
-def special_mod7_frequency(
-    rows
-) -> Dict[int, int]:
+def special_zone_frequency(rows):
 
     counter = Counter()
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
-
-            counter[
-                get_mod7(n)
-            ] += 1
-
-    return dict(counter)
-
-
-# =========================================================
-# 分区
-# =========================================================
-
-def special_zone_frequency(
-    rows
-) -> Dict[int, int]:
-
-    counter = Counter()
-
-    for row in rows:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
+        if number is not None:
 
             counter[
-                get_zone(n)
+                get_zone(number)
             ] += 1
 
     return dict(counter)
@@ -494,57 +603,41 @@ def special_zone_frequency(
 # 波色序列
 # =========================================================
 
-def get_wave_sequence(
-    rows
-) -> List[str]:
+def wave_sequence(rows):
 
-    result = []
+    sequence = []
 
     for row in rows:
 
-        n = get_special(row)
+        number = safe_special(row)
 
-        if 1 <= n <= 49:
+        if number is None:
+            continue
 
-            wave = get_wave(n)
+        wave = get_wave(number)
 
-            if wave in WAVES:
-                result.append(wave)
+        if wave in WAVES:
 
-    return result
+            sequence.append(wave)
+
+    return sequence
 
 
 # =========================================================
-# 最新波色
+# 当前连续波色
 # =========================================================
 
-def latest_wave(
-    rows
-) -> Optional[str]:
+def current_wave_streak(rows):
 
-    sequence = get_wave_sequence(rows)
+    sequence = wave_sequence(rows)
 
     if not sequence:
-        return None
 
-    return sequence[0]
-
-
-# =========================================================
-# 波色连续长度
-# =========================================================
-
-def wave_streak(
-    rows
-) -> Dict[str, int]:
-
-    sequence = get_wave_sequence(rows)
-
-    if not sequence:
         return {
             "wave": None,
             "length": 0,
         }
+
 
     current = sequence[0]
 
@@ -554,9 +647,9 @@ def wave_streak(
 
         if wave == current:
             length += 1
-
         else:
             break
+
 
     return {
         "wave": current,
@@ -570,55 +663,53 @@ def wave_streak(
 
 def wave_transition_matrix(
     rows
-) -> Dict[str, Dict[str, float]]:
+):
 
-    sequence = get_wave_sequence(rows)
+    sequence = wave_sequence(
+        rows
+    )
 
-    counts = {
 
-        wave: {
-            target: 1.0
+    matrix = {
+
+        source: {
+
+            target: 0
+
             for target in WAVES
+
         }
 
-        for wave in WAVES
+        for source in WAVES
+
     }
 
-    # Laplace smoothing
+
+    if len(sequence) < 2:
+
+        return matrix
+
+
     for i in range(
         len(sequence) - 1
     ):
 
         current = sequence[i]
 
-        next_wave = sequence[i + 1]
+        previous = sequence[i + 1]
+
 
         if (
-            current in WAVES
-            and next_wave in WAVES
+            previous in WAVES
+            and current in WAVES
         ):
 
-            counts[
-                current
+            matrix[
+                previous
             ][
-                next_wave
-            ] += 1.0
+                current
+            ] += 1
 
-    matrix = {}
-
-    for wave in WAVES:
-
-        total = sum(
-            counts[wave].values()
-        )
-
-        matrix[wave] = {
-
-            target:
-                counts[wave][target] / total
-
-            for target in WAVES
-        }
 
     return matrix
 
@@ -629,294 +720,557 @@ def wave_transition_matrix(
 
 def wave_transition_probability(
     rows
-) -> Dict[str, float]:
+):
 
     matrix = wave_transition_matrix(
         rows
     )
 
-    current = latest_wave(rows)
 
-    if current not in WAVES:
+    result = {}
 
-        return {
-            wave: 1 / 3
-            for wave in WAVES
-        }
 
-    return matrix[current]
+    for source in WAVES:
+
+        total = sum(
+            matrix[source].values()
+        )
+
+
+        if total <= 0:
+
+            result[source] = {
+
+                wave:
+                    1 / 3
+
+                for wave in WAVES
+
+            }
+
+        else:
+
+            # Laplace smoothing
+            denominator = (
+                total + 3
+            )
+
+            result[source] = {
+
+                wave:
+                    (
+                        matrix[source][wave]
+                        + 1
+                    )
+                    / denominator
+
+                for wave in WAVES
+
+            }
+
+
+    return result
+
+
+# =========================================================
+# 熵
+# =========================================================
+
+def entropy(
+    probabilities
+):
+
+    values = [
+        p
+        for p in probabilities
+        if p > 0
+    ]
+
+
+    if not values:
+        return 0.0
+
+
+    result = 0.0
+
+    for p in values:
+
+        result -= (
+            p * math.log(
+                p,
+                2
+            )
+        )
+
+
+    return result
 
 
 # =========================================================
 # 波色熵
 # =========================================================
 
-def wave_entropy(
-    rows,
-    limit: int = 36
-) -> float:
+def wave_entropy(rows):
 
-    sequence = get_wave_sequence(
-        rows[:limit]
+    counter = Counter(
+        wave_sequence(rows)
     )
 
-    if not sequence:
+
+    total = sum(
+        counter.values()
+    )
+
+
+    if total <= 0:
         return 1.0
 
-    counter = Counter(sequence)
 
-    total = len(sequence)
+    probabilities = [
 
-    entropy = 0.0
-
-    for wave in WAVES:
-
-        count = counter.get(
+        counter.get(
             wave,
             0
-        )
+        ) / total
 
-        if count <= 0:
-            continue
+        for wave in WAVES
 
-        p = count / total
+    ]
 
-        entropy -= p * math.log(
-            p
-        )
 
-    max_entropy = math.log(3)
+    # 归一化到 0~1
+    value = entropy(
+        probabilities
+    )
 
-    if max_entropy <= 0:
-        return 1.0
 
-    return entropy / max_entropy
+    return value / math.log(
+        3,
+        2
+    )
 
 
 # =========================================================
-# 波色偏离程度
+# 波色近期偏离程度
 # =========================================================
 
 def wave_deviation(
     rows,
-    limit: int = 36
-) -> Dict[str, float]:
+    window=12
+):
 
-    sequence = get_wave_sequence(
-        rows[:limit]
+    data = rows[:window]
+
+    counter = Counter(
+        wave_sequence(data)
     )
 
-    if not sequence:
+
+    total = sum(
+        counter.values()
+    )
+
+
+    if total <= 0:
 
         return {
             wave: 0.0
             for wave in WAVES
         }
 
-    counter = Counter(sequence)
-
-    total = len(sequence)
-
-    result = {}
 
     expected = 1 / 3
 
-    for wave in WAVES:
 
-        actual = (
-            counter.get(
-                wave,
-                0
-            ) / total
+    return {
+
+        wave:
+            (
+                counter.get(
+                    wave,
+                    0
+                ) / total
+            ) - expected
+
+        for wave in WAVES
+
+    }
+
+
+# =========================================================
+# 数字热度
+# =========================================================
+
+def number_hot_score(
+    rows,
+    window
+):
+
+    data = rows[:window]
+
+    frequency = special_frequency(
+        data
+    )
+
+
+    total = sum(
+        frequency.values()
+    )
+
+
+    if total <= 0:
+
+        return {
+            n: 0.0
+            for n in NUMBERS
+        }
+
+
+    return {
+
+        n:
+            frequency.get(n, 0)
+            / total
+
+        for n in NUMBERS
+
+    }
+
+
+# =========================================================
+# 趋势
+# =========================================================
+
+def number_trend_score(
+    rows,
+    short_window=12,
+    medium_window=36
+):
+
+    short = number_hot_score(
+        rows,
+        short_window
+    )
+
+
+    medium = number_hot_score(
+        rows,
+        medium_window
+    )
+
+
+    result = {}
+
+
+    for number in NUMBERS:
+
+        result[number] = (
+            short[number]
+            - medium[number]
         )
 
-        result[wave] = (
-            actual - expected
-        )
 
     return result
 
 
 # =========================================================
-# 波色综合特征
+# 数字尾数概率
 # =========================================================
 
-def wave_features(
-    rows
-) -> Dict[str, Any]:
+def tail_probability(
+    rows,
+    window=36
+):
 
-    sequence = get_wave_sequence(rows)
+    data = rows[:window]
 
-    latest = (
-        sequence[0]
-        if sequence
-        else None
+    counter = Counter()
+
+
+    for row in data:
+
+        number = safe_special(row)
+
+        if number is not None:
+
+            counter[
+                get_tail(number)
+            ] += 1
+
+
+    total = sum(
+        counter.values()
     )
 
-    streak = wave_streak(rows)
 
-    transition = wave_transition_probability(
-        rows
-    )
+    if total <= 0:
 
-    entropy = wave_entropy(
-        rows,
-        limit=36
-    )
+        return {
+            tail: 0.1
+            for tail in range(10)
+        }
 
-    deviation = wave_deviation(
-        rows,
-        limit=36
-    )
 
     return {
 
-        "latest":
-            latest,
+        tail:
+            (
+                counter.get(
+                    tail,
+                    0
+                ) + 1
+            )
+            / (
+                total + 10
+            )
 
-        "streak_wave":
-            streak["wave"],
+        for tail in range(10)
 
-        "streak_length":
-            streak["length"],
-
-        "transition":
-            transition,
-
-        "entropy":
-            entropy,
-
-        "deviation":
-            deviation,
     }
 
 
 # =========================================================
-# 动态窗口
+# 分区概率
 # =========================================================
 
-def dynamic_windows(
-    rows
-) -> Dict[str, List]:
+def zone_probability(
+    rows,
+    window=36
+):
+
+    data = rows[:window]
+
+    counter = Counter()
+
+
+    for row in data:
+
+        number = safe_special(row)
+
+        if number is not None:
+
+            counter[
+                get_zone(number)
+            ] += 1
+
+
+    total = sum(
+        counter.values()
+    )
+
+
+    if total <= 0:
+
+        return {
+            zone:
+                0.2
+            for zone in range(1, 6)
+        }
+
 
     return {
 
-        "short":
-            rows[:12],
+        zone:
+            (
+                counter.get(
+                    zone,
+                    0
+                ) + 1
+            )
+            / (
+                total + 5
+            )
 
-        "medium":
-            rows[:36],
+        for zone in range(1, 6)
 
-        "long":
-            rows[:120],
     }
 
 
 # =========================================================
-# 数据质量
+# 大小概率
 # =========================================================
 
-def data_quality(
-    rows
-) -> Dict[str, Any]:
+def size_probability(
+    rows,
+    window=36
+):
 
-    total = len(rows)
+    data = rows[:window]
 
-    valid = 0
+    counter = Counter()
 
-    invalid = 0
 
-    duplicate_special = 0
+    for row in data:
 
-    previous_issue = None
+        number = safe_special(row)
 
-    issue_order_errors = 0
+        if number is not None:
 
-    for row in rows:
+            counter[
+                get_size(number)
+            ] += 1
 
-        numbers = get_all_numbers(row)
 
-        if len(numbers) >= 7:
-
-            valid += 1
-
-            special = numbers[6]
-
-            if not (
-                1 <= special <= 49
-            ):
-
-                invalid += 1
-
-            if (
-                len(set(numbers[:6]))
-                != len(numbers[:6])
-            ):
-
-                duplicate_special += 1
-
-        else:
-
-            invalid += 1
-
-        issue = row.get(
-            "issue"
-        ) if isinstance(
-            row,
-            dict
-        ) else None
-
-        if issue is not None:
-
-            try:
-
-                current_issue = int(
-                    str(issue)
-                    .replace(
-                        "-",
-                        ""
-                    )
-                )
-
-                if (
-                    previous_issue is not None
-                    and current_issue
-                    > previous_issue
-                ):
-
-                    issue_order_errors += 1
-
-                previous_issue = current_issue
-
-            except Exception:
-                pass
-
-    valid_ratio = (
-        valid / total
-        if total > 0
-        else 0.0
+    total = sum(
+        counter.values()
     )
+
+
+    if total <= 0:
+
+        return {
+            "大": 0.5,
+            "小": 0.5,
+        }
+
 
     return {
 
-        "total":
-            total,
+        "大":
+            (
+                counter["大"] + 1
+            )
+            / (
+                total + 2
+            ),
 
-        "valid":
-            valid,
+        "小":
+            (
+                counter["小"] + 1
+            )
+            / (
+                total + 2
+            ),
 
-        "invalid":
-            invalid,
+    }
 
-        "valid_ratio":
-            valid_ratio,
 
-        "duplicate_main_numbers":
-            duplicate_special,
+# =========================================================
+# 单双概率
+# =========================================================
 
-        "issue_order_errors":
-            issue_order_errors,
+def parity_probability(
+    rows,
+    window=36
+):
 
-        "quality_score":
-            valid_ratio,
+    data = rows[:window]
+
+    counter = Counter()
+
+
+    for row in data:
+
+        number = safe_special(row)
+
+        if number is not None:
+
+            counter[
+                get_odd_even(number)
+            ] += 1
+
+
+    total = sum(
+        counter.values()
+    )
+
+
+    if total <= 0:
+
+        return {
+            "单": 0.5,
+            "双": 0.5,
+        }
+
+
+    return {
+
+        "单":
+            (
+                counter["单"] + 1
+            )
+            / (
+                total + 2
+            ),
+
+        "双":
+            (
+                counter["双"] + 1
+            )
+            / (
+                total + 2
+            ),
+
+    }
+
+
+# =========================================================
+# 特征摘要
+# =========================================================
+
+def build_feature_summary(
+    rows
+):
+
+    return {
+
+        "short_window":
+            12,
+
+        "medium_window":
+            36,
+
+        "long_window":
+            120,
+
+        "size":
+            size_probability(
+                rows,
+                36
+            ),
+
+        "parity":
+            parity_probability(
+                rows,
+                36
+            ),
+
+        "wave":
+            special_wave_frequency(
+                rows[:36]
+            ),
+
+        "wave_entropy":
+            wave_entropy(
+                rows[:36]
+            ),
+
+        "wave_streak":
+            current_wave_streak(
+                rows
+            ),
+
+        "wave_transition":
+            wave_transition_probability(
+                rows[:120]
+            ),
+
+        "wave_deviation":
+            wave_deviation(
+                rows,
+                12
+            ),
+
+        "tail":
+            tail_probability(
+                rows,
+                36
+            ),
+
+        "zone":
+            zone_probability(
+                rows,
+                36
+            ),
+
     }
