@@ -3,18 +3,41 @@
 """
 六合彩 AI V3.0
 特征计算模块
+
+数据库：
+
+draws:
+    lottery
+    name
+    issue
+    open_time
+    numbers
+    zodiac
+    wave
+    source
+    created_at
+
+特码：
+    numbers 第 7 个号码
 """
 
-from collections import Counter
-from math import log
-from typing import Any, Dict, List
+
+from collections import Counter, defaultdict
+from typing import Any, Dict, List, Optional
+import math
 
 
 # =========================================================
 # 常量
 # =========================================================
 
-NUMBERS = range(1, 50)
+NUMBERS = list(range(1, 50))
+
+WAVES = [
+    "红",
+    "蓝",
+    "绿",
+]
 
 
 # =========================================================
@@ -56,15 +79,8 @@ for n in GREEN:
     NUMBER_TO_WAVE[n] = "绿"
 
 
-WAVES = (
-    "红",
-    "蓝",
-    "绿"
-)
-
-
 # =========================================================
-# 解析号码
+# 基础解析
 # =========================================================
 
 def parse_numbers(row) -> List[int]:
@@ -72,13 +88,37 @@ def parse_numbers(row) -> List[int]:
     if row is None:
         return []
 
+    # -----------------------------------------------------
+    # row 可能已经是 list
+    # -----------------------------------------------------
+
+    if isinstance(row, (list, tuple)):
+
+        result = []
+
+        for item in row:
+
+            try:
+
+                n = int(
+                    str(item).strip()
+                )
+
+                if 1 <= n <= 49:
+                    result.append(n)
+
+            except Exception:
+                continue
+
+        return result
+
+    # -----------------------------------------------------
+    # row 字典
+    # -----------------------------------------------------
+
     try:
         value = row["numbers"]
-    except (
-        KeyError,
-        TypeError,
-        IndexError
-    ):
+    except Exception:
         return []
 
     if value is None:
@@ -88,10 +128,7 @@ def parse_numbers(row) -> List[int]:
     # list
     # -----------------------------------------------------
 
-    if isinstance(
-        value,
-        (list, tuple)
-    ):
+    if isinstance(value, (list, tuple)):
 
         result = []
 
@@ -106,16 +143,13 @@ def parse_numbers(row) -> List[int]:
                 if 1 <= n <= 49:
                     result.append(n)
 
-            except (
-                TypeError,
-                ValueError
-            ):
+            except Exception:
                 continue
 
         return result
 
     # -----------------------------------------------------
-    # string
+    # 字符串
     # -----------------------------------------------------
 
     text = str(value).strip()
@@ -131,11 +165,9 @@ def parse_numbers(row) -> List[int]:
         .replace(" ", ",")
     )
 
-    parts = text.split(",")
-
     result = []
 
-    for item in parts:
+    for item in text.split(","):
 
         item = item.strip()
 
@@ -149,7 +181,7 @@ def parse_numbers(row) -> List[int]:
             if 1 <= n <= 49:
                 result.append(n)
 
-        except ValueError:
+        except Exception:
             continue
 
     return result
@@ -166,26 +198,14 @@ def get_special(row) -> int:
     if len(numbers) >= 7:
         return numbers[6]
 
-    try:
-
-        value = row["special"]
-
-        n = int(value)
-
-        if 1 <= n <= 49:
-            return n
-
-    except Exception:
-        pass
-
     return 0
 
 
 # =========================================================
-# 全部号码
+# 所有号码
 # =========================================================
 
-def get_all_numbers(row):
+def get_all_numbers(row) -> List[int]:
 
     return parse_numbers(row)
 
@@ -196,11 +216,12 @@ def get_all_numbers(row):
 
 def get_size(number: int) -> str:
 
-    return (
-        "大"
-        if int(number) >= 25
-        else "小"
-    )
+    try:
+        number = int(number)
+    except Exception:
+        return "未知"
+
+    return "大" if number >= 25 else "小"
 
 
 # =========================================================
@@ -209,11 +230,12 @@ def get_size(number: int) -> str:
 
 def get_odd_even(number: int) -> str:
 
-    return (
-        "单"
-        if int(number) % 2
-        else "双"
-    )
+    try:
+        number = int(number)
+    except Exception:
+        return "未知"
+
+    return "单" if number % 2 else "双"
 
 
 # =========================================================
@@ -222,8 +244,13 @@ def get_odd_even(number: int) -> str:
 
 def get_wave(number: int) -> str:
 
+    try:
+        number = int(number)
+    except Exception:
+        return "未知"
+
     return NUMBER_TO_WAVE.get(
-        int(number),
+        number,
         "未知"
     )
 
@@ -235,6 +262,15 @@ def get_wave(number: int) -> str:
 def get_tail(number: int) -> int:
 
     return int(number) % 10
+
+
+# =========================================================
+# MOD7
+# =========================================================
+
+def get_mod7(number: int) -> int:
+
+    return int(number) % 7
 
 
 # =========================================================
@@ -264,31 +300,13 @@ def get_zone(number: int) -> int:
 
 
 # =========================================================
-# 特码序列
-# =========================================================
-
-def special_sequence(rows):
-
-    result = []
-
-    for row in rows:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-            result.append(n)
-
-    return result
-
-
-# =========================================================
 # 特码频率
 # =========================================================
 
 def special_frequency(
     rows,
-    limit=None
-):
+    limit: Optional[int] = None
+) -> Dict[int, int]:
 
     if limit is not None:
         rows = rows[:limit]
@@ -306,49 +324,13 @@ def special_frequency(
 
 
 # =========================================================
-# 加权近期频率
-# =========================================================
-
-def weighted_special_frequency(
-    rows
-):
-
-    scores = {
-        n: 0.0
-        for n in NUMBERS
-    }
-
-    if not rows:
-        return scores
-
-    total = len(rows)
-
-    for index, row in enumerate(rows):
-
-        n = get_special(row)
-
-        if not 1 <= n <= 49:
-            continue
-
-        # 最新权重最高
-        weight = (
-            (total - index)
-            / total
-        )
-
-        scores[n] += weight
-
-    return scores
-
-
-# =========================================================
-# 遗漏
+# 特码遗漏
 # =========================================================
 
 def special_omission(
     rows,
-    limit=120
-):
+    limit: int = 120
+) -> Dict[int, int]:
 
     rows = rows[:limit]
 
@@ -363,46 +345,19 @@ def special_omission(
 
         if 1 <= n <= 49:
 
-            # 最新数据 index=0
-            # 因此 index 就是当前遗漏
+            # 最新出现的距离
             omission[n] = index
 
     return omission
 
 
 # =========================================================
-# 最近一次出现
-# =========================================================
-
-def last_seen_distance(
-    rows
-):
-
-    result = {}
-
-    for n in NUMBERS:
-        result[n] = len(rows)
-
-    for index, row in enumerate(rows):
-
-        n = get_special(row)
-
-        if n not in result:
-            continue
-
-        if result[n] == len(rows):
-            result[n] = index
-
-    return result
-
-
-# =========================================================
-# 大小统计
+# 特码大小统计
 # =========================================================
 
 def special_size_frequency(
     rows
-):
+) -> Dict[str, int]:
 
     counter = Counter()
 
@@ -411,6 +366,7 @@ def special_size_frequency(
         n = get_special(row)
 
         if 1 <= n <= 49:
+
             counter[
                 get_size(n)
             ] += 1
@@ -419,12 +375,12 @@ def special_size_frequency(
 
 
 # =========================================================
-# 单双统计
+# 特码单双统计
 # =========================================================
 
 def special_parity_frequency(
     rows
-):
+) -> Dict[str, int]:
 
     counter = Counter()
 
@@ -433,6 +389,7 @@ def special_parity_frequency(
         n = get_special(row)
 
         if 1 <= n <= 49:
+
             counter[
                 get_odd_even(n)
             ] += 1
@@ -441,12 +398,12 @@ def special_parity_frequency(
 
 
 # =========================================================
-# 波色统计
+# 特码波色统计
 # =========================================================
 
 def special_wave_frequency(
     rows
-):
+) -> Dict[str, int]:
 
     counter = Counter()
 
@@ -458,19 +415,19 @@ def special_wave_frequency(
 
             wave = get_wave(n)
 
-            if wave != "未知":
+            if wave in WAVES:
                 counter[wave] += 1
 
     return dict(counter)
 
 
 # =========================================================
-# 尾数
+# 尾数统计
 # =========================================================
 
 def special_tail_frequency(
     rows
-):
+) -> Dict[int, int]:
 
     counter = Counter()
 
@@ -488,12 +445,35 @@ def special_tail_frequency(
 
 
 # =========================================================
+# MOD7
+# =========================================================
+
+def special_mod7_frequency(
+    rows
+) -> Dict[int, int]:
+
+    counter = Counter()
+
+    for row in rows:
+
+        n = get_special(row)
+
+        if 1 <= n <= 49:
+
+            counter[
+                get_mod7(n)
+            ] += 1
+
+    return dict(counter)
+
+
+# =========================================================
 # 分区
 # =========================================================
 
 def special_zone_frequency(
     rows
-):
+) -> Dict[int, int]:
 
     counter = Counter()
 
@@ -514,7 +494,9 @@ def special_zone_frequency(
 # 波色序列
 # =========================================================
 
-def wave_sequence(rows):
+def get_wave_sequence(
+    rows
+) -> List[str]:
 
     result = []
 
@@ -533,126 +515,14 @@ def wave_sequence(rows):
 
 
 # =========================================================
-# 波色转移矩阵
+# 最新波色
 # =========================================================
 
-def wave_transition_matrix(
+def latest_wave(
     rows
-):
+) -> Optional[str]:
 
-    """
-    计算：
-
-    红 -> 红 / 蓝 / 绿
-    蓝 -> 红 / 蓝 / 绿
-    绿 -> 红 / 蓝 / 绿
-
-    rows:
-        最新 -> 最旧
-
-    因为方向是：
-        当前旧状态 -> 下一期新状态
-    """
-
-    sequence = wave_sequence(rows)
-
-    matrix = {
-
-        "红": {
-            "红": 0,
-            "蓝": 0,
-            "绿": 0,
-        },
-
-        "蓝": {
-            "红": 0,
-            "蓝": 0,
-            "绿": 0,
-        },
-
-        "绿": {
-            "红": 0,
-            "蓝": 0,
-            "绿": 0,
-        },
-    }
-
-    if len(sequence) < 2:
-        return matrix
-
-    # sequence 是 最新 -> 最旧
-    # 因此反向遍历才是时间正向
-
-    chronological = list(
-        reversed(sequence)
-    )
-
-    for i in range(
-        len(chronological) - 1
-    ):
-
-        current = chronological[i]
-
-        nxt = chronological[i + 1]
-
-        if (
-            current in matrix
-            and nxt in matrix[current]
-        ):
-
-            matrix[current][nxt] += 1
-
-    return matrix
-
-
-# =========================================================
-# 波色转移概率
-# =========================================================
-
-def wave_transition_probability(
-    rows
-):
-
-    matrix = wave_transition_matrix(
-        rows
-    )
-
-    result = {}
-
-    for current in WAVES:
-
-        total = sum(
-            matrix[current].values()
-        )
-
-        if total <= 0:
-
-            result[current] = {
-                wave: 1 / 3
-                for wave in WAVES
-            }
-
-        else:
-
-            result[current] = {
-
-                wave:
-                    matrix[current][wave]
-                    / total
-
-                for wave in WAVES
-            }
-
-    return result
-
-
-# =========================================================
-# 当前波色
-# =========================================================
-
-def current_wave(rows):
-
-    sequence = wave_sequence(rows)
+    sequence = get_wave_sequence(rows)
 
     if not sequence:
         return None
@@ -661,12 +531,14 @@ def current_wave(rows):
 
 
 # =========================================================
-# 连续波色长度
+# 波色连续长度
 # =========================================================
 
-def current_wave_streak(rows):
+def wave_streak(
+    rows
+) -> Dict[str, int]:
 
-    sequence = wave_sequence(rows)
+    sequence = get_wave_sequence(rows)
 
     if not sequence:
         return {
@@ -682,6 +554,7 @@ def current_wave_streak(rows):
 
         if wave == current:
             length += 1
+
         else:
             break
 
@@ -692,51 +565,107 @@ def current_wave_streak(rows):
 
 
 # =========================================================
-# 波色反转率
+# 波色转移矩阵
 # =========================================================
 
-def wave_reversal_rate(rows):
+def wave_transition_matrix(
+    rows
+) -> Dict[str, Dict[str, float]]:
 
-    sequence = wave_sequence(rows)
+    sequence = get_wave_sequence(rows)
 
-    if len(sequence) < 2:
-        return 0.5
+    counts = {
 
-    changes = 0
+        wave: {
+            target: 1.0
+            for target in WAVES
+        }
 
-    total = 0
+        for wave in WAVES
+    }
 
+    # Laplace smoothing
     for i in range(
         len(sequence) - 1
     ):
 
-        total += 1
+        current = sequence[i]
 
-        if sequence[i] != sequence[i + 1]:
-            changes += 1
+        next_wave = sequence[i + 1]
 
-    if total <= 0:
-        return 0.5
+        if (
+            current in WAVES
+            and next_wave in WAVES
+        ):
 
-    return changes / total
+            counts[
+                current
+            ][
+                next_wave
+            ] += 1.0
+
+    matrix = {}
+
+    for wave in WAVES:
+
+        total = sum(
+            counts[wave].values()
+        )
+
+        matrix[wave] = {
+
+            target:
+                counts[wave][target] / total
+
+            for target in WAVES
+        }
+
+    return matrix
+
+
+# =========================================================
+# 波色转移概率
+# =========================================================
+
+def wave_transition_probability(
+    rows
+) -> Dict[str, float]:
+
+    matrix = wave_transition_matrix(
+        rows
+    )
+
+    current = latest_wave(rows)
+
+    if current not in WAVES:
+
+        return {
+            wave: 1 / 3
+            for wave in WAVES
+        }
+
+    return matrix[current]
 
 
 # =========================================================
 # 波色熵
 # =========================================================
 
-def wave_entropy(rows):
+def wave_entropy(
+    rows,
+    limit: int = 36
+) -> float:
 
-    counter = Counter(
-        wave_sequence(rows)
+    sequence = get_wave_sequence(
+        rows[:limit]
     )
 
-    total = sum(
-        counter.values()
-    )
-
-    if total <= 0:
+    if not sequence:
         return 1.0
+
+    counter = Counter(sequence)
+
+    total = len(sequence)
 
     entropy = 0.0
 
@@ -752,93 +681,242 @@ def wave_entropy(rows):
 
         p = count / total
 
-        entropy -= p * log(
+        entropy -= p * math.log(
             p
         )
 
-    # 最大熵 ln(3)
-    max_entropy = log(3)
+    max_entropy = math.log(3)
 
     if max_entropy <= 0:
-        return 0.0
+        return 1.0
 
     return entropy / max_entropy
 
 
 # =========================================================
-# 波色近期偏离
+# 波色偏离程度
 # =========================================================
 
-def wave_deviation(rows):
+def wave_deviation(
+    rows,
+    limit: int = 36
+) -> Dict[str, float]:
 
-    counter = Counter(
-        wave_sequence(rows)
+    sequence = get_wave_sequence(
+        rows[:limit]
     )
 
-    total = sum(
-        counter.values()
-    )
-
-    if total <= 0:
+    if not sequence:
 
         return {
             wave: 0.0
             for wave in WAVES
         }
 
+    counter = Counter(sequence)
+
+    total = len(sequence)
+
+    result = {}
+
+    expected = 1 / 3
+
+    for wave in WAVES:
+
+        actual = (
+            counter.get(
+                wave,
+                0
+            ) / total
+        )
+
+        result[wave] = (
+            actual - expected
+        )
+
+    return result
+
+
+# =========================================================
+# 波色综合特征
+# =========================================================
+
+def wave_features(
+    rows
+) -> Dict[str, Any]:
+
+    sequence = get_wave_sequence(rows)
+
+    latest = (
+        sequence[0]
+        if sequence
+        else None
+    )
+
+    streak = wave_streak(rows)
+
+    transition = wave_transition_probability(
+        rows
+    )
+
+    entropy = wave_entropy(
+        rows,
+        limit=36
+    )
+
+    deviation = wave_deviation(
+        rows,
+        limit=36
+    )
+
     return {
 
-        wave:
-            (
-                counter.get(
-                    wave,
-                    0
-                ) / total
-            ) - (1 / 3)
+        "latest":
+            latest,
 
-        for wave in WAVES
+        "streak_wave":
+            streak["wave"],
+
+        "streak_length":
+            streak["length"],
+
+        "transition":
+            transition,
+
+        "entropy":
+            entropy,
+
+        "deviation":
+            deviation,
     }
 
 
 # =========================================================
-# 连续号码特征
+# 动态窗口
 # =========================================================
 
-def consecutive_features(rows):
-
-    numbers = special_sequence(rows)
-
-    if len(numbers) < 2:
-
-        return {
-            "repeat": 0,
-            "up": 0,
-            "down": 0,
-        }
-
-    repeat = 0
-    up = 0
-    down = 0
-
-    for i in range(
-        len(numbers) - 1
-    ):
-
-        current = numbers[i]
-
-        previous = numbers[i + 1]
-
-        if current == previous:
-            repeat += 1
-
-        elif current > previous:
-            up += 1
-
-        else:
-            down += 1
+def dynamic_windows(
+    rows
+) -> Dict[str, List]:
 
     return {
-        "repeat": repeat,
-        "up": up,
-        "down": down,
+
+        "short":
+            rows[:12],
+
+        "medium":
+            rows[:36],
+
+        "long":
+            rows[:120],
+    }
+
+
+# =========================================================
+# 数据质量
+# =========================================================
+
+def data_quality(
+    rows
+) -> Dict[str, Any]:
+
+    total = len(rows)
+
+    valid = 0
+
+    invalid = 0
+
+    duplicate_special = 0
+
+    previous_issue = None
+
+    issue_order_errors = 0
+
+    for row in rows:
+
+        numbers = get_all_numbers(row)
+
+        if len(numbers) >= 7:
+
+            valid += 1
+
+            special = numbers[6]
+
+            if not (
+                1 <= special <= 49
+            ):
+
+                invalid += 1
+
+            if (
+                len(set(numbers[:6]))
+                != len(numbers[:6])
+            ):
+
+                duplicate_special += 1
+
+        else:
+
+            invalid += 1
+
+        issue = row.get(
+            "issue"
+        ) if isinstance(
+            row,
+            dict
+        ) else None
+
+        if issue is not None:
+
+            try:
+
+                current_issue = int(
+                    str(issue)
+                    .replace(
+                        "-",
+                        ""
+                    )
+                )
+
+                if (
+                    previous_issue is not None
+                    and current_issue
+                    > previous_issue
+                ):
+
+                    issue_order_errors += 1
+
+                previous_issue = current_issue
+
+            except Exception:
+                pass
+
+    valid_ratio = (
+        valid / total
+        if total > 0
+        else 0.0
+    )
+
+    return {
+
+        "total":
+            total,
+
+        "valid":
+            valid,
+
+        "invalid":
+            invalid,
+
+        "valid_ratio":
+            valid_ratio,
+
+        "duplicate_main_numbers":
+            duplicate_special,
+
+        "issue_order_errors":
+            issue_order_errors,
+
+        "quality_score":
+            valid_ratio,
     }
