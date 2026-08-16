@@ -6,332 +6,615 @@
 """
 
 from collections import Counter
-from typing import Dict
-
-from core.config import (
-    SHORT_WINDOW,
-    MEDIUM_WINDOW,
-    LONG_WINDOW,
-)
+from typing import Dict, Any
 
 from core.features import (
     get_special,
     get_size,
     get_odd_even,
     get_wave,
-    wave_entropy,
+    wave_features,
 )
 
 
 # =========================================================
-# 基础比例
+# 基础统计
 # =========================================================
 
-def ratio(
-    value,
-    total
-):
+def _valid_numbers(rows):
 
-    if total <= 0:
+    result = []
+
+    for row in rows:
+
+        n = get_special(row)
+
+        if 1 <= n <= 49:
+            result.append(n)
+
+    return result
+
+
+# =========================================================
+# 大小状态
+# =========================================================
+
+def detect_size_state(
+    rows
+) -> Dict[str, Any]:
+
+    numbers = _valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "state": "unknown",
+            "prob_big": 0.5,
+            "strength": 0.0,
+        }
+
+    big = sum(
+        n >= 25
+        for n in numbers
+    )
+
+    total = len(numbers)
+
+    prob_big = big / total
+
+    deviation = abs(
+        prob_big - 0.5
+    ) * 2
+
+    if prob_big >= 0.65:
+
+        state = "big_hot"
+
+    elif prob_big <= 0.35:
+
+        state = "small_hot"
+
+    else:
+
+        state = "balanced"
+
+    return {
+
+        "state":
+            state,
+
+        "prob_big":
+            prob_big,
+
+        "strength":
+            deviation,
+    }
+
+
+# =========================================================
+# 单双状态
+# =========================================================
+
+def detect_parity_state(
+    rows
+) -> Dict[str, Any]:
+
+    numbers = _valid_numbers(rows)
+
+    if not numbers:
+
+        return {
+            "state": "unknown",
+            "prob_odd": 0.5,
+            "strength": 0.0,
+        }
+
+    odd = sum(
+        n % 2 == 1
+        for n in numbers
+    )
+
+    total = len(numbers)
+
+    prob_odd = odd / total
+
+    deviation = abs(
+        prob_odd - 0.5
+    ) * 2
+
+    if prob_odd >= 0.65:
+
+        state = "odd_hot"
+
+    elif prob_odd <= 0.35:
+
+        state = "even_hot"
+
+    else:
+
+        state = "balanced"
+
+    return {
+
+        "state":
+            state,
+
+        "prob_odd":
+            prob_odd,
+
+        "strength":
+            deviation,
+    }
+
+
+# =========================================================
+# 波色状态
+# =========================================================
+
+def detect_wave_state(
+    rows
+) -> Dict[str, Any]:
+
+    features = wave_features(
+        rows
+    )
+
+    deviation = features[
+        "deviation"
+    ]
+
+    transition = features[
+        "transition"
+    ]
+
+    latest = features[
+        "latest"
+    ]
+
+    streak_length = features[
+        "streak_length"
+    ]
+
+    strongest = max(
+        deviation,
+        key=deviation.get
+    )
+
+    strength = abs(
+        deviation[strongest]
+    )
+
+    if strength >= 0.12:
+
+        state = (
+            f"{strongest}_trend"
+        )
+
+    elif streak_length >= 3:
+
+        state = "streak"
+
+    else:
+
+        state = "balanced"
+
+    return {
+
+        "state":
+            state,
+
+        "latest":
+            latest,
+
+        "streak":
+            streak_length,
+
+        "strength":
+            strength,
+
+        "transition":
+            transition,
+
+        "entropy":
+            features["entropy"],
+    }
+
+
+# =========================================================
+# 数字趋势
+# =========================================================
+
+def detect_number_trend(
+    rows
+) -> Dict[str, Any]:
+
+    short = _valid_numbers(
+        rows[:12]
+    )
+
+    medium = _valid_numbers(
+        rows[:36]
+    )
+
+    long = _valid_numbers(
+        rows[:120]
+    )
+
+    if len(short) < 5:
+
+        return {
+            "state": "unknown",
+            "strength": 0.0,
+        }
+
+    short_avg = (
+        sum(short)
+        / len(short)
+    )
+
+    medium_avg = (
+        sum(medium)
+        / len(medium)
+        if medium
+        else short_avg
+    )
+
+    long_avg = (
+        sum(long)
+        / len(long)
+        if long
+        else medium_avg
+    )
+
+    short_diff = (
+        short_avg
+        - medium_avg
+    )
+
+    medium_diff = (
+        medium_avg
+        - long_avg
+    )
+
+    score = (
+        0.65 * short_diff
+        + 0.35 * medium_diff
+    )
+
+    if score >= 2.5:
+
+        state = "up"
+
+    elif score <= -2.5:
+
+        state = "down"
+
+    else:
+
+        state = "neutral"
+
+    strength = min(
+        abs(score) / 10.0,
+        1.0
+    )
+
+    return {
+
+        "state":
+            state,
+
+        "strength":
+            strength,
+
+        "score":
+            score,
+
+        "short_avg":
+            short_avg,
+
+        "medium_avg":
+            medium_avg,
+
+        "long_avg":
+            long_avg,
+    }
+
+
+# =========================================================
+# 趋势稳定性
+# =========================================================
+
+def trend_stability(
+    rows
+) -> float:
+
+    short = _valid_numbers(
+        rows[:12]
+    )
+
+    medium = _valid_numbers(
+        rows[:36]
+    )
+
+    if len(short) < 5:
         return 0.0
 
-    return value / total
+    if len(medium) < 10:
+        return 0.0
+
+    short_avg = (
+        sum(short)
+        / len(short)
+    )
+
+    medium_avg = (
+        sum(medium)
+        / len(medium)
+    )
+
+    diff = abs(
+        short_avg
+        - medium_avg
+    )
+
+    return min(
+        diff / 8.0,
+        1.0
+    )
 
 
 # =========================================================
-# 状态识别
+# 混沌程度
 # =========================================================
 
-def detect_state(
+def calculate_chaos(
     rows
-) -> Dict:
+) -> float:
 
-    if not rows:
+    numbers = _valid_numbers(
+        rows[:36]
+    )
+
+    if len(numbers) < 10:
+
+        return 1.0
+
+    # -----------------------------------------------------
+    # 号码分布熵
+    # -----------------------------------------------------
+
+    counter = Counter(numbers)
+
+    total = len(numbers)
+
+    entropy = 0.0
+
+    for count in counter.values():
+
+        p = count / total
+
+        entropy -= (
+            p
+            * __import__("math").log(p)
+        )
+
+    max_entropy = __import__(
+        "math"
+    ).log(49)
+
+    number_entropy = (
+        entropy / max_entropy
+        if max_entropy > 0
+        else 1.0
+    )
+
+    # -----------------------------------------------------
+    # 波色熵
+    # -----------------------------------------------------
+
+    wave = wave_features(
+        rows
+    )
+
+    wave_entropy_value = wave[
+        "entropy"
+    ]
+
+    # -----------------------------------------------------
+    # 趋势稳定性
+    # -----------------------------------------------------
+
+    stability = trend_stability(
+        rows
+    )
+
+    # 越没有明显趋势，越混沌
+    trend_chaos = 1.0 - stability
+
+    chaos = (
+        0.40 * number_entropy
+        + 0.30 * wave_entropy_value
+        + 0.30 * trend_chaos
+    )
+
+    return max(
+        0.0,
+        min(
+            1.0,
+            chaos
+        )
+    )
+
+
+# =========================================================
+# 总状态
+# =========================================================
+
+def detect_market_state(
+    rows
+) -> Dict[str, Any]:
+
+    if len(rows) < 12:
 
         return {
 
             "state":
-                "chaos",
+                "unknown",
 
             "confidence":
                 0.0,
 
+            "window_mode":
+                "normal",
+
             "size":
-                "unknown",
+                {},
 
             "parity":
-                "unknown",
+                {},
 
             "wave":
-                "unknown",
+                {},
 
             "trend":
-                "neutral",
+                {},
+
+            "chaos":
+                1.0,
         }
 
-    short = rows[
-        :SHORT_WINDOW
-    ]
 
-    medium = rows[
-        :MEDIUM_WINDOW
-    ]
-
-    # =====================================================
-    # 大小
-    # =====================================================
-
-    size_counter = Counter()
-
-    for row in short:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-
-            size_counter[
-                get_size(n)
-            ] += 1
-
-    size_total = sum(
-        size_counter.values()
+    size = detect_size_state(
+        rows
     )
 
-    if size_total:
-
-        big_ratio = ratio(
-            size_counter["大"],
-            size_total
-        )
-
-        small_ratio = ratio(
-            size_counter["小"],
-            size_total
-        )
-
-        if big_ratio >= 0.67:
-            size_state = "big"
-
-        elif small_ratio >= 0.67:
-            size_state = "small"
-
-        else:
-            size_state = "balanced"
-
-    else:
-
-        size_state = "unknown"
-
-
-    # =====================================================
-    # 单双
-    # =====================================================
-
-    parity_counter = Counter()
-
-    for row in short:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-
-            parity_counter[
-                get_odd_even(n)
-            ] += 1
-
-    parity_total = sum(
-        parity_counter.values()
+    parity = detect_parity_state(
+        rows
     )
 
-    if parity_total:
-
-        odd_ratio = ratio(
-            parity_counter["单"],
-            parity_total
-        )
-
-        even_ratio = ratio(
-            parity_counter["双"],
-            parity_total
-        )
-
-        if odd_ratio >= 0.67:
-            parity_state = "odd"
-
-        elif even_ratio >= 0.67:
-            parity_state = "even"
-
-        else:
-            parity_state = "balanced"
-
-    else:
-
-        parity_state = "unknown"
-
-
-    # =====================================================
-    # 波色
-    # =====================================================
-
-    wave_counter = Counter()
-
-    for row in short:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-
-            wave = get_wave(n)
-
-            if wave != "未知":
-
-                wave_counter[
-                    wave
-                ] += 1
-
-    wave_total = sum(
-        wave_counter.values()
+    wave = detect_wave_state(
+        rows
     )
 
-    if wave_total:
+    trend = detect_number_trend(
+        rows
+    )
 
-        wave, count = (
-            wave_counter
-            .most_common(1)[0]
-        )
-
-        if count / wave_total >= 0.50:
-
-            wave_state = (
-                f"{wave}_hot"
-            )
-
-        else:
-
-            wave_state = "balanced"
-
-    else:
-
-        wave_state = "unknown"
-
-
-    # =====================================================
-    # 数值趋势
-    # =====================================================
-
-    short_numbers = []
-
-    medium_numbers = []
-
-    for row in short:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-            short_numbers.append(n)
-
-    for row in medium:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-            medium_numbers.append(n)
-
-    if short_numbers and medium_numbers:
-
-        short_avg = (
-            sum(short_numbers)
-            / len(short_numbers)
-        )
-
-        medium_avg = (
-            sum(medium_numbers)
-            / len(medium_numbers)
-        )
-
-        delta = (
-            short_avg
-            - medium_avg
-        )
-
-        if delta >= 3:
-            trend_state = "up"
-
-        elif delta <= -3:
-            trend_state = "down"
-
-        else:
-            trend_state = "neutral"
-
-    else:
-
-        trend_state = "neutral"
-
-
-    # =====================================================
-    # 波色熵
-    # =====================================================
-
-    entropy = wave_entropy(
-        short
+    chaos = calculate_chaos(
+        rows
     )
 
 
     # =====================================================
-    # 综合状态
+    # 趋势强度
     # =====================================================
 
-    signals = 0
+    trend_strength = trend.get(
+        "strength",
+        0.0
+    )
 
-    strong_signals = 0
+    size_strength = size.get(
+        "strength",
+        0.0
+    )
 
-    if size_state != "balanced":
-        signals += 1
+    parity_strength = parity.get(
+        "strength",
+        0.0
+    )
 
-    if parity_state != "balanced":
-        signals += 1
+    wave_strength = wave.get(
+        "strength",
+        0.0
+    )
 
-    if wave_state != "balanced":
-        signals += 1
 
-    if trend_state != "neutral":
-        signals += 1
-
-    if entropy < 0.88:
-        strong_signals += 1
+    structural_strength = (
+        0.25 * size_strength
+        + 0.25 * parity_strength
+        + 0.25 * wave_strength
+        + 0.25 * trend_strength
+    )
 
 
     # =====================================================
-    # 状态判断
+    # 最终状态
     # =====================================================
 
-    if strong_signals >= 1 and signals >= 2:
+    if chaos >= 0.78:
+
+        state = "chaos"
+
+        confidence = chaos
+
+        window_mode = "long"
+
+
+    elif (
+        trend_strength >= 0.35
+        or wave_strength >= 0.15
+    ):
 
         state = "trend"
 
-    elif signals == 0 or entropy >= 0.96:
+        confidence = min(
+            0.95,
+            0.50
+            + structural_strength
+        )
 
-        state = "chaos"
+        window_mode = "short"
+
 
     else:
 
         state = "normal"
 
+        confidence = max(
+            0.45,
+            1.0 - chaos
+        )
+
+        window_mode = "balanced"
+
 
     # =====================================================
-    # 置信度
+    # 动态窗口权重
     # =====================================================
 
-    confidence = (
-        0.35
-        + signals * 0.10
-        + strong_signals * 0.10
-    )
+    if state == "trend":
 
-    confidence = min(
-        max(confidence, 0.0),
-        0.95
-    )
+        window_weights = {
+
+            "short": 0.50,
+
+            "medium": 0.30,
+
+            "long": 0.20,
+        }
+
+    elif state == "chaos":
+
+        window_weights = {
+
+            "short": 0.20,
+
+            "medium": 0.35,
+
+            "long": 0.45,
+        }
+
+    else:
+
+        window_weights = {
+
+            "short": 0.35,
+
+            "medium": 0.35,
+
+            "long": 0.30,
+        }
 
 
     return {
@@ -345,95 +628,27 @@ def detect_state(
                 4
             ),
 
+        "window_mode":
+            window_mode,
+
+        "window_weights":
+            window_weights,
+
         "size":
-            size_state,
+            size,
 
         "parity":
-            parity_state,
+            parity,
 
         "wave":
-            wave_state,
+            wave,
 
         "trend":
-            trend_state,
+            trend,
 
-        "wave_entropy":
+        "chaos":
             round(
-                entropy,
+                chaos,
                 4
             ),
     }
-
-
-# =========================================================
-# 动态窗口权重
-# =========================================================
-
-def get_window_weights(
-    state: str
-):
-
-    if state == "trend":
-
-        return {
-
-            "short":
-                0.50,
-
-            "medium":
-                0.30,
-
-            "long":
-                0.20,
-        }
-
-    if state == "chaos":
-
-        return {
-
-            "short":
-                0.20,
-
-            "medium":
-                0.35,
-
-            "long":
-                0.45,
-        }
-
-    return {
-
-        "short":
-            0.35,
-
-        "medium":
-            0.35,
-
-        "long":
-            0.30,
-    }
-
-
-# =========================================================
-# 状态完整信息
-# =========================================================
-
-def analyze_state(
-    rows
-):
-
-    state_info = detect_state(
-        rows
-    )
-
-    window_weights = (
-        get_window_weights(
-            state_info["state"]
-        )
-    )
-
-    state_info[
-        "window_weights"
-    ] = window_weights
-
-    return state_info
