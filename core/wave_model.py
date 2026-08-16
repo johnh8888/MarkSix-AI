@@ -2,606 +2,111 @@
 
 """
 六合彩 AI V3.0
-波色独立模型
+波色动态模型
 
 核心：
 
 1. 波色频率
 2. 波色转移矩阵
-3. 连续状态
-4. 反转
-5. 非反转
-6. 波色熵
-7. 近期偏离
-8. 动态窗口
-9. 单推
-10. 双推
+3. 上一期波色
+4. 连续波色
+5. 反转概率
+6. 非反转概率
+7. 波色熵
+8. 短/中/长期融合
+9. 波色单推
+10. 波色双推
+
+仅用于统计分析和历史回测。
 """
 
 from collections import Counter
 
-from .features import (
-    WAVES,
+from core.features import (
+    get_special,
     get_wave,
-    safe_special,
-    wave_sequence,
-    wave_transition_probability,
-    current_wave_streak,
-    wave_entropy,
-    wave_deviation,
+)
+
+from model.state_engine import (
+    get_windows,
 )
 
 
+WAVES = (
+    "红",
+    "蓝",
+    "绿",
+)
+
+
+def safe_wave(row):
+
+    try:
+
+        number = int(
+            get_special(row)
+        )
+
+        wave = get_wave(
+            number
+        )
+
+        if wave in WAVES:
+            return wave
+
+    except Exception:
+        pass
+
+    return None
+
+
 # =========================================================
-# 基础频率
+# 波色序列
 # =========================================================
 
-def wave_frequency(
-    rows,
-    window
-):
+def get_wave_sequence(rows):
 
-    sequence = wave_sequence(
-        rows[:window]
+    sequence = []
+
+    for row in rows:
+
+        wave = safe_wave(row)
+
+        if wave:
+            sequence.append(
+                wave
+            )
+
+    return sequence
+
+
+# =========================================================
+# 波色频率
+# =========================================================
+
+def wave_frequency(rows):
+
+    sequence = get_wave_sequence(
+        rows
     )
-
 
     counter = Counter(
         sequence
     )
 
+    total = len(sequence)
 
-    total = sum(
-        counter.values()
-    )
-
-
-    if total <= 0:
+    if total == 0:
 
         return {
-
-            wave:
-                1 / 3
-
+            wave: 1 / 3
             for wave in WAVES
-
         }
-
 
     return {
 
         wave:
-            (
-                counter.get(
-                    wave,
-                    0
-                ) + 1
-            )
-            / (
-                total + 3
-            )
-
-        for wave in WAVES
-
-    }
-
-
-# =========================================================
-# 上一期波色
-# =========================================================
-
-def previous_wave(
-    rows
-):
-
-    sequence = wave_sequence(
-        rows
-    )
-
-
-    if not sequence:
-        return None
-
-
-    return sequence[0]
-
-
-# =========================================================
-# 连续状态评分
-# =========================================================
-
-def streak_adjustment(
-    rows
-):
-
-    streak = current_wave_streak(
-        rows
-    )
-
-
-    current = streak[
-        "wave"
-    ]
-
-    length = streak[
-        "length"
-    ]
-
-
-    result = {
-
-        wave:
-            0.0
-
-        for wave in WAVES
-
-    }
-
-
-    if current not in WAVES:
-        return result
-
-
-    # -----------------------------------------------------
-    # 1次：没有明显调整
-    # -----------------------------------------------------
-
-    if length <= 1:
-
-        return result
-
-
-    # -----------------------------------------------------
-    # 2次：
-    # 非当前色略微增加
-    # -----------------------------------------------------
-
-    if length == 2:
-
-        result[current] -= 0.03
-
-        for wave in WAVES:
-
-            if wave != current:
-                result[wave] += 0.015
-
-
-    # -----------------------------------------------------
-    # 3次
-    # -----------------------------------------------------
-
-    elif length == 3:
-
-        result[current] -= 0.06
-
-        for wave in WAVES:
-
-            if wave != current:
-                result[wave] += 0.03
-
-
-    # -----------------------------------------------------
-    # 4次+
-    # -----------------------------------------------------
-
-    else:
-
-        result[current] -= 0.10
-
-        for wave in WAVES:
-
-            if wave != current:
-                result[wave] += 0.05
-
-
-    return result
-
-
-# =========================================================
-# 反转模型
-# =========================================================
-
-def reversal_model(
-    rows
-):
-
-    sequence = wave_sequence(
-        rows
-    )
-
-
-    result = {
-
-        wave:
-            0.0
-
-        for wave in WAVES
-
-    }
-
-
-    if len(sequence) < 3:
-
-        return result
-
-
-    current = sequence[0]
-
-
-    # 统计：
-    #
-    # 当前色之后，
-    # 下一期是否发生变化
-
-    changed = Counter()
-
-    total = Counter()
-
-
-    for index in range(
-        len(sequence) - 1
-    ):
-
-        source = sequence[
-            index
-        ]
-
-        target = sequence[
-            index + 1
-        ]
-
-
-        total[source] += 1
-
-
-        if target != source:
-
-            changed[source] += 1
-
-
-    if current not in total:
-
-        return result
-
-
-    reversal_rate = (
-        changed[current]
-        + 1
-    ) / (
-        total[current]
-        + 2
-    )
-
-
-    # 如果反转概率高，
-    # 当前色降低，
-    # 其他颜色增加。
-
-    result[current] -= (
-        0.12
-        * reversal_rate
-    )
-
-
-    for wave in WAVES:
-
-        if wave != current:
-
-            result[wave] += (
-                0.06
-                * reversal_rate
-            )
-
-
-    return result
-
-
-# =========================================================
-# 非反转模型
-# =========================================================
-
-def continuation_model(
-    rows
-):
-
-    sequence = wave_sequence(
-        rows
-    )
-
-
-    result = {
-
-        wave:
-            0.0
-
-        for wave in WAVES
-
-    }
-
-
-    if len(sequence) < 3:
-        return result
-
-
-    current = sequence[0]
-
-
-    total = 0
-
-    same = 0
-
-
-    for index in range(
-        len(sequence) - 1
-    ):
-
-        source = sequence[
-            index
-        ]
-
-        target = sequence[
-            index + 1
-        ]
-
-
-        if source == current:
-
-            total += 1
-
-            if target == source:
-
-                same += 1
-
-
-    if total <= 0:
-        return result
-
-
-    rate = (
-        same + 1
-    ) / (
-        total + 2
-    )
-
-
-    result[current] += (
-        0.12
-        * rate
-    )
-
-
-    return result
-
-
-# =========================================================
-# 转移模型
-# =========================================================
-
-def transition_model(
-    rows
-):
-
-    transition = (
-        wave_transition_probability(
-            rows[:120]
-        )
-    )
-
-
-    current = previous_wave(
-        rows
-    )
-
-
-    result = {
-
-        wave:
-            1 / 3
-
-        for wave in WAVES
-
-    }
-
-
-    if current not in transition:
-
-        return result
-
-
-    return dict(
-        transition[current]
-    )
-
-
-# =========================================================
-# 综合波色概率
-# =========================================================
-
-def wave_probabilities(
-    rows
-):
-
-    if not rows:
-
-        return {
-
-            wave:
-                1 / 3
-
-            for wave in WAVES
-
-        }
-
-
-    # -----------------------------------------------------
-    # 12 / 36 / 120
-    # -----------------------------------------------------
-
-    short = wave_frequency(
-        rows,
-        12
-    )
-
-
-    medium = wave_frequency(
-        rows,
-        36
-    )
-
-
-    long = wave_frequency(
-        rows,
-        120
-    )
-
-
-    # -----------------------------------------------------
-    # 转移
-    # -----------------------------------------------------
-
-    transition = transition_model(
-        rows
-    )
-
-
-    # -----------------------------------------------------
-    # 连续
-    # -----------------------------------------------------
-
-    streak = streak_adjustment(
-        rows
-    )
-
-
-    # -----------------------------------------------------
-    # 反转
-    # -----------------------------------------------------
-
-    reversal = reversal_model(
-        rows
-    )
-
-
-    # -----------------------------------------------------
-    # 非反转
-    # -----------------------------------------------------
-
-    continuation = continuation_model(
-        rows
-    )
-
-
-    # -----------------------------------------------------
-    # 动态权重
-    # -----------------------------------------------------
-
-    result = {}
-
-
-    for wave in WAVES:
-
-        score = (
-
-            short[wave]
-            * 0.25
-
-            +
-
-            medium[wave]
-            * 0.20
-
-            +
-
-            long[wave]
-            * 0.10
-
-            +
-
-            transition[wave]
-            * 0.30
-
-            +
-
-            0.10
-
-        )
-
-
-        score += (
-            streak[wave]
-            * 0.50
-        )
-
-
-        score += (
-            reversal[wave]
-            * 0.50
-        )
-
-
-        score += (
-            continuation[wave]
-            * 0.50
-        )
-
-
-        result[wave] = max(
-            score,
-            0.0001
-        )
-
-
-    # -----------------------------------------------------
-    # 近期偏离修正
-    # -----------------------------------------------------
-
-    deviation = wave_deviation(
-        rows,
-        12
-    )
-
-
-    for wave in WAVES:
-
-        # 偏离越大，
-        # 对短期过热适度降权。
-
-        result[wave] *= (
-            1.0
-            -
-            max(
-                deviation[wave],
-                0
-            )
-            * 0.20
-        )
-
-
-    # -----------------------------------------------------
-    # 归一化
-    # -----------------------------------------------------
-
-    total = sum(
-        result.values()
-    )
-
-
-    if total <= 0:
-
-        return {
-
-            wave:
-                1 / 3
-
-            for wave in WAVES
-
-        }
-
-
-    return {
-
-        wave:
-            result[wave]
+            counter.get(wave, 0)
             / total
 
         for wave in WAVES
@@ -610,95 +115,539 @@ def wave_probabilities(
 
 
 # =========================================================
-# 双推
+# 转移矩阵
 # =========================================================
 
-def wave_double_pick(
-    probabilities
-):
+def transition_matrix(rows):
+
+    sequence = get_wave_sequence(
+        rows
+    )
+
+    matrix = {
+
+        source: {
+
+            target: 0.0
+            for target in WAVES
+
+        }
+
+        for source in WAVES
+    }
+
+    counts = {
+
+        source: {
+
+            target: 0
+            for target in WAVES
+
+        }
+
+        for source in WAVES
+    }
+
+    if len(sequence) < 2:
+
+        return matrix
+
+    for i in range(
+        len(sequence) - 1
+    ):
+
+        current = sequence[i]
+        next_wave = sequence[i + 1]
+
+        counts[
+            current
+        ][
+            next_wave
+        ] += 1
+
+    for source in WAVES:
+
+        total = sum(
+            counts[source].values()
+        )
+
+        if total == 0:
+
+            for target in WAVES:
+
+                matrix[
+                    source
+                ][
+                    target
+                ] = 1 / 3
+
+        else:
+
+            for target in WAVES:
+
+                matrix[
+                    source
+                ][
+                    target
+                ] = (
+                    counts[
+                        source
+                    ][
+                        target
+                    ]
+                    / total
+                )
+
+    return matrix
+
+
+# =========================================================
+# 当前波色
+# =========================================================
+
+def current_wave(rows):
+
+    sequence = get_wave_sequence(
+        rows
+    )
+
+    if not sequence:
+        return None
+
+    return sequence[0]
+
+
+# =========================================================
+# 连续波色
+# =========================================================
+
+def current_streak(rows):
+
+    sequence = get_wave_sequence(
+        rows
+    )
+
+    if not sequence:
+
+        return {
+            "wave": None,
+            "length": 0,
+        }
+
+    wave = sequence[0]
+
+    length = 0
+
+    for item in sequence:
+
+        if item == wave:
+            length += 1
+        else:
+            break
+
+    return {
+
+        "wave":
+            wave,
+
+        "length":
+            length,
+
+    }
+
+
+# =========================================================
+# 反转统计
+# =========================================================
+
+def reversal_stats(rows):
+
+    sequence = get_wave_sequence(
+        rows
+    )
+
+    if len(sequence) < 2:
+
+        return {
+
+            "reversal":
+                0.5,
+
+            "same":
+                0.5,
+
+        }
+
+    reversal = 0
+    same = 0
+
+    for i in range(
+        len(sequence) - 1
+    ):
+
+        if sequence[i] == sequence[i + 1]:
+
+            same += 1
+
+        else:
+
+            reversal += 1
+
+    total = (
+        reversal
+        + same
+    )
+
+    if total == 0:
+
+        return {
+            "reversal": 0.5,
+            "same": 0.5,
+        }
+
+    return {
+
+        "reversal":
+            reversal / total,
+
+        "same":
+            same / total,
+
+    }
+
+
+# =========================================================
+# 连续长度统计
+# =========================================================
+
+def streak_statistics(rows):
+
+    sequence = get_wave_sequence(
+        rows
+    )
+
+    if not sequence:
+
+        return {
+            1: 1.0,
+            2: 0.0,
+            3: 0.0,
+            4: 0.0,
+        }
+
+    streaks = []
+
+    current = sequence[0]
+    length = 1
+
+    for wave in sequence[1:]:
+
+        if wave == current:
+
+            length += 1
+
+        else:
+
+            streaks.append(
+                length
+            )
+
+            current = wave
+            length = 1
+
+    streaks.append(
+        length
+    )
+
+    counter = Counter(
+        min(length, 4)
+        for length in streaks
+    )
+
+    total = len(streaks)
+
+    return {
+
+        key:
+            counter.get(key, 0)
+            / total
+
+        for key in (
+            1,
+            2,
+            3,
+            4,
+        )
+
+    }
+
+
+# =========================================================
+# 波色熵
+# =========================================================
+
+def entropy(rows):
+
+    import math
+
+    probs = wave_frequency(
+        rows
+    )
+
+    value = 0.0
+
+    for p in probs.values():
+
+        if p > 0:
+
+            value -= (
+                p
+                * math.log(p)
+            )
+
+    maximum = math.log(3)
+
+    if maximum <= 0:
+        return 0.0
+
+    return value / maximum
+
+
+# =========================================================
+# 单窗口评分
+# =========================================================
+
+def score_window(rows):
+
+    if not rows:
+
+        return {
+            wave: 1 / 3
+            for wave in WAVES
+        }
+
+    frequency = wave_frequency(
+        rows
+    )
+
+    matrix = transition_matrix(
+        rows
+    )
+
+    current = current_wave(
+        rows
+    )
+
+    # ---------------------------------------------
+    # 基础频率
+    # ---------------------------------------------
+
+    scores = {
+
+        wave:
+            frequency[wave] * 0.35
+
+        for wave in WAVES
+    }
+
+    # ---------------------------------------------
+    # 转移
+    # ---------------------------------------------
+
+    if current in WAVES:
+
+        for wave in WAVES:
+
+            scores[wave] += (
+                matrix[current][wave]
+                * 0.45
+            )
+
+    # ---------------------------------------------
+    # 反转
+    # ---------------------------------------------
+
+    reversal = reversal_stats(
+        rows
+    )
+
+    if current in WAVES:
+
+        if reversal["reversal"] > 0.5:
+
+            for wave in WAVES:
+
+                if wave != current:
+
+                    scores[wave] += (
+                        reversal["reversal"]
+                        * 0.10
+                        / 2
+                    )
+
+        else:
+
+            scores[current] += (
+                reversal["same"]
+                * 0.10
+            )
+
+    total = sum(
+        scores.values()
+    )
+
+    if total <= 0:
+
+        return {
+            wave: 1 / 3
+            for wave in WAVES
+        }
+
+    return {
+
+        wave:
+            scores[wave] / total
+
+        for wave in WAVES
+
+    }
+
+
+# =========================================================
+# V3 综合波色概率
+# =========================================================
+
+def predict_wave(rows):
+
+    windows = get_windows(
+        rows
+    )
+
+    short = score_window(
+        windows["short"]
+    )
+
+    medium = score_window(
+        windows["medium"]
+    )
+
+    long = score_window(
+        windows["long"]
+    )
+
+    # -----------------------------------------------------
+    # 基础动态窗口
+    # -----------------------------------------------------
+
+    # 这里使用状态引擎给出的动态窗口。
+    # 为避免循环导入，直接按照当前数据结构计算。
+    from model.state_engine import detect_state
+
+    state = detect_state(
+        rows
+    )
+
+    sw = state["short_weight"]
+    mw = state["medium_weight"]
+    lw = state["long_weight"]
+
+    probabilities = {}
+
+    for wave in WAVES:
+
+        probabilities[wave] = (
+
+            short[wave] * sw
+
+            +
+
+            medium[wave] * mw
+
+            +
+
+            long[wave] * lw
+
+        )
+
+    # -----------------------------------------------------
+    # 上一期转移强化
+    # -----------------------------------------------------
+
+    current = current_wave(
+        rows
+    )
+
+    if current in WAVES:
+
+        matrix = transition_matrix(
+            rows
+        )
+
+        for wave in WAVES:
+
+            probabilities[wave] = (
+
+                probabilities[wave]
+                * 0.70
+
+                +
+
+                matrix[current][wave]
+                * 0.30
+
+            )
+
+    # -----------------------------------------------------
+    # 归一化
+    # -----------------------------------------------------
+
+    total = sum(
+        probabilities.values()
+    )
+
+    if total <= 0:
+
+        probabilities = {
+            wave: 1 / 3
+            for wave in WAVES
+        }
+
+    else:
+
+        probabilities = {
+
+            wave:
+                probabilities[wave]
+                / total
+
+            for wave in WAVES
+
+        }
 
     ranking = sorted(
 
         probabilities.items(),
 
-        key=lambda item:
-            item[1],
+        key=lambda x: x[1],
 
         reverse=True
 
     )
 
+    single = ranking[0][0]
 
-    if len(ranking) < 2:
-
-        return []
-
-
-    return [
-
+    double = [
         ranking[0][0],
-
         ranking[1][0],
-
     ]
-
-
-# =========================================================
-# 单推
-# =========================================================
-
-def wave_single_pick(
-    probabilities
-):
-
-    if not probabilities:
-
-        return None
-
-
-    return max(
-
-        probabilities,
-
-        key=probabilities.get
-
-    )
-
-
-# =========================================================
-# 完整波色报告
-# =========================================================
-
-def build_wave_report(
-    rows
-):
-
-    probabilities = (
-        wave_probabilities(
-            rows
-        )
-    )
-
-
-    single = wave_single_pick(
-        probabilities
-    )
-
-
-    double = wave_double_pick(
-        probabilities
-    )
-
-
-    streak = current_wave_streak(
-        rows
-    )
-
 
     return {
 
         "probabilities":
             probabilities,
+
+        "ranking":
+            ranking,
 
         "single":
             single,
@@ -706,22 +655,109 @@ def build_wave_report(
         "double":
             double,
 
-        "previous":
-            previous_wave(
-                rows
-            ),
+        "current_wave":
+            current,
 
         "streak":
-            streak,
+            current_streak(rows),
+
+        "reversal":
+            reversal_stats(rows),
 
         "entropy":
-            wave_entropy(
-                rows[:36]
-            ),
+            entropy(rows),
 
         "transition":
-            wave_transition_probability(
-                rows[:120]
-            ),
+            transition_matrix(rows),
 
     }
+
+
+# =========================================================
+# 测试
+# =========================================================
+
+if __name__ == "__main__":
+
+    rows = []
+
+    numbers = [
+
+        23, 13, 27, 43,
+        34, 8, 45, 46,
+        49, 29, 12, 18,
+        31, 7, 22, 40,
+        15, 26, 38, 4,
+        33, 16, 9, 44,
+
+    ]
+
+    for i, n in enumerate(
+        numbers
+    ):
+
+        rows.append({
+
+            "numbers":
+                f"01,02,03,04,05,06,{n:02d}",
+
+            "issue":
+                str(2026000 + i),
+
+        })
+
+    result = predict_wave(
+        rows
+    )
+
+    print("=" * 70)
+    print("六合彩 AI V3.0 波色模型")
+    print("=" * 70)
+
+    print(
+        "当前波色：",
+        result["current_wave"]
+    )
+
+    print(
+        "连续：",
+        result["streak"]
+    )
+
+    print(
+        "波色单推：",
+        result["single"]
+    )
+
+    print(
+        "波色双推：",
+        " + ".join(
+            result["double"]
+        )
+    )
+
+    print(
+        "\n波色概率："
+    )
+
+    for wave, probability in result[
+        "ranking"
+    ]:
+
+        print(
+            f"{wave}: "
+            f"{probability:.4f}"
+        )
+
+    print(
+        "\n转移矩阵："
+    )
+
+    for source, targets in result[
+        "transition"
+    ].items():
+
+        print(
+            source,
+            targets
+        )
