@@ -1,1 +1,6405 @@
-{}
+{
+  "hk": {
+    "name": "香港六合彩",
+    "generated_at": "2026-08-16T16:47:57.122150",
+    "results": {
+      "100": {
+        "tests": 100,
+        "number_top10_hit_rate": 0.15,
+        "zodiac_top5_hit_rate": 0.37,
+        "pingte_top2_hit_rate": 0.09,
+        "size_hit_rate": 0.45,
+        "parity_hit_rate": 0.53,
+        "details": [
+          {
+            "issue": "2025124",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025125",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2025126",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025127",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025128",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025129",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025130",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2025131",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025132",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2025133",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2025134",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026001",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026002",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026003",
+            "actual_number": 13,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026004",
+            "actual_number": 42,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026005",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026006",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026007",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026008",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026009",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026010",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026011",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026012",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026013",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026014",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026015",
+            "actual_number": 42,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026016",
+            "actual_number": 20,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026017",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026018",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026019",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026020",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026021",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026022",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026023",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026024",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026025",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026026",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026027",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026028",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026029",
+            "actual_number": 13,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026030",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026031",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026032",
+            "actual_number": 7,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026033",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026034",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026035",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026036",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026037",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026038",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026039",
+            "actual_number": 2,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026040",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026041",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026042",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026043",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026044",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026045",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026046",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026047",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026048",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026049",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026050",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026051",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026052",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026053",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026054",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026055",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026056",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026057",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026058",
+            "actual_number": 42,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026059",
+            "actual_number": 20,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026060",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026061",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026062",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026063",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026064",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026065",
+            "actual_number": 24,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026066",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026067",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026068",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026069",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026070",
+            "actual_number": 13,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026071",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026072",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026073",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026074",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026075",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026076",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026077",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026078",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026079",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026080",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026081",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026082",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026083",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026084",
+            "actual_number": 38,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026085",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026086",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026087",
+            "actual_number": 13,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026088",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026089",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          }
+        ]
+      },
+      "300": {
+        "error": "数据不足"
+      },
+      "500": {
+        "error": "数据不足"
+      },
+      "1000": {
+        "error": "数据不足"
+      }
+    }
+  },
+  "newMacau": {
+    "name": "新澳门六合彩",
+    "generated_at": "2026-08-16T16:47:58.692577",
+    "results": {
+      "100": {
+        "tests": 100,
+        "number_top10_hit_rate": 0.23,
+        "zodiac_top5_hit_rate": 0.48,
+        "pingte_top2_hit_rate": 0.22,
+        "size_hit_rate": 0.44,
+        "parity_hit_rate": 0.6,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 49,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 27,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 2,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 6,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 41,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 1,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 1,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 39,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 39,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 49,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 1,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 6,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 17,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 1,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 1,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 17,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          }
+        ]
+      },
+      "300": {
+        "tests": 300,
+        "number_top10_hit_rate": 0.133333,
+        "zodiac_top5_hit_rate": 0.376667,
+        "pingte_top2_hit_rate": 0.156667,
+        "size_hit_rate": 0.456667,
+        "parity_hit_rate": 0.453333,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 33,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 44,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 2,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 6,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 44,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 10,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 41,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 6,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 35,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 43,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          }
+        ]
+      },
+      "500": {
+        "tests": 500,
+        "number_top10_hit_rate": 0.182,
+        "zodiac_top5_hit_rate": 0.402,
+        "pingte_top2_hit_rate": 0.136,
+        "size_hit_rate": 0.49,
+        "parity_hit_rate": 0.472,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 49,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 44,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 31,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 45,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 2,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 6,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 44,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 10,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 7,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 5,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 47,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 31,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 49,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 6,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 14,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          }
+        ]
+      },
+      "1000": {
+        "error": "数据不足"
+      }
+    }
+  },
+  "oldMacau": {
+    "name": "老澳门六合彩",
+    "generated_at": "2026-08-16T16:48:00.271283",
+    "results": {
+      "100": {
+        "tests": 100,
+        "number_top10_hit_rate": 0.21,
+        "zodiac_top5_hit_rate": 0.39,
+        "pingte_top2_hit_rate": 0.19,
+        "size_hit_rate": 0.59,
+        "parity_hit_rate": 0.46,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 39,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 45,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 18,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 18,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 39,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 38,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 33,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 38,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 18,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 30,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 20,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 18,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 48,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 11,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          }
+        ]
+      },
+      "300": {
+        "tests": 300,
+        "number_top10_hit_rate": 0.243333,
+        "zodiac_top5_hit_rate": 0.426667,
+        "pingte_top2_hit_rate": 0.16,
+        "size_hit_rate": 0.566667,
+        "parity_hit_rate": 0.47,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 46,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 15,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 15,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 19,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 48,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 42,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 24,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 24,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 33,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 33,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 27,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 29,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 31,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 26,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 42,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 16,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 17,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 20,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 48,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 47,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          }
+        ]
+      },
+      "500": {
+        "tests": 500,
+        "number_top10_hit_rate": 0.216,
+        "zodiac_top5_hit_rate": 0.412,
+        "pingte_top2_hit_rate": 0.146,
+        "size_hit_rate": 0.554,
+        "parity_hit_rate": 0.496,
+        "details": [
+          {
+            "issue": "2026129",
+            "actual_number": 46,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026130",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026131",
+            "actual_number": 44,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026132",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026133",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026134",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026135",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026136",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026137",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026138",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026139",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026140",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026141",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026142",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026143",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026144",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026145",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026146",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026147",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026148",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026149",
+            "actual_number": 15,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026150",
+            "actual_number": 19,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026151",
+            "actual_number": 48,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026152",
+            "actual_number": 17,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026153",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026154",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026155",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026156",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026157",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026158",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026159",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026160",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026161",
+            "actual_number": 35,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026162",
+            "actual_number": 31,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026163",
+            "actual_number": 27,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026164",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026165",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026166",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026167",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026168",
+            "actual_number": 28,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026169",
+            "actual_number": 39,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026170",
+            "actual_number": 31,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026171",
+            "actual_number": 24,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026172",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026173",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026174",
+            "actual_number": 33,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026175",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026176",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026177",
+            "actual_number": 36,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026178",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026179",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026180",
+            "actual_number": 33,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026181",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026182",
+            "actual_number": 43,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026183",
+            "actual_number": 27,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026184",
+            "actual_number": 37,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026185",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026186",
+            "actual_number": 23,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026187",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026188",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026189",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026190",
+            "actual_number": 13,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026191",
+            "actual_number": 3,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026192",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026193",
+            "actual_number": 40,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026194",
+            "actual_number": 38,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026195",
+            "actual_number": 47,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026196",
+            "actual_number": 12,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026197",
+            "actual_number": 29,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026198",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026199",
+            "actual_number": 22,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026200",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026201",
+            "actual_number": 45,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026202",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026203",
+            "actual_number": 9,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026204",
+            "actual_number": 31,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026205",
+            "actual_number": 21,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026206",
+            "actual_number": 26,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026207",
+            "actual_number": 42,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026208",
+            "actual_number": 4,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026209",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026210",
+            "actual_number": 16,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026211",
+            "actual_number": 17,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026212",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026213",
+            "actual_number": 10,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026214",
+            "actual_number": 8,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026215",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026216",
+            "actual_number": 49,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026217",
+            "actual_number": 34,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026218",
+            "actual_number": 41,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": true,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026219",
+            "actual_number": 25,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026220",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026221",
+            "actual_number": 30,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026222",
+            "actual_number": 20,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026223",
+            "actual_number": 1,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026224",
+            "actual_number": 18,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026225",
+            "actual_number": 48,
+            "number_hit": true,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026226",
+            "actual_number": 47,
+            "number_hit": true,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": true
+          },
+          {
+            "issue": "2026227",
+            "actual_number": 32,
+            "number_hit": false,
+            "zodiac_hit": false,
+            "pingte_zodiac_hit": false,
+            "size_hit": true,
+            "parity_hit": false
+          },
+          {
+            "issue": "2026228",
+            "actual_number": 11,
+            "number_hit": false,
+            "zodiac_hit": true,
+            "pingte_zodiac_hit": false,
+            "size_hit": false,
+            "parity_hit": true
+          }
+        ]
+      },
+      "1000": {
+        "error": "数据不足"
+      }
+    }
+  }
+}

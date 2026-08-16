@@ -1,1 +1,311 @@
-{}
+{
+  "hk": {
+    "name": "香港六合彩",
+    "generated_at": "2026-08-16T16:47:56.997402",
+    "history_count": 277,
+    "prediction": {
+      "top10_numbers": [
+        {
+          "number": 27,
+          "score": 0.790467
+        },
+        {
+          "number": 23,
+          "score": 0.706647
+        },
+        {
+          "number": 13,
+          "score": 0.704415
+        },
+        {
+          "number": 46,
+          "score": 0.60537
+        },
+        {
+          "number": 8,
+          "score": 0.558718
+        },
+        {
+          "number": 43,
+          "score": 0.542394
+        },
+        {
+          "number": 45,
+          "score": 0.528349
+        },
+        {
+          "number": 34,
+          "score": 0.480928
+        },
+        {
+          "number": 44,
+          "score": 0.46769
+        },
+        {
+          "number": 1,
+          "score": 0.426119
+        }
+      ],
+      "top5_zodiac": [
+        {
+          "zodiac": "马",
+          "score": 1.953419
+        },
+        {
+          "zodiac": "猴",
+          "score": 1.634218
+        },
+        {
+          "zodiac": "龙",
+          "score": 1.586781
+        },
+        {
+          "zodiac": "鸡",
+          "score": 1.569989
+        },
+        {
+          "zodiac": "猪",
+          "score": 1.547421
+        }
+      ],
+      "top2_pingte_zodiac": [
+        {
+          "zodiac": "猴",
+          "score": 0.311981
+        },
+        {
+          "zodiac": "马",
+          "score": 0.307053
+        }
+      ],
+      "size": {
+        "prediction": "大",
+        "probability": {
+          "大": 0.52,
+          "小": 0.48
+        }
+      },
+      "parity": {
+        "prediction": "单",
+        "probability": {
+          "单": 0.53,
+          "双": 0.47
+        }
+      },
+      "wave": {
+        "prediction": "红",
+        "probability": {
+          "红": 0.46,
+          "蓝": 0.24,
+          "绿": 0.3
+        }
+      }
+    }
+  },
+  "newMacau": {
+    "name": "新澳门六合彩",
+    "generated_at": "2026-08-16T16:47:57.132615",
+    "history_count": 668,
+    "prediction": {
+      "top10_numbers": [
+        {
+          "number": 1,
+          "score": 0.788533
+        },
+        {
+          "number": 26,
+          "score": 0.622498
+        },
+        {
+          "number": 23,
+          "score": 0.605596
+        },
+        {
+          "number": 17,
+          "score": 0.500687
+        },
+        {
+          "number": 16,
+          "score": 0.480516
+        },
+        {
+          "number": 41,
+          "score": 0.476355
+        },
+        {
+          "number": 37,
+          "score": 0.435354
+        },
+        {
+          "number": 9,
+          "score": 0.433141
+        },
+        {
+          "number": 3,
+          "score": 0.430253
+        },
+        {
+          "number": 15,
+          "score": 0.426129
+        }
+      ],
+      "top5_zodiac": [
+        {
+          "zodiac": "马",
+          "score": 2.233076
+        },
+        {
+          "zodiac": "虎",
+          "score": 1.685593
+        },
+        {
+          "zodiac": "龙",
+          "score": 1.571545
+        },
+        {
+          "zodiac": "鼠",
+          "score": 1.46299
+        },
+        {
+          "zodiac": "猴",
+          "score": 1.439025
+        }
+      ],
+      "top2_pingte_zodiac": [
+        {
+          "zodiac": "马",
+          "score": 0.353631
+        },
+        {
+          "zodiac": "虎",
+          "score": 0.323979
+        }
+      ],
+      "size": {
+        "prediction": "小",
+        "probability": {
+          "大": 0.48,
+          "小": 0.52
+        }
+      },
+      "parity": {
+        "prediction": "单",
+        "probability": {
+          "单": 0.6,
+          "双": 0.4
+        }
+      },
+      "wave": {
+        "prediction": "蓝",
+        "probability": {
+          "红": 0.34,
+          "蓝": 0.39,
+          "绿": 0.27
+        }
+      }
+    }
+  },
+  "oldMacau": {
+    "name": "老澳门六合彩",
+    "generated_at": "2026-08-16T16:47:58.701753",
+    "history_count": 650,
+    "prediction": {
+      "top10_numbers": [
+        {
+          "number": 41,
+          "score": 0.789883
+        },
+        {
+          "number": 18,
+          "score": 0.564055
+        },
+        {
+          "number": 30,
+          "score": 0.552647
+        },
+        {
+          "number": 16,
+          "score": 0.505345
+        },
+        {
+          "number": 10,
+          "score": 0.466392
+        },
+        {
+          "number": 38,
+          "score": 0.465975
+        },
+        {
+          "number": 47,
+          "score": 0.439238
+        },
+        {
+          "number": 26,
+          "score": 0.412929
+        },
+        {
+          "number": 34,
+          "score": 0.411718
+        },
+        {
+          "number": 31,
+          "score": 0.392038
+        }
+      ],
+      "top5_zodiac": [
+        {
+          "zodiac": "牛",
+          "score": 1.752
+        },
+        {
+          "zodiac": "虎",
+          "score": 1.535125
+        },
+        {
+          "zodiac": "鸡",
+          "score": 1.468799
+        },
+        {
+          "zodiac": "兔",
+          "score": 1.407405
+        },
+        {
+          "zodiac": "羊",
+          "score": 1.30603
+        }
+      ],
+      "top2_pingte_zodiac": [
+        {
+          "zodiac": "牛",
+          "score": 0.3406
+        },
+        {
+          "zodiac": "虎",
+          "score": 0.290647
+        }
+      ],
+      "size": {
+        "prediction": "大",
+        "probability": {
+          "大": 0.63,
+          "小": 0.37
+        }
+      },
+      "parity": {
+        "prediction": "双",
+        "probability": {
+          "单": 0.48,
+          "双": 0.52
+        }
+      },
+      "wave": {
+        "prediction": "绿",
+        "probability": {
+          "红": 0.31,
+          "蓝": 0.34,
+          "绿": 0.35
+        }
+      }
+    }
+  }
+}
