@@ -1,7 +1,29 @@
 # -*- coding: utf-8 -*-
 
+"""
+六合彩 AI 智能预测系统 V2.0
+
+工作流：
+
+1. 初始化数据库
+2. 同步在线数据
+3. 分析三个彩种
+4. 自适应49码评分
+5. Top10
+6. Top3
+7. 生肖5肖
+8. 平特2肖
+9. 大小
+10. 单双
+11. 波色单推
+12. 波色双推
+13. Walk-Forward 10/20期
+14. 保存 JSON
+"""
+
 import json
 from datetime import datetime
+
 
 from core.config import (
     LOTTERIES,
@@ -9,18 +31,22 @@ from core.config import (
     BACKTEST_FILE,
 )
 
+
 from core.database import (
     init_database,
     get_draws,
 )
 
+
 from core.data_source import (
     update_all,
 )
 
+
 from core.predictor import (
     generate_prediction,
 )
+
 
 from core.backtest import (
     multi_window_backtest,
@@ -28,15 +54,19 @@ from core.backtest import (
 
 
 # =========================================================
-# JSON 保存
+# JSON
 # =========================================================
 
-def save_json(path, data):
+def save_json(
+    path,
+    data
+):
 
     path.parent.mkdir(
         parents=True,
         exist_ok=True
     )
+
 
     with open(
         path,
@@ -53,37 +83,6 @@ def save_json(path, data):
 
 
 # =========================================================
-# 百分比格式
-# =========================================================
-
-def pct(value):
-
-    try:
-        return f"{float(value):.2%}"
-    except Exception:
-        return "0.00%"
-
-
-# =========================================================
-# 打印号码
-# =========================================================
-
-def print_numbers(items):
-
-    result = []
-
-    for item in items:
-
-        try:
-            number = int(item["number"])
-            result.append(f"{number:02d}")
-        except Exception:
-            pass
-
-    return " ".join(result)
-
-
-# =========================================================
 # 打印预测
 # =========================================================
 
@@ -95,166 +94,209 @@ def print_prediction(
 
     print()
     print("=" * 70)
-    print(f"{lottery_name} ({lottery_key})")
+
+    print(
+        f"{lottery_name} ({lottery_key})"
+    )
+
     print("=" * 70)
 
-    # -----------------------------------------------------
-    # 特码10码
-    # -----------------------------------------------------
+
+    # =====================================================
+    # Top10
+    # =====================================================
 
     top10 = prediction.get(
         "top10_numbers",
         []
     )
 
+
     print()
+
     print("【特码10码】")
-    print(print_numbers(top10))
 
-    # -----------------------------------------------------
-    # 49码排名
-    # -----------------------------------------------------
-
-    ranking = prediction.get(
-        "number_ranking",
-        []
+    print(
+        " ".join(
+            f"{int(item['number']):02d}"
+            for item in top10
+        )
     )
 
+
     print()
+
     print("【49码综合评分 Top10】")
 
+
     for index, item in enumerate(
-        ranking[:10],
+        top10,
         1
     ):
 
-        number = int(
-            item.get("number", 0)
-        )
-
-        score = float(
-            item.get("score", 0)
-        )
-
         print(
-            f"第{index:02d}名  "
-            f"{number:02d}  "
-            f"评分：{score:.4f}"
+            f"第{index:02d}名 "
+            f"{int(item['number']):02d} "
+            f"评分：{item['score']:.4f}"
         )
 
-    # -----------------------------------------------------
-    # 3码
-    # -----------------------------------------------------
+
+    # =====================================================
+    # Top3
+    # =====================================================
 
     top3 = prediction.get(
         "top3_numbers",
         []
     )
 
-    print()
-    print("【下一期3码推荐】")
-    print(print_numbers(top3))
-
-    # -----------------------------------------------------
-    # 第一推荐
-    # -----------------------------------------------------
-
-    first = prediction.get(
-        "first_number",
-        {}
-    )
 
     print()
+
+    print("【下一期重点推荐】")
 
     print(
-        "【第一推荐】"
-        f"{int(first.get('number', 0)):02d}"
-        f"  "
-        f"模型评分："
-        f"{float(first.get('score', 0)):.4f}"
+        " ".join(
+            f"{int(item['number']):02d}"
+            for item in top3
+        )
     )
 
-    # -----------------------------------------------------
-    # 生肖5肖
-    # -----------------------------------------------------
+
+    if top3:
+
+        print(
+            f"第一推荐："
+            f"{int(top3[0]['number']):02d} "
+            f"模型评分："
+            f"{top3[0]['score']:.4f}"
+        )
+
+
+    # =====================================================
+    # 生肖
+    # =====================================================
 
     zodiacs = prediction.get(
         "top5_zodiac",
         []
     )
 
+
     print()
+
     print("【特码生肖5肖】")
 
     print(
         " ".join(
-            str(item.get("zodiac", ""))
+            item["zodiac"]
             for item in zodiacs
         )
     )
 
-    # -----------------------------------------------------
-    # 平特2肖
-    # -----------------------------------------------------
+
+    # =====================================================
+    # 平特
+    # =====================================================
 
     pingte = prediction.get(
         "top2_pingte_zodiac",
         []
     )
 
+
     print()
+
     print("【平特生肖2肖】")
 
     print(
         " ".join(
-            str(item.get("zodiac", ""))
+            item["zodiac"]
             for item in pingte
         )
     )
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # 大小
-    # -----------------------------------------------------
+    # =====================================================
 
     size = prediction.get(
         "size",
         {}
     )
 
+
     print()
+
     print(
-        "【大小】"
-        f"{size.get('prediction', '-')}"
-        f" "
-        f"{size.get('probability', {})}"
+        "【大小】",
+        size.get(
+            "prediction",
+            "-"
+        ),
+        size.get(
+            "probability",
+            {}
+        )
     )
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # 单双
-    # -----------------------------------------------------
+    # =====================================================
 
     parity = prediction.get(
         "parity",
         {}
     )
 
+
     print(
-        "【单双】"
-        f"{parity.get('prediction', '-')}"
-        f" "
-        f"{parity.get('probability', {})}"
+        "【单双】",
+        parity.get(
+            "prediction",
+            "-"
+        ),
+        parity.get(
+            "probability",
+            {}
+        )
     )
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # 波色
-    # -----------------------------------------------------
+    # =====================================================
 
     wave = prediction.get(
         "wave",
         {}
     )
 
+
     print()
+
+    print(
+        "【波色单推】",
+        wave.get(
+            "single",
+            "-"
+        )
+    )
+
+
+    print(
+        "【波色双推】",
+        " + ".join(
+            wave.get(
+                "double",
+                []
+            )
+        )
+    )
+
+
     print(
         "【波色概率】",
         wave.get(
@@ -263,65 +305,28 @@ def print_prediction(
         )
     )
 
-    print(
-        "【波色单推】",
-        wave.get(
-            "single_prediction",
-            "-"
-        )
+
+    # =====================================================
+    # 动态权重
+    # =====================================================
+
+    weights = prediction.get(
+        "dynamic_weights",
+        {}
     )
 
-    print(
-        "【波色双推】",
-        " + ".join(
-            wave.get(
-                "double_prediction",
-                []
-            )
-        )
-    )
-
-    # -----------------------------------------------------
-    # 波色三组合
-    # -----------------------------------------------------
-
-    combinations = wave.get(
-        "double_combinations",
-        []
-    )
-
-    if combinations:
-
-        print()
-        print("【波色双推组合评分】")
-
-        for item in combinations:
-
-            pair = item.get(
-                "pair",
-                []
-            )
-
-            pair_text = " + ".join(
-                pair
-            )
-
-            print(
-                f"{pair_text}："
-                f"{pct(item.get('score', 0))}"
-            )
-
-    # -----------------------------------------------------
-    # 随机基准
-    # -----------------------------------------------------
 
     print()
-    print(
-        "【波色随机基准】"
-        "单推 33.33%"
-        " / "
-        "双推 66.67%"
-    )
+
+    print("【V2.0动态策略权重】")
+
+
+    for name, weight in weights.items():
+
+        print(
+            f"{name:<10}"
+            f"{weight:.4f}"
+        )
 
 
 # =========================================================
@@ -334,12 +339,18 @@ def print_backtest(
 ):
 
     print()
-    print("=" * 70)
-    print(f"{lottery_name} 回测结果")
+
     print("=" * 70)
 
+    print(
+        f"{lottery_name} Walk-Forward回测"
+    )
+
+    print("=" * 70)
+
+
     # -----------------------------------------------------
-    # 只保留10、20
+    # 只保留10 / 20
     # -----------------------------------------------------
 
     for window in [
@@ -352,10 +363,13 @@ def print_backtest(
             {}
         )
 
+
         print()
+
         print(
             f"【最近{window}期】"
         )
+
 
         if "error" in result:
 
@@ -366,6 +380,7 @@ def print_backtest(
 
             continue
 
+
         print(
             "测试期数：",
             result.get(
@@ -374,122 +389,57 @@ def print_backtest(
             )
         )
 
+
         print(
             "特码10码命中率：",
-            pct(
-                result.get(
-                    "number_top10_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('number_top10_hit_rate', 0):.2%}"
         )
+
 
         print(
             "生肖5肖命中率：",
-            pct(
-                result.get(
-                    "zodiac_top5_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('zodiac_top5_hit_rate', 0):.2%}"
         )
+
 
         print(
             "平特2肖命中率：",
-            pct(
-                result.get(
-                    "pingte_top2_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('pingte_top2_hit_rate', 0):.2%}"
         )
+
 
         print(
             "大小命中率：",
-            pct(
-                result.get(
-                    "size_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('size_hit_rate', 0):.2%}"
         )
+
 
         print(
             "单双命中率：",
-            pct(
-                result.get(
-                    "parity_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('parity_hit_rate', 0):.2%}"
         )
+
 
         print(
             "波色单推命中率：",
-            pct(
-                result.get(
-                    "wave_single_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('wave_single_hit_rate', 0):.2%}"
         )
+
 
         print(
             "波色双推命中率：",
-            pct(
-                result.get(
-                    "wave_double_hit_rate",
-                    0
-                )
-            )
+            f"{result.get('wave_double_hit_rate', 0):.2%}"
         )
+
 
         print(
-            "波色单推相对随机：",
-            pct(
-                result.get(
-                    "wave_single_edge",
-                    0
-                )
-            )
+            "波色双推提升：",
+            f"{result.get('wave_double_improvement', 0):+.2%}"
         )
-
-        print(
-            "波色双推相对随机：",
-            pct(
-                result.get(
-                    "wave_double_edge",
-                    0
-                )
-            )
-        )
-
-        # -------------------------------------------------
-        # 三种组合
-        # -------------------------------------------------
-
-        pairs = result.get(
-            "wave_pair_rates",
-            {}
-        )
-
-        if pairs:
-
-            print()
-            print(
-                "【波色双推组合命中率】"
-            )
-
-            for pair_name, rate in pairs.items():
-
-                print(
-                    f"{pair_name}："
-                    f"{pct(rate)}"
-                )
 
 
 # =========================================================
-# 主程序
+# MAIN
 # =========================================================
 
 def main():
@@ -497,132 +447,158 @@ def main():
     print()
 
     print("=" * 70)
-    print("六合彩AI智能预测系统 V1.4")
-    print("工作流：数据同步 → 独立模型 → 10码 → 3码 → 生肖 → 属性 → 波色 → 10/20期回测")
-    print(datetime.now().isoformat())
+
+    print(
+        "六合彩AI智能预测系统 V2.0"
+    )
+
+    print(
+        "自适应预测 + 状态识别 + 动态权重"
+    )
+
+    print(
+        "Walk-Forward：10/20期"
+    )
+
+    print(
+        datetime.now().isoformat()
+    )
+
     print("=" * 70)
 
+
     # =====================================================
-    # 1. 初始化
+    # 1
     # =====================================================
 
     print()
+
+    print("=" * 70)
+
     print("【步骤1】初始化数据库")
 
-    try:
+    print("=" * 70)
 
-        init_database()
 
-        print(
-            "✅ 数据库初始化完成"
-        )
+    init_database()
 
-    except Exception as e:
 
-        print(
-            "❌ 数据库初始化失败：",
-            repr(e)
-        )
+    print(
+        "✅ 数据库初始化完成"
+    )
 
-        return
 
     # =====================================================
-    # 2. 同步
+    # 2
     # =====================================================
 
     print()
+
+    print("=" * 70)
+
     print("【步骤2】同步在线数据")
 
+    print("=" * 70)
+
+
     inserted = 0
+
 
     try:
 
         inserted = update_all()
 
+
         print()
+
         print(
             f"本次新增数据：{inserted}"
         )
 
+
     except Exception as e:
 
         print()
+
         print(
-            "⚠️ 数据同步出现异常：",
+            "⚠️ 数据同步异常：",
             repr(e)
         )
 
-        print(
-            "继续使用数据库历史数据进行预测。"
-        )
 
     # =====================================================
-    # 3. 预测
+    # 3
     # =====================================================
 
     predictions = {}
+
     backtests = {}
 
-    success_count = 0
 
     for lottery_key, config in LOTTERIES.items():
 
         lottery_name = config["name"]
 
+
         print()
+
         print("#" * 70)
+
         print(
             f"开始分析：{lottery_name}"
         )
+
         print("#" * 70)
 
+
         # -------------------------------------------------
-        # 获取数据
+        # 历史
         # -------------------------------------------------
 
-        try:
+        rows = get_draws(
+            lottery_key,
+            limit=3000
+        )
 
-            rows = get_draws(
-                lottery_key,
-                limit=3000
-            )
-
-        except Exception as e:
-
-            print(
-                "❌ 获取历史数据失败：",
-                repr(e)
-            )
-
-            continue
 
         print(
             f"历史数据：{len(rows)}期"
         )
 
+
         if len(rows) < 100:
 
             print(
                 f"⚠️ {lottery_name}"
-                " 历史数据不足100期，跳过。"
+                " 历史数据不足100期"
             )
 
             continue
+
 
         # =================================================
         # 预测
         # =================================================
 
         print()
+
+        print("-" * 70)
+
         print(
             "【步骤3】生成下一期预测"
         )
 
+        print("-" * 70)
+
+
         try:
 
-            prediction = generate_prediction(
-                rows
+            prediction = (
+                generate_prediction(
+                    rows
+                )
             )
+
 
             predictions[lottery_key] = {
 
@@ -639,38 +615,50 @@ def main():
                     prediction,
             }
 
+
             print_prediction(
                 lottery_key,
                 lottery_name,
                 prediction
             )
 
-            success_count += 1
 
         except Exception as e:
 
             print()
+
             print(
-                f"❌ {lottery_name}预测失败：",
+                f"❌ {lottery_name}"
+                f"预测失败：",
                 repr(e)
             )
 
             continue
+
 
         # =================================================
         # 回测
         # =================================================
 
         print()
+
+        print("-" * 70)
+
         print(
             "【步骤4】Walk-Forward历史回测"
         )
 
+        print("-" * 70)
+
+
         try:
 
-            result = multi_window_backtest(
-                rows
+            result = (
+                multi_window_backtest(
+                    rows
+                )
             )
+
 
             backtests[lottery_key] = {
 
@@ -684,18 +672,23 @@ def main():
                     result,
             }
 
+
             print_backtest(
                 lottery_name,
                 result
             )
 
+
         except Exception as e:
 
             print()
+
             print(
-                f"❌ {lottery_name}回测失败：",
+                f"❌ {lottery_name}"
+                f"回测失败：",
                 repr(e)
             )
+
 
             backtests[lottery_key] = {
 
@@ -709,79 +702,73 @@ def main():
                     repr(e),
             }
 
-    # =====================================================
-    # 5. 保存预测
-    # =====================================================
-
-    print()
-    print(
-        "【步骤5】保存预测结果"
-    )
-
-    try:
-
-        save_json(
-            PREDICTION_FILE,
-            predictions
-        )
-
-        print(
-            "✅ 预测结果已保存"
-        )
-
-        print(
-            f"文件：{PREDICTION_FILE}"
-        )
-
-    except Exception as e:
-
-        print(
-            "❌ 保存预测失败：",
-            repr(e)
-        )
 
     # =====================================================
-    # 6. 保存回测
+    # 保存
     # =====================================================
 
     print()
-    print(
-        "【步骤6】保存回测结果"
+
+    print("-" * 70)
+
+    print("【步骤5】保存预测结果")
+
+    print("-" * 70)
+
+
+    save_json(
+        PREDICTION_FILE,
+        predictions
     )
 
-    try:
 
-        save_json(
-            BACKTEST_FILE,
-            backtests
-        )
+    print(
+        "✅ 预测结果已保存"
+    )
 
-        print(
-            "✅ 回测结果已保存"
-        )
+    print(
+        f"文件：{PREDICTION_FILE}"
+    )
 
-        print(
-            f"文件：{BACKTEST_FILE}"
-        )
 
-    except Exception as e:
+    print()
 
-        print(
-            "❌ 保存回测失败：",
-            repr(e)
-        )
+    print("-" * 70)
+
+    print("【步骤6】保存回测结果")
+
+    print("-" * 70)
+
+
+    save_json(
+        BACKTEST_FILE,
+        backtests
+    )
+
+
+    print(
+        "✅ 回测结果已保存"
+    )
+
+    print(
+        f"文件：{BACKTEST_FILE}"
+    )
+
 
     # =====================================================
     # 完成
     # =====================================================
 
     print()
+
     print("=" * 70)
+
     print("本次运行完成")
+
     print("=" * 70)
 
     print(
-        f"分析彩种：{success_count}"
+        f"分析彩种：{len(predictions)}"
     )
 
     print(
@@ -797,12 +784,16 @@ def main():
     )
 
     print("=" * 70)
-    print("系统运行结束")
+
+    print(
+        "系统运行结束"
+    )
+
     print("=" * 70)
 
 
 # =========================================================
-# Entry
+# ENTRY
 # =========================================================
 
 if __name__ == "__main__":
