@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import json
 import time
 import requests
 import urllib3
@@ -46,7 +47,7 @@ SESSION.headers.update({
         "(Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 "
         "(KHTML, like Gecko) "
-        "Chrome/131 Safari/537.36",
+        "Chrome/151.0.0.0 Safari/537.36",
 
     "Accept":
         "application/json,text/plain,*/*",
@@ -81,7 +82,26 @@ def normalize_number(value):
 
 
 # =========================================================
-# 解析号码
+# 从任意字典中寻找字段
+# =========================================================
+
+def get_first(data, keys):
+
+    if not isinstance(data, dict):
+        return None
+
+    for key in keys:
+
+        value = data.get(key)
+
+        if value is not None and value != "":
+            return value
+
+    return None
+
+
+# =========================================================
+# 数字解析
 # =========================================================
 
 def parse_numbers(payload):
@@ -91,7 +111,7 @@ def parse_numbers(payload):
 
 
     # -----------------------------------------------------
-    # numbers
+    # 1. numbers
     # -----------------------------------------------------
 
     numbers = payload.get("numbers")
@@ -112,10 +132,58 @@ def parse_numbers(payload):
 
 
     # -----------------------------------------------------
-    # openCode
+    # 2. openCode
     # -----------------------------------------------------
 
     open_code = payload.get("openCode")
+
+    if isinstance(open_code, list):
+
+        result = []
+
+        for value in open_code:
+
+            number = normalize_number(value)
+
+            if number is not None:
+                result.append(number)
+
+        if len(result) == 7:
+            return result
+
+
+    if isinstance(open_code, str):
+
+        text = (
+            open_code
+            .replace("|", ",")
+            .replace("/", ",")
+            .replace("\\", ",")
+            .replace(" ", ",")
+            .replace("，", ",")
+            .replace("-", ",")
+        )
+
+        parts = text.split(",")
+
+        result = []
+
+        for value in parts:
+
+            number = normalize_number(value)
+
+            if number is not None:
+                result.append(number)
+
+        if len(result) == 7:
+            return result
+
+
+    # -----------------------------------------------------
+    # 3. open_code
+    # -----------------------------------------------------
+
+    open_code = payload.get("open_code")
 
     if isinstance(open_code, str):
 
@@ -141,6 +209,34 @@ def parse_numbers(payload):
             return result
 
 
+    # -----------------------------------------------------
+    # 4. code / codes
+    # -----------------------------------------------------
+
+    for key in (
+        "code",
+        "codes",
+        "openNumbers",
+        "open_numbers",
+    ):
+
+        value = payload.get(key)
+
+        if isinstance(value, list):
+
+            result = []
+
+            for item in value:
+
+                number = normalize_number(item)
+
+                if number is not None:
+                    result.append(number)
+
+            if len(result) == 7:
+                return result
+
+
     return []
 
 
@@ -153,13 +249,36 @@ def parse_wave(payload):
     if not isinstance(payload, dict):
         return None
 
-    if "wave" in payload:
-        return payload.get("wave")
+    return get_first(
+        payload,
+        (
+            "wave",
+            "waveColor",
+            "wave_color",
+            "waveColors",
+            "wave_colors",
+        )
+    )
 
-    if "waveColors" in payload:
-        return payload.get("waveColors")
 
-    return None
+# =========================================================
+# 解析生肖
+# =========================================================
+
+def parse_zodiac(payload):
+
+    if not isinstance(payload, dict):
+        return None
+
+    return get_first(
+        payload,
+        (
+            "zodiac",
+            "zodiacs",
+            "shengxiao",
+            "sheng_xiao",
+        )
+    )
 
 
 # =========================================================
@@ -168,29 +287,13 @@ def parse_wave(payload):
 
 def extract_history(payload):
 
-    """
-    尽可能兼容不同 API 的 history 返回结构。
-
-    支持：
-
-    payload["history"]
-
-    payload["lottery_data"]["history"]
-
-    payload["data"]["history"]
-
-    payload["result"]["history"]
-
-    以及 history 本身直接就是 list。
-    """
-
     if not isinstance(payload, dict):
         return []
 
 
-    # -----------------------------------------------------
-    # 第一层
-    # -----------------------------------------------------
+    # =====================================================
+    # 第一层 history
+    # =====================================================
 
     history = payload.get("history")
 
@@ -214,27 +317,84 @@ def extract_history(payload):
                 return value
 
 
-    # -----------------------------------------------------
-    # 第二层容器
-    # -----------------------------------------------------
+    # =====================================================
+    # lottery_data
+    # =====================================================
 
-    for parent_key in (
-        "lottery_data",
-        "data",
-        "result",
-    ):
+    lottery_data = payload.get(
+        "lottery_data"
+    )
 
-        parent = payload.get(parent_key)
+    if isinstance(lottery_data, dict):
 
-        if not isinstance(parent, dict):
-            continue
-
-
-        history = parent.get("history")
+        history = lottery_data.get(
+            "history"
+        )
 
         if isinstance(history, list):
             return history
 
+        if isinstance(history, dict):
+
+            for key in (
+                "data",
+                "list",
+                "records",
+                "items",
+                "history",
+            ):
+
+                value = history.get(key)
+
+                if isinstance(value, list):
+                    return value
+
+
+    # =====================================================
+    # data
+    # =====================================================
+
+    data = payload.get("data")
+
+    if isinstance(data, dict):
+
+        history = data.get(
+            "history"
+        )
+
+        if isinstance(history, list):
+            return history
+
+        if isinstance(history, dict):
+
+            for key in (
+                "data",
+                "list",
+                "records",
+                "items",
+                "history",
+            ):
+
+                value = history.get(key)
+
+                if isinstance(value, list):
+                    return value
+
+
+    # =====================================================
+    # result
+    # =====================================================
+
+    result = payload.get("result")
+
+    if isinstance(result, dict):
+
+        history = result.get(
+            "history"
+        )
+
+        if isinstance(history, list):
+            return history
 
         if isinstance(history, dict):
 
@@ -256,6 +416,85 @@ def extract_history(payload):
 
 
 # =========================================================
+# 查找当前开奖数据
+# =========================================================
+
+def extract_current_payload(payload):
+
+    if not isinstance(payload, dict):
+        return None
+
+
+    # -----------------------------------------------------
+    # 顶层本身
+    # -----------------------------------------------------
+
+    if (
+        payload.get("expect")
+        or payload.get("issue")
+        or payload.get("issueNo")
+    ):
+
+        return payload
+
+
+    # -----------------------------------------------------
+    # lottery_data
+    # -----------------------------------------------------
+
+    lottery_data = payload.get(
+        "lottery_data"
+    )
+
+    if isinstance(lottery_data, dict):
+
+        if (
+            lottery_data.get("expect")
+            or lottery_data.get("issue")
+            or lottery_data.get("issueNo")
+        ):
+
+            return lottery_data
+
+
+    # -----------------------------------------------------
+    # data
+    # -----------------------------------------------------
+
+    data = payload.get("data")
+
+    if isinstance(data, dict):
+
+        if (
+            data.get("expect")
+            or data.get("issue")
+            or data.get("issueNo")
+        ):
+
+            return data
+
+
+    # -----------------------------------------------------
+    # result
+    # -----------------------------------------------------
+
+    result = payload.get("result")
+
+    if isinstance(result, dict):
+
+        if (
+            result.get("expect")
+            or result.get("issue")
+            or result.get("issueNo")
+        ):
+
+            return result
+
+
+    return None
+
+
+# =========================================================
 # 解析开奖
 # =========================================================
 
@@ -273,11 +512,16 @@ def parse_draw(
     # 期号
     # -----------------------------------------------------
 
-    issue = (
-        payload.get("expect")
-        or payload.get("issue")
-        or payload.get("issueNo")
-        or payload.get("issue_no")
+    issue = get_first(
+        payload,
+        (
+            "expect",
+            "issue",
+            "issueNo",
+            "issue_no",
+            "period",
+            "periodNo",
+        )
     )
 
     if issue is None:
@@ -286,15 +530,19 @@ def parse_draw(
 
     issue = str(issue).strip()
 
+    if not issue:
+        return None
+
 
     # -----------------------------------------------------
     # 开奖号码
     # -----------------------------------------------------
 
-    numbers = parse_numbers(payload)
+    numbers = parse_numbers(
+        payload
+    )
 
     if len(numbers) != 7:
-
         return None
 
 
@@ -315,7 +563,6 @@ def parse_draw(
     # -----------------------------------------------------
 
     if len(set(numbers)) != 7:
-
         return None
 
 
@@ -323,9 +570,8 @@ def parse_draw(
     # 生肖
     # -----------------------------------------------------
 
-    zodiac = (
-        payload.get("zodiac")
-        or payload.get("zodiacs")
+    zodiac = parse_zodiac(
+        payload
     )
 
 
@@ -333,18 +579,25 @@ def parse_draw(
     # 波色
     # -----------------------------------------------------
 
-    wave = parse_wave(payload)
+    wave = parse_wave(
+        payload
+    )
 
 
     # -----------------------------------------------------
     # 开奖时间
     # -----------------------------------------------------
 
-    open_time = (
-        payload.get("openTime")
-        or payload.get("open_time")
-        or payload.get("drawTime")
-        or payload.get("draw_time")
+    open_time = get_first(
+        payload,
+        (
+            "openTime",
+            "open_time",
+            "drawTime",
+            "draw_time",
+            "openDate",
+            "date",
+        )
     )
 
 
@@ -417,14 +670,45 @@ def fetch_api(
                     REQUEST_TIMEOUT,
 
                 verify=
-                    SSL_VERIFY
+                    SSL_VERIFY,
+
+                allow_redirects=True,
+            )
+
+
+            print(
+                f"[{lottery_key}] "
+                f"HTTP {response.status_code}"
             )
 
 
             response.raise_for_status()
 
 
-            payload = response.json()
+            # -------------------------------------------------
+            # JSON
+            # -------------------------------------------------
+
+            try:
+
+                payload = response.json()
+
+            except ValueError:
+
+                # 有些服务器 Content-Type 不规范
+                # 但实际返回仍然是 JSON
+
+                text = response.text.strip()
+
+                if not text:
+
+                    raise ValueError(
+                        "API返回为空"
+                    )
+
+                payload = json.loads(
+                    text
+                )
 
 
             if not isinstance(
@@ -505,14 +789,24 @@ def fetch_api(
                 timeout=
                     REQUEST_TIMEOUT,
 
-                verify=False
+                verify=False,
+
+                allow_redirects=True,
             )
 
 
             response.raise_for_status()
 
 
-            payload = response.json()
+            try:
+
+                payload = response.json()
+
+            except ValueError:
+
+                payload = json.loads(
+                    response.text
+                )
 
 
             if isinstance(
@@ -550,10 +844,11 @@ def parse_history(
     source
 ):
 
-    history = extract_history(payload)
+    history = extract_history(
+        payload
+    )
 
     if not history:
-
         return []
 
 
@@ -563,7 +858,7 @@ def parse_history(
     for item in history:
 
         # -------------------------------------------------
-        # history 可能是字典
+        # 字典
         # -------------------------------------------------
 
         if isinstance(item, dict):
@@ -582,7 +877,7 @@ def parse_history(
 
 
         # -------------------------------------------------
-        # 某些 API history 可能是字符串
+        # JSON 字符串
         # -------------------------------------------------
 
         if isinstance(item, str):
@@ -593,13 +888,11 @@ def parse_history(
                 continue
 
 
-            # 暂时只接受 JSON 对象字符串
-
             try:
 
-                import json
-
-                item_payload = json.loads(item)
+                item_payload = json.loads(
+                    item
+                )
 
             except Exception:
 
@@ -622,9 +915,9 @@ def parse_history(
                     draws.append(draw)
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # 按期号去重
-    # -----------------------------------------------------
+    # =====================================================
 
     unique = {}
 
@@ -696,21 +989,33 @@ def update_lottery(
 
 
     # =====================================================
-    # 1. 当前开奖
+    # 当前开奖
     # =====================================================
 
-    current_draw = parse_draw(
-
-        payload,
-
-        lottery_key,
-
-        source
+    current_payload = (
+        extract_current_payload(
+            payload
+        )
     )
 
 
+    current_draw = None
+
+
+    if current_payload is not None:
+
+        current_draw = parse_draw(
+
+            current_payload,
+
+            lottery_key,
+
+            source
+        )
+
+
     # =====================================================
-    # 2. 历史开奖
+    # 历史开奖
     # =====================================================
 
     history_draws = parse_history(
@@ -742,9 +1047,9 @@ def update_lottery(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # 按期号去重
-    # -----------------------------------------------------
+    # =====================================================
 
     unique_draws = {}
 
@@ -800,7 +1105,7 @@ def update_lottery(
 
 
     # =====================================================
-    # 输出结果
+    # 输出
     # =====================================================
 
     print()
@@ -816,9 +1121,9 @@ def update_lottery(
     )
 
 
-    # -----------------------------------------------------
-    # 当前期显示
-    # -----------------------------------------------------
+    # =====================================================
+    # 当前期
+    # =====================================================
 
     if current_draw is not None:
 
@@ -848,6 +1153,15 @@ def update_lottery(
             current_draw["wave"]
         )
 
+    else:
+
+        print()
+
+        print(
+            "⚠️ 未解析到当前开奖，"
+            "但历史数据仍可入库。"
+        )
+
 
     # =====================================================
     # 抓取日志
@@ -860,8 +1174,11 @@ def update_lottery(
         True,
 
         issue=(
+
             current_draw["issue"]
+
             if current_draw
+
             else None
         ),
 
