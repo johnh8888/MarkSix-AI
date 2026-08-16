@@ -1,330 +1,245 @@
 # -*- coding: utf-8 -*-
 
+"""
+六合彩 AI V2.0
+自适应策略引擎
+
+核心：
+1. 近期频率
+2. 中期频率
+3. 长期频率
+4. 遗漏
+5. 趋势
+6. 大小
+7. 单双
+8. 波色
+9. 状态识别
+10. 动态策略权重
+
+注意：
+本模块用于统计建模与回测，不代表开奖结果可以被确定预测。
+"""
+
 from collections import Counter
+import math
+
+from .features import (
+    get_special,
+    special_frequency,
+    special_omission,
+)
+
+
+NUMBERS = range(1, 50)
 
 
 # =========================================================
-# 基础工具
+# 常量
 # =========================================================
 
-def get_special(row):
+WAVE_MAP = {
+    "红": {
+        1, 2, 7, 8, 12, 13, 18, 19,
+        23, 24, 29, 30, 34, 35, 40, 45, 46
+    },
 
-    """
-    兼容：
+    "蓝": {
+        3, 4, 9, 10, 14, 15, 20, 25,
+        26, 31, 36, 37, 41, 42, 47, 48
+    },
 
-    {
-        "special": 27
+    "绿": {
+        5, 6, 11, 16, 17, 21, 22, 27,
+        28, 32, 33, 38, 39, 43, 44, 49
     }
+}
 
-    或：
 
-    {
-        "numbers": "33,27,16,28,04,25,14"
-    }
-    """
+NUMBER_TO_WAVE = {}
+
+for wave, nums in WAVE_MAP.items():
+    for n in nums:
+        NUMBER_TO_WAVE[n] = wave
+
+
+# =========================================================
+# 工具
+# =========================================================
+
+def safe_number(row):
 
     try:
+        n = get_special(row)
+        n = int(n)
 
-        if isinstance(row, dict):
-
-            if "special" in row:
-
-                return int(
-                    row["special"]
-                )
-
-            if "special_number" in row:
-
-                return int(
-                    row["special_number"]
-                )
-
-            numbers = row.get(
-                "numbers"
-            )
-
-            if numbers:
-
-                if isinstance(
-                    numbers,
-                    str
-                ):
-
-                    values = [
-                        int(x.strip())
-                        for x in numbers.split(",")
-                        if x.strip()
-                    ]
-
-                    if values:
-
-                        return values[1] if len(values) >= 7 else values[0]
-
-                if isinstance(
-                    numbers,
-                    list
-                ):
-
-                    values = [
-                        int(x)
-                        for x in numbers
-                    ]
-
-                    if values:
-
-                        return values[1] if len(values) >= 7 else values[0]
+        if 1 <= n <= 49:
+            return n
 
     except Exception:
-
         pass
 
-    return 0
+    return None
 
-
-# =========================================================
-# 归一化
-# =========================================================
 
 def normalize_scores(scores):
 
     if not scores:
+        return {n: 0.5 for n in NUMBERS}
 
-        return {
-            n: 0.5
-            for n in range(1, 50)
-        }
-
-    values = list(
-        scores.values()
-    )
+    values = list(scores.values())
 
     low = min(values)
     high = max(values)
 
     if high == low:
-
         return {
             n: 0.5
             for n in scores
         }
 
     return {
-
-        n:
-            (value - low)
-            /
-            (high - low)
-
-        for n, value
-        in scores.items()
+        n: (value - low) / (high - low)
+        for n, value in scores.items()
     }
 
 
-# =========================================================
-# 平滑频率
-# =========================================================
+def sigmoid(x):
 
-def smoothed_frequency(rows):
-
-    counter = Counter()
-
-    for row in rows:
-
-        n = get_special(row)
-
-        if 1 <= n <= 49:
-
-            counter[n] += 1
-
-    total = sum(
-        counter.values()
-    )
-
-    result = {}
-
-    for n in range(1, 50):
-
-        result[n] = (
-            counter[n] + 1
-        ) / (
-            total + 49
-        )
-
-    return result
+    try:
+        return 1.0 / (1.0 + math.exp(-x))
+    except OverflowError:
+        return 1.0 if x > 0 else 0.0
 
 
 # =========================================================
-# 最近频率
+# 策略1：近期频率
 # =========================================================
 
 def strategy_recent(rows):
 
     data = rows[:20]
 
-    freq = smoothed_frequency(
-        data
-    )
+    freq = special_frequency(data)
 
-    return normalize_scores(
-        freq
-    )
+    scores = normalize_scores(freq)
 
-
-# =========================================================
-# 近期增强
-# =========================================================
-
-def strategy_recent10(rows):
-
-    data = rows[:10]
-
-    freq = smoothed_frequency(
-        data
-    )
-
-    return normalize_scores(
-        freq
-    )
+    return {
+        n: scores.get(n, 0.0)
+        for n in NUMBERS
+    }
 
 
 # =========================================================
-# 中短期
+# 策略2：中期频率
 # =========================================================
 
 def strategy_medium(rows):
 
-    data = rows[:50]
+    data = rows[:80]
 
-    freq = smoothed_frequency(
-        data
-    )
+    freq = special_frequency(data)
 
-    return normalize_scores(
-        freq
-    )
+    scores = normalize_scores(freq)
+
+    return {
+        n: scores.get(n, 0.0)
+        for n in NUMBERS
+    }
 
 
 # =========================================================
-# 长期基础
+# 策略3：长期频率
 # =========================================================
 
 def strategy_long(rows):
 
-    data = rows[:200]
+    data = rows[:300]
 
-    freq = smoothed_frequency(
-        data
-    )
+    freq = special_frequency(data)
 
-    return normalize_scores(
-        freq
-    )
+    scores = normalize_scores(freq)
+
+    return {
+        n: scores.get(n, 0.0)
+        for n in NUMBERS
+    }
 
 
 # =========================================================
-# 遗漏策略
+# 策略4：遗漏
 # =========================================================
 
 def strategy_omission(rows):
 
-    omission = {}
+    omission = special_omission(
+        rows[:300]
+    )
 
-    seen = set()
-
-    for index, row in enumerate(rows[:200]):
-
-        n = get_special(row)
-
-        if not 1 <= n <= 49:
-            continue
-
-        if n not in seen:
-
-            omission[n] = (
-                index + 1
-            )
-
-            seen.add(n)
-
-    for n in range(1, 50):
-
-        omission.setdefault(
-            n,
-            201
-        )
-
-    return normalize_scores(
+    scores = normalize_scores(
         omission
     )
 
+    return {
+        n: scores.get(n, 0.0)
+        for n in NUMBERS
+    }
+
 
 # =========================================================
-# 遗漏压缩
+# 策略5：趋势
 # =========================================================
 
-def strategy_omission_decay(rows):
+def strategy_trend(rows):
 
-    """
-    避免极端遗漏号码获得过高分。
+    recent = rows[:20]
+    medium = rows[:80]
 
-    使用 sqrt 压缩。
-    """
+    recent_freq = special_frequency(
+        recent
+    )
 
-    import math
+    medium_freq = special_frequency(
+        medium
+    )
 
-    omission = {}
+    scores = {}
 
-    seen = set()
+    for n in NUMBERS:
 
-    for index, row in enumerate(rows[:100]):
+        r = recent_freq.get(n, 0)
+        m = medium_freq.get(n, 0)
 
-        n = get_special(row)
+        # 当前近期表现相对于中期表现
+        r_rate = r / max(len(recent), 1)
+        m_rate = m / max(len(medium), 1)
 
-        if not 1 <= n <= 49:
-            continue
-
-        if n not in seen:
-
-            omission[n] = (
-                index + 1
-            )
-
-            seen.add(n)
-
-    result = {}
-
-    for n in range(1, 50):
-
-        value = omission.get(
-            n,
-            101
+        trend = (
+            r_rate - m_rate
         )
 
-        result[n] = math.sqrt(
-            value
-        )
+        scores[n] = trend
 
     return normalize_scores(
-        result
+        scores
     )
 
 
 # =========================================================
-# 大小
+# 策略6：大小
 # =========================================================
 
 def strategy_size(rows):
 
-    recent = rows[:20]
+    data = rows[:80]
 
     big = 0
     small = 0
 
-    for row in recent:
+    for row in data:
 
-        n = get_special(row)
+        n = safe_number(row)
 
-        if not 1 <= n <= 49:
+        if n is None:
             continue
 
         if n >= 25:
@@ -335,124 +250,337 @@ def strategy_size(rows):
     total = big + small
 
     if total == 0:
-
         return {
             n: 0.5
-            for n in range(1, 50)
+            for n in NUMBERS
         }
 
-    big_prob = (
-        big + 1
-    ) / (
-        total + 2
-    )
+    big_prob = big / total
+    small_prob = small / total
 
-    small_prob = (
-        small + 1
-    ) / (
-        total + 2
-    )
+    scores = {}
 
-    result = {}
-
-    for n in range(1, 50):
+    for n in NUMBERS:
 
         if n >= 25:
-
-            result[n] = big_prob
-
+            scores[n] = big_prob
         else:
+            scores[n] = small_prob
 
-            result[n] = small_prob
-
-    return result
+    return normalize_scores(
+        scores
+    )
 
 
 # =========================================================
-# 单双
+# 策略7：单双
 # =========================================================
 
 def strategy_parity(rows):
 
-    recent = rows[:20]
+    data = rows[:80]
 
     odd = 0
     even = 0
 
-    for row in recent:
+    for row in data:
 
-        n = get_special(row)
+        n = safe_number(row)
 
-        if not 1 <= n <= 49:
+        if n is None:
             continue
 
         if n % 2:
-
             odd += 1
-
         else:
-
             even += 1
 
     total = odd + even
 
     if total == 0:
-
         return {
             n: 0.5
-            for n in range(1, 50)
+            for n in NUMBERS
         }
 
-    odd_prob = (
-        odd + 1
-    ) / (
-        total + 2
-    )
+    odd_prob = odd / total
+    even_prob = even / total
 
-    even_prob = (
-        even + 1
-    ) / (
-        total + 2
-    )
+    scores = {}
 
-    result = {}
-
-    for n in range(1, 50):
+    for n in NUMBERS:
 
         if n % 2:
+            scores[n] = odd_prob
+        else:
+            scores[n] = even_prob
 
-            result[n] = odd_prob
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 策略8：波色
+# =========================================================
+
+def strategy_wave(rows):
+
+    data = rows[:80]
+
+    counter = Counter()
+
+    for row in data:
+
+        n = safe_number(row)
+
+        if n is None:
+            continue
+
+        wave = NUMBER_TO_WAVE.get(n)
+
+        if wave:
+            counter[wave] += 1
+
+    total = sum(counter.values())
+
+    if total == 0:
+
+        probs = {
+            "红": 1 / 3,
+            "蓝": 1 / 3,
+            "绿": 1 / 3
+        }
+
+    else:
+
+        probs = {
+            wave:
+                counter.get(wave, 0) / total
+
+            for wave in [
+                "红",
+                "蓝",
+                "绿"
+            ]
+        }
+
+    scores = {}
+
+    for n in NUMBERS:
+
+        wave = NUMBER_TO_WAVE.get(n)
+
+        scores[n] = probs.get(
+            wave,
+            1 / 3
+        )
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 状态识别
+# =========================================================
+
+def detect_state(rows):
+
+    data = rows[:20]
+
+    if len(data) < 5:
+
+        return {
+            "size": "unknown",
+            "parity": "unknown",
+            "wave": "unknown",
+            "trend": "neutral",
+        }
+
+    numbers = []
+
+    for row in data:
+
+        n = safe_number(row)
+
+        if n:
+            numbers.append(n)
+
+    if not numbers:
+
+        return {
+            "size": "unknown",
+            "parity": "unknown",
+            "wave": "unknown",
+            "trend": "neutral",
+        }
+
+    # -----------------------------------------------------
+    # 大小状态
+    # -----------------------------------------------------
+
+    big = sum(
+        n >= 25
+        for n in numbers
+    )
+
+    small = len(numbers) - big
+
+    if big / len(numbers) >= 0.65:
+        size_state = "big_hot"
+
+    elif small / len(numbers) >= 0.65:
+        size_state = "small_hot"
+
+    else:
+        size_state = "balanced"
+
+    # -----------------------------------------------------
+    # 单双状态
+    # -----------------------------------------------------
+
+    odd = sum(
+        n % 2 == 1
+        for n in numbers
+    )
+
+    even = len(numbers) - odd
+
+    if odd / len(numbers) >= 0.65:
+        parity_state = "odd_hot"
+
+    elif even / len(numbers) >= 0.65:
+        parity_state = "even_hot"
+
+    else:
+        parity_state = "balanced"
+
+    # -----------------------------------------------------
+    # 波色状态
+    # -----------------------------------------------------
+
+    waves = [
+        NUMBER_TO_WAVE.get(n)
+        for n in numbers
+    ]
+
+    wave_counter = Counter(
+        w for w in waves if w
+    )
+
+    if wave_counter:
+
+        wave, count = wave_counter.most_common(1)[0]
+
+        if count / len(numbers) >= 0.50:
+            wave_state = f"{wave}_hot"
+        else:
+            wave_state = "balanced"
+
+    else:
+        wave_state = "unknown"
+
+    # -----------------------------------------------------
+    # 趋势
+    # -----------------------------------------------------
+
+    first = numbers[:10]
+    second = numbers[10:20]
+
+    if len(second) >= 5:
+
+        first_avg = sum(first) / len(first)
+        second_avg = sum(second) / len(second)
+
+        if first_avg > second_avg + 3:
+            trend_state = "up"
+
+        elif first_avg < second_avg - 3:
+            trend_state = "down"
 
         else:
+            trend_state = "neutral"
 
-            result[n] = even_prob
+    else:
 
-    return result
+        trend_state = "neutral"
+
+    return {
+        "size": size_state,
+        "parity": parity_state,
+        "wave": wave_state,
+        "trend": trend_state,
+    }
 
 
 # =========================================================
-# 尾数
+# 状态调整
 # =========================================================
 
-def strategy_tail(rows):
+def apply_state_adjustment(
+    scores,
+    rows
+):
 
-    counter = Counter()
+    state = detect_state(rows)
 
-    for row in rows[:50]:
+    result = dict(scores)
 
-        n = get_special(row)
+    # -----------------------------------------------------
+    # 大小
+    # -----------------------------------------------------
 
-        if 1 <= n <= 49:
+    if state["size"] == "big_hot":
 
-            counter[n % 10] += 1
+        for n in NUMBERS:
 
-    result = {}
+            if n >= 25:
+                result[n] *= 1.04
+            else:
+                result[n] *= 0.98
 
-    for n in range(1, 50):
+    elif state["size"] == "small_hot":
 
-        result[n] = (
-            counter[n % 10] + 1
-        )
+        for n in NUMBERS:
+
+            if n < 25:
+                result[n] *= 1.04
+            else:
+                result[n] *= 0.98
+
+    # -----------------------------------------------------
+    # 单双
+    # -----------------------------------------------------
+
+    if state["parity"] == "odd_hot":
+
+        for n in NUMBERS:
+
+            if n % 2:
+                result[n] *= 1.03
+
+    elif state["parity"] == "even_hot":
+
+        for n in NUMBERS:
+
+            if n % 2 == 0:
+                result[n] *= 1.03
+
+    # -----------------------------------------------------
+    # 波色
+    # -----------------------------------------------------
+
+    wave_state = state["wave"]
+
+    if wave_state.endswith("_hot"):
+
+        hot_wave = wave_state.split("_")[0]
+
+        for n in NUMBERS:
+
+            if NUMBER_TO_WAVE.get(n) == hot_wave:
+                result[n] *= 1.025
 
     return normalize_scores(
         result
@@ -460,53 +588,102 @@ def strategy_tail(rows):
 
 
 # =========================================================
-# 分区
+# 动态权重
 # =========================================================
 
-def get_zone(n):
+DEFAULT_WEIGHTS = {
 
-    if n <= 10:
-        return 1
+    "recent": 0.20,
 
-    if n <= 20:
-        return 2
+    "medium": 0.16,
 
-    if n <= 30:
-        return 3
+    "long": 0.10,
 
-    if n <= 40:
-        return 4
+    "omission": 0.10,
 
-    return 5
+    "trend": 0.18,
+
+    "size": 0.08,
+
+    "parity": 0.08,
+
+    "wave": 0.10,
+}
 
 
-def strategy_zone(rows):
+def calculate_dynamic_weights(
+    rows
+):
 
-    counter = Counter()
+    """
+    第一阶段自适应权重。
 
-    for row in rows[:50]:
+    不直接使用未来结果。
 
-        n = get_special(row)
+    根据当前历史结构计算权重，
+    并且对极端权重进行限制。
+    """
 
-        if 1 <= n <= 49:
+    weights = dict(
+        DEFAULT_WEIGHTS
+    )
 
-            counter[
-                get_zone(n)
-            ] += 1
+    state = detect_state(
+        rows
+    )
 
-    result = {}
+    # -----------------------------------------------------
+    # 趋势明显时，提高趋势模型
+    # -----------------------------------------------------
 
-    for n in range(1, 50):
+    if state["trend"] != "neutral":
+        weights["trend"] += 0.05
 
-        result[n] = (
-            counter[
-                get_zone(n)
-            ] + 1
+    # -----------------------------------------------------
+    # 大小明显偏态
+    # -----------------------------------------------------
+
+    if state["size"] != "balanced":
+        weights["size"] += 0.025
+
+    # -----------------------------------------------------
+    # 单双明显偏态
+    # -----------------------------------------------------
+
+    if state["parity"] != "balanced":
+        weights["parity"] += 0.025
+
+    # -----------------------------------------------------
+    # 波色明显偏态
+    # -----------------------------------------------------
+
+    if state["wave"].endswith("_hot"):
+        weights["wave"] += 0.025
+
+    # -----------------------------------------------------
+    # 近期数据优先
+    # -----------------------------------------------------
+
+    weights["recent"] += 0.025
+
+    # -----------------------------------------------------
+    # 归一化
+    # -----------------------------------------------------
+
+    total = sum(
+        weights.values()
+    )
+
+    if total <= 0:
+
+        return dict(
+            DEFAULT_WEIGHTS
         )
 
-    return normalize_scores(
-        result
-    )
+    return {
+        key: value / total
+        for key, value in weights.items()
+    }
 
 
 # =========================================================
@@ -519,17 +696,15 @@ def combine_strategies(rows):
 
         empty = {
             n: 0.5
-            for n in range(1, 50)
+            for n in NUMBERS
         }
 
-        return empty, {}
+        return empty, {}, {}
+
 
     strategies = {
 
-        "recent10":
-            strategy_recent10(rows),
-
-        "recent20":
+        "recent":
             strategy_recent(rows),
 
         "medium":
@@ -541,8 +716,8 @@ def combine_strategies(rows):
         "omission":
             strategy_omission(rows),
 
-        "omission_decay":
-            strategy_omission_decay(rows),
+        "trend":
+            strategy_trend(rows),
 
         "size":
             strategy_size(rows),
@@ -550,54 +725,22 @@ def combine_strategies(rows):
         "parity":
             strategy_parity(rows),
 
-        "tail":
-            strategy_tail(rows),
+        "wave":
+            strategy_wave(rows),
 
-        "zone":
-            strategy_zone(rows),
     }
 
-    # -----------------------------------------------------
-    # 权重
-    # -----------------------------------------------------
 
-    weights = {
+    weights = calculate_dynamic_weights(
+        rows
+    )
 
-        "recent10":
-            0.18,
-
-        "recent20":
-            0.18,
-
-        "medium":
-            0.12,
-
-        "long":
-            0.06,
-
-        "omission":
-            0.08,
-
-        "omission_decay":
-            0.06,
-
-        "size":
-            0.10,
-
-        "parity":
-            0.08,
-
-        "tail":
-            0.07,
-
-        "zone":
-            0.07,
-    }
 
     final_scores = {
         n: 0.0
-        for n in range(1, 50)
+        for n in NUMBERS
     }
+
 
     for name, scores in strategies.items():
 
@@ -606,24 +749,29 @@ def combine_strategies(rows):
             0.0
         )
 
-        for n in range(1, 50):
+        for n in NUMBERS:
 
             final_scores[n] += (
-                scores.get(
-                    n,
-                    0.5
-                )
-                *
-                weight
+                scores.get(n, 0.0)
+                * weight
             )
+
 
     final_scores = normalize_scores(
         final_scores
     )
 
+
+    final_scores = apply_state_adjustment(
+        final_scores,
+        rows
+    )
+
+
     return (
         final_scores,
-        strategies
+        strategies,
+        weights
     )
 
 
@@ -649,31 +797,41 @@ if __name__ == "__main__":
             "numbers":
                 "47,14,44,32,07,37,11"
         },
+
     ]
 
     print("=" * 70)
-    print("strategies.py V1.4")
+    print("V2.0 strategies.py")
     print("=" * 70)
 
-    scores, strategy_scores = combine_strategies(
-        rows
+    scores, strategy_scores, weights = (
+        combine_strategies(rows)
     )
 
-    top10 = sorted(
+    print("\n动态权重：")
+
+    for name, weight in weights.items():
+
+        print(
+            f"{name:<10} "
+            f"{weight:.4f}"
+        )
+
+    print("\nTop10：")
+
+    ranking = sorted(
         scores.items(),
         key=lambda x: x[1],
         reverse=True
     )[:10]
 
-    print()
-
-    for index, (n, score) in enumerate(
-        top10,
+    for i, (number, score) in enumerate(
+        ranking,
         1
     ):
 
         print(
-            f"{index:02d}. "
-            f"{n:02d} -> "
+            f"{i:02d}. "
+            f"{number:02d} "
             f"{score:.6f}"
         )
