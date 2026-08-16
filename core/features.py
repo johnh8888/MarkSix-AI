@@ -1,220 +1,112 @@
-# -*- coding: utf-8 -*-
-
-from collections import Counter, defaultdict
-
-import math
-
-
-def row_numbers(row):
-
-    return [
-        row["n1"],
-        row["n2"],
-        row["n3"],
-        row["n4"],
-        row["n5"],
-        row["n6"],
-        row["special"],
-    ]
-
-
 def get_special(row):
+    """
+    获取特码。
 
-    return int(row["special"])
+    兼容以下数据结构：
 
+    1. row["special"]
+    2. row["special_number"]
+    3. row["numbers"] 为列表
+    4. row["numbers"] 为逗号分隔字符串
+    5. row["openCode"] 为逗号分隔字符串
 
-def frequency_scores(rows):
+    香港六合彩 / 澳门六合彩：
+    最后一个号码作为特码。
+    """
 
-    counter = Counter()
+    # -----------------------------------------
+    # 1. 直接存在 special
+    # -----------------------------------------
 
-    for row in rows:
+    value = row.get("special")
 
-        for n in row_numbers(row):
+    if value not in (None, ""):
 
-            counter[n] += 1
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            pass
 
-    total = max(len(rows), 1)
+    # -----------------------------------------
+    # 2. special_number
+    # -----------------------------------------
 
-    scores = {}
+    value = row.get("special_number")
 
-    for n in range(1, 50):
+    if value not in (None, ""):
 
-        scores[n] = counter[n] / (
-            total * 7
-        )
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            pass
 
-    return scores
+    # -----------------------------------------
+    # 3. numbers
+    # -----------------------------------------
 
+    numbers = row.get("numbers")
 
-def omission_scores(rows):
+    if numbers:
 
-    result = {}
+        if isinstance(numbers, str):
 
-    for number in range(1, 50):
+            parts = [
+                x.strip()
+                for x in numbers.split(",")
+                if x.strip()
+            ]
 
-        omission = len(rows)
+        elif isinstance(numbers, (list, tuple)):
 
-        for i, row in enumerate(rows):
+            parts = list(numbers)
 
-            if number in row_numbers(row):
-
-                omission = i
-                break
-
-        result[number] = omission
-
-    return result
-
-
-def special_frequency(rows):
-
-    counter = Counter()
-
-    for row in rows:
-
-        counter[get_special(row)] += 1
-
-    total = max(len(rows), 1)
-
-    return {
-        n: counter[n] / total
-        for n in range(1, 50)
-    }
-
-
-def special_omission(rows):
-
-    result = {}
-
-    for number in range(1, 50):
-
-        omission = len(rows)
-
-        for i, row in enumerate(rows):
-
-            if get_special(row) == number:
-
-                omission = i
-                break
-
-        result[number] = omission
-
-    return result
-
-
-def size_value(number):
-
-    # 01-24 小
-    # 25-49 大
-    return 0 if number <= 24 else 1
-
-
-def parity_value(number):
-
-    return 0 if number % 2 == 0 else 1
-
-
-def number_basic_features(number):
-
-    return {
-        "number": number,
-
-        "size": size_value(number),
-
-        "parity": parity_value(number),
-
-        "tail": number % 10,
-
-        "zone": (
-            1 if number <= 16
-            else 2 if number <= 33
-            else 3
-        ),
-    }
-
-
-def size_stats(rows):
-
-    big = 0
-    small = 0
-
-    for row in rows:
-
-        n = get_special(row)
-
-        if n >= 25:
-            big += 1
         else:
-            small += 1
 
-    total = big + small
+            parts = []
 
-    if total == 0:
-        return {
-            "big": 0.5,
-            "small": 0.5
-        }
+        if parts:
 
-    return {
-        "big": big / total,
-        "small": small / total
-    }
+            try:
+                return int(parts[-1])
+            except (TypeError, ValueError):
+                pass
 
+    # -----------------------------------------
+    # 4. openCode
+    # -----------------------------------------
 
-def parity_stats(rows):
+    open_code = row.get("openCode")
 
-    odd = 0
-    even = 0
+    if open_code:
 
-    for row in rows:
+        if isinstance(open_code, str):
 
-        n = get_special(row)
+            parts = [
+                x.strip()
+                for x in open_code.split(",")
+                if x.strip()
+            ]
 
-        if n % 2:
-            odd += 1
+        elif isinstance(open_code, (list, tuple)):
+
+            parts = list(open_code)
+
         else:
-            even += 1
 
-    total = odd + even
+            parts = []
 
-    if total == 0:
-        return {
-            "odd": 0.5,
-            "even": 0.5
-        }
+        if parts:
 
-    return {
-        "odd": odd / total,
-        "even": even / total
-    }
+            try:
+                return int(parts[-1])
+            except (TypeError, ValueError):
+                pass
 
+    # -----------------------------------------
+    # 5. 无法解析
+    # -----------------------------------------
 
-def build_number_features(rows):
-
-    short_rows = rows[:30]
-    medium_rows = rows[:100]
-    long_rows = rows[:300]
-
-    features = {}
-
-    short_freq = special_frequency(short_rows)
-    medium_freq = special_frequency(medium_rows)
-    long_freq = special_frequency(long_rows)
-
-    short_omission = special_omission(short_rows)
-
-    for number in range(1, 50):
-
-        features[number] = {
-            "short_freq": short_freq[number],
-
-            "medium_freq": medium_freq[number],
-
-            "long_freq": long_freq[number],
-
-            "omission": short_omission[number],
-
-            **number_basic_features(number)
-        }
-
-    return features
+    raise ValueError(
+        f"无法获取特码，数据库记录字段："
+        f"{list(row.keys())}"
+    )
