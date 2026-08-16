@@ -3,24 +3,23 @@
 """
 六合彩 V3.0 策略层
 
-统一向 predictor.py 提供：
+负责：
 
-- 号码频率
-- 遗漏
-- 趋势
-- 大小
-- 单双
-- 波色
-- 尾数
-- 分区
-- 号码评分
-
-所有模型均基于：
-最新 → 最旧
+1. 号码频率
+2. 近期趋势
+3. 遗漏
+4. 尾数
+5. 分区
+6. 大小
+7. 单双
+8. 波色
+9. 综合策略
+10. 动态权重
 """
 
 from collections import Counter
 from typing import Any, Dict, List
+
 
 from .wave_model import (
     RED,
@@ -32,115 +31,63 @@ from .wave_model import (
     wave_probabilities,
     wave_single_pick,
     wave_double_pick,
-    analyze_wave,
 )
 
 
 # =========================================================
-# 基础号码
+# 工具
 # =========================================================
 
-NUMBERS = list(range(1, 50))
+def extract_special(
+    row: Dict[str, Any]
+) -> int:
 
-
-# =========================================================
-# 解析 numbers
-# =========================================================
-
-def parse_numbers(value) -> List[int]:
-
-    if value is None:
-        return []
-
-    if isinstance(
-        value,
-        (list, tuple)
-    ):
-
-        result = []
-
-        for x in value:
-
-            try:
-
-                n = int(x)
-
-                if 1 <= n <= 49:
-                    result.append(n)
-
-            except Exception:
-                continue
-
-        return result
-
-    text = str(value).strip()
-
-    if not text:
-        return []
-
-    text = (
-        text
-        .replace("，", ",")
-        .replace("|", ",")
-        .replace(" ", ",")
+    special = row.get(
+        "special"
     )
 
-    result = []
-
-    for x in text.split(","):
+    if special is not None:
 
         try:
-
-            n = int(
-                x.strip()
-            )
-
-            if 1 <= n <= 49:
-                result.append(n)
-
-        except Exception:
-            continue
-
-    return result
-
-
-# =========================================================
-# 获取特码
-# =========================================================
-
-def get_special(row) -> int:
-
-    try:
-
-        special = row.get(
-            "special"
-        )
-
-        if special is not None:
 
             n = int(special)
 
             if 1 <= n <= 49:
                 return n
 
-    except Exception:
-        pass
+        except Exception:
+            pass
+
+    numbers = row.get(
+        "numbers",
+        []
+    )
+
+    if isinstance(
+        numbers,
+        str
+    ):
+
+        numbers = (
+            numbers
+            .replace("，", ",")
+            .split(",")
+        )
 
     try:
 
-        numbers = row.get(
-            "numbers"
-        )
+        numbers = [
+            int(str(x).strip())
+            for x in numbers
+            if str(x).strip()
+        ]
 
     except Exception:
 
         return 0
 
-    numbers = parse_numbers(
-        numbers
-    )
-
     if len(numbers) >= 7:
+
         return numbers[6]
 
     return 0
@@ -150,165 +97,155 @@ def get_special(row) -> int:
 # 提取特码
 # =========================================================
 
-def special_history(
-    rows,
-    limit=None
+def special_sequence(
+    rows: List[Dict[str, Any]]
 ) -> List[int]:
-
-    if limit is not None:
-        rows = rows[:limit]
 
     result = []
 
     for row in rows:
 
-        n = get_special(row)
+        n = extract_special(row)
 
         if 1 <= n <= 49:
-
             result.append(n)
 
     return result
 
 
 # =========================================================
-# 频率模型
+# 频率
 # =========================================================
 
-def frequency_score(
-    rows,
-    window=120
+def frequency_scores(
+    rows: List[Dict[str, Any]],
+    window: int = 120
 ) -> Dict[int, float]:
 
-    history = special_history(
-        rows,
-        window
+    sequence = special_sequence(
+        rows[:window]
     )
 
-    counter = Counter(
-        history
+    counts = Counter(
+        sequence
     )
 
-    total = len(history)
-
-    if total <= 0:
-
-        return {
-            n: 1.0 / 49.0
-            for n in NUMBERS
-        }
-
-    # 拉普拉斯平滑
-    denominator = (
-        total + 49
+    total = max(
+        len(sequence),
+        1
     )
 
     return {
-
         n:
-        (
-            counter.get(n, 0) + 1
-        ) / denominator
+            (
+                counts.get(n, 0)
+                + 1.0
+            )
+            /
+            (
+                total
+                + 49.0
+            )
 
-        for n in NUMBERS
+        for n in range(1, 50)
     }
 
 
 # =========================================================
-# 遗漏模型
+# 近期趋势
 # =========================================================
 
-def omission_score(
-    rows,
-    window=120
+def trend_scores(
+    rows: List[Dict[str, Any]],
+    window: int = 36
 ) -> Dict[int, float]:
 
-    history = special_history(
-        rows,
-        window
+    sequence = special_sequence(
+        rows[:window]
     )
+
+    scores = {
+        n: 0.0
+        for n in range(1, 50)
+    }
+
+    if not sequence:
+        return scores
+
+    total = len(sequence)
+
+    # 越近权重越高
+    for index, number in enumerate(
+        sequence
+    ):
+
+        weight = (
+            total - index
+        ) / total
+
+        scores[number] += weight
+
+    maximum = max(
+        scores.values()
+    )
+
+    if maximum > 0:
+
+        for n in scores:
+
+            scores[n] /= maximum
+
+    return scores
+
+
+# =========================================================
+# 遗漏
+# =========================================================
+
+def omission_scores(
+    rows: List[Dict[str, Any]],
+    window: int = 120
+) -> Dict[int, float]:
+
+    sequence = special_sequence(
+        rows[:window]
+    )
+
+    scores = {}
+
+    for n in range(1, 50):
+
+        omission = window
+
+        for index, value in enumerate(
+            sequence
+        ):
+
+            if value == n:
+
+                omission = index
+                break
+
+        scores[n] = omission
+
+    # 适度降权极端遗漏
+    maximum = max(
+        scores.values()
+    ) if scores else 1
 
     result = {}
 
-    for n in NUMBERS:
+    for n in range(1, 50):
 
-        try:
-
-            index = history.index(n)
-
-            omission = index
-
-        except ValueError:
-
-            omission = len(history)
-
-        result[n] = omission
-
-    # -----------------------------------------------------
-    # 防止遗漏无限放大
-    # -----------------------------------------------------
-
-    max_omission = max(
-        result.values()
-    ) if result else 1
-
-    if max_omission <= 0:
-        max_omission = 1
-
-    normalized = {}
-
-    for n in NUMBERS:
-
-        # 适度衰减
-        value = (
-            result[n] /
-            max_omission
-        )
-
-        normalized[n] = value
-
-    return normalized
-
-
-# =========================================================
-# 趋势模型
-# =========================================================
-
-def trend_score(
-    rows
-) -> Dict[int, float]:
-
-    short = frequency_score(
-        rows,
-        12
-    )
-
-    medium = frequency_score(
-        rows,
-        36
-    )
-
-    long = frequency_score(
-        rows,
-        120
-    )
-
-    result = {}
-
-    for n in NUMBERS:
+        omission = scores[n]
 
         result[n] = (
-
-            short[n] * 0.50
-
-            +
-
-            medium[n] * 0.30
-
-            +
-
-            long[n] * 0.20
-
+            1.0
+            -
+            omission / max(
+                maximum,
+                1
+            )
         )
 
     return result
@@ -318,40 +255,39 @@ def trend_score(
 # 尾数
 # =========================================================
 
-def tail_score(
-    rows
+def tail_scores(
+    rows: List[Dict[str, Any]],
+    window: int = 36
 ) -> Dict[int, float]:
 
-    history = special_history(
-        rows,
-        120
+    sequence = special_sequence(
+        rows[:window]
     )
 
-    counter = Counter(
+    counts = Counter(
         n % 10
-        for n in history
+        for n in sequence
     )
-
-    total = len(history)
 
     result = {}
 
-    for n in NUMBERS:
-
-        tail = n % 10
+    for n in range(1, 50):
 
         result[n] = (
-            (
-                counter.get(
-                    tail,
-                    0
-                ) + 1
+            counts.get(
+                n % 10,
+                0
             )
-            /
-            (
-                total + 10
-            )
+            + 1
         )
+
+    maximum = max(
+        result.values()
+    )
+
+    for n in result:
+
+        result[n] /= maximum
 
     return result
 
@@ -360,7 +296,7 @@ def tail_score(
 # 分区
 # =========================================================
 
-def get_zone(
+def zone(
     number: int
 ) -> int:
 
@@ -382,36 +318,39 @@ def get_zone(
     return 0
 
 
-def zone_score(
-    rows
+def zone_scores(
+    rows: List[Dict[str, Any]],
+    window: int = 36
 ) -> Dict[int, float]:
 
-    history = special_history(
-        rows,
-        120
+    sequence = special_sequence(
+        rows[:window]
     )
 
-    counter = Counter(
-        get_zone(n)
-        for n in history
+    counts = Counter(
+        zone(n)
+        for n in sequence
     )
-
-    total = len(history)
 
     result = {}
 
-    for n in NUMBERS:
-
-        zone = get_zone(n)
+    for n in range(1, 50):
 
         result[n] = (
-            counter.get(
-                zone,
+            counts.get(
+                zone(n),
                 0
-            ) + 1
-        ) / (
-            total + 5
+            )
+            + 1
         )
+
+    maximum = max(
+        result.values()
+    )
+
+    for n in result:
+
+        result[n] /= maximum
 
     return result
 
@@ -420,33 +359,59 @@ def zone_score(
 # 大小
 # =========================================================
 
-def size_score(
-    rows
+def get_size(
+    number: int
+) -> str:
+
+    return "大" if number >= 25 else "小"
+
+
+def size_probabilities(
+    rows: List[Dict[str, Any]],
+    window: int = 36
 ) -> Dict[str, float]:
 
-    history = special_history(
-        rows,
-        36
+    sequence = special_sequence(
+        rows[:window]
     )
 
-    counter = Counter(
-        "大" if n >= 25 else "小"
-        for n in history
+    counts = Counter(
+        get_size(n)
+        for n in sequence
     )
 
-    total = len(history)
+    total = sum(
+        counts.values()
+    )
+
+    if total <= 0:
+
+        return {
+            "大": 0.5,
+            "小": 0.5
+        }
 
     return {
 
         "大":
-        (
-            counter.get("大", 0) + 1
-        ) / (total + 2),
+            (
+                counts.get("大", 0)
+                + 1
+            )
+            /
+            (
+                total + 2
+            ),
 
         "小":
-        (
-            counter.get("小", 0) + 1
-        ) / (total + 2),
+            (
+                counts.get("小", 0)
+                + 1
+            )
+            /
+            (
+                total + 2
+            ),
     }
 
 
@@ -454,247 +419,455 @@ def size_score(
 # 单双
 # =========================================================
 
-def parity_score(
-    rows
+def get_parity(
+    number: int
+) -> str:
+
+    return "单" if number % 2 else "双"
+
+
+def parity_probabilities(
+    rows: List[Dict[str, Any]],
+    window: int = 36
 ) -> Dict[str, float]:
 
-    history = special_history(
-        rows,
-        36
+    sequence = special_sequence(
+        rows[:window]
     )
 
-    counter = Counter(
-        "单" if n % 2 else "双"
-        for n in history
+    counts = Counter(
+        get_parity(n)
+        for n in sequence
     )
 
-    total = len(history)
+    total = sum(
+        counts.values()
+    )
+
+    if total <= 0:
+
+        return {
+            "单": 0.5,
+            "双": 0.5
+        }
 
     return {
 
         "单":
-        (
-            counter.get("单", 0) + 1
-        ) / (total + 2),
+            (
+                counts.get("单", 0)
+                + 1
+            )
+            /
+            (
+                total + 2
+            ),
 
         "双":
-        (
-            counter.get("双", 0) + 1
-        ) / (total + 2),
+            (
+                counts.get("双", 0)
+                + 1
+            )
+            /
+            (
+                total + 2
+            ),
     }
 
 
 # =========================================================
-# 波色
+# 号码策略综合
 # =========================================================
 
-def wave_score(
-    rows
-) -> Dict[str, float]:
-
-    return wave_probabilities(
-        rows
-    )
-
-
-# =========================================================
-# 号码波色
-# =========================================================
-
-def number_wave_score(
-    number: int,
-    wave_prob: Dict[str, float]
-) -> float:
-
-    wave = NUMBER_TO_WAVE.get(
-        number
-    )
-
-    if wave is None:
-        return 0.0
-
-    return wave_prob.get(
-        wave,
-        0.0
-    )
-
-
-# =========================================================
-# 综合号码评分
-# =========================================================
-
-def combined_number_score(
-    rows
+def combine_strategies(
+    rows: List[Dict[str, Any]],
+    weights: Dict[str, float] = None
 ) -> Dict[int, float]:
 
-    frequency = frequency_score(
+    if weights is None:
+
+        weights = {
+
+            "frequency": 0.22,
+
+            "trend": 0.24,
+
+            "omission": 0.10,
+
+            "tail": 0.10,
+
+            "zone": 0.08,
+
+            "wave": 0.16,
+
+            "size": 0.05,
+
+            "parity": 0.05,
+        }
+
+    frequency = frequency_scores(
         rows,
         120
     )
 
-    trend = trend_score(
-        rows
+    trend = trend_scores(
+        rows,
+        36
     )
 
-    omission = omission_score(
+    omission = omission_scores(
         rows,
         120
     )
 
-    tail = tail_score(
+    tail = tail_scores(
+        rows,
+        36
+    )
+
+    zone_s = zone_scores(
+        rows,
+        36
+    )
+
+    wave = wave_probabilities(
         rows
     )
 
-    zone = zone_score(
+    size_p = size_probabilities(
         rows
     )
 
-    wave = wave_score(
+    parity_p = parity_probabilities(
         rows
     )
 
     result = {}
 
-    for n in NUMBERS:
+    for number in range(1, 50):
 
-        # -------------------------------------------------
-        # 遗漏采用适度权重
-        #
-        # 注意：
-        # 遗漏不是“越久没出越一定出”
-        # -------------------------------------------------
-
-        omission_component = (
-            1.0 -
-            omission[n] * 0.30
+        wave_p = wave.get(
+            get_wave(number),
+            1.0 / 3.0
         )
 
-        if omission_component < 0:
-            omission_component = 0.0
+        size_pn = size_p.get(
+            get_size(number),
+            0.5
+        )
+
+        parity_pn = parity_p.get(
+            get_parity(number),
+            0.5
+        )
 
         score = (
 
-            frequency[n] * 0.25
+            frequency[number]
+            * weights["frequency"]
 
             +
 
-            trend[n] * 0.30
+            trend[number]
+            * weights["trend"]
 
             +
 
-            omission_component * 0.10
+            omission[number]
+            * weights["omission"]
 
             +
 
-            tail[n] * 0.10
+            tail[number]
+            * weights["tail"]
 
             +
 
-            zone[n] * 0.10
+            zone_s[number]
+            * weights["zone"]
 
             +
 
-            number_wave_score(
-                n,
-                wave
-            ) * 0.15
+            wave_p
+            * weights["wave"]
 
+            +
+
+            size_pn
+            * weights["size"]
+
+            +
+
+            parity_pn
+            * weights["parity"]
         )
 
-        result[n] = score
+        result[number] = score
 
     return result
 
 
 # =========================================================
-# Top10
+# 排名
 # =========================================================
 
-def top_numbers(
-    rows,
-    count=10
+def rank_numbers(
+    scores: Dict[int, float],
+    top_n: int = 10
 ) -> List[int]:
 
-    scores = combined_number_score(
-        rows
-    )
-
     ordered = sorted(
-
-        NUMBERS,
-
-        key=lambda n:
-        scores[n],
-
+        scores.items(),
+        key=lambda x: x[1],
         reverse=True
     )
 
-    return ordered[:count]
+    return [
+        number
+        for number, _ in ordered[:top_n]
+    ]
 
 
 # =========================================================
-# Top3
+# 号码概率
 # =========================================================
 
-def top_numbers_3(
-    rows
-) -> List[int]:
+def calibrate_number_probabilities(
+    scores: Dict[int, float]
+) -> Dict[int, float]:
 
-    return top_numbers(
+    if not scores:
+
+        return {}
+
+    # -----------------------------------------------------
+    # 防止 1.0000
+    #
+    # 不把 raw score 直接当概率
+    # -----------------------------------------------------
+
+    minimum = min(
+        scores.values()
+    )
+
+    shifted = {
+        n:
+            max(
+                score - minimum,
+                0.000001
+            )
+
+        for n, score in scores.items()
+    }
+
+    total = sum(
+        shifted.values()
+    )
+
+    if total <= 0:
+
+        return {
+            n: 1.0 / 49.0
+            for n in scores
+        }
+
+    probabilities = {
+
+        n:
+            value / total
+
+        for n, value in shifted.items()
+    }
+
+    return probabilities
+
+
+# =========================================================
+# 动态模块权重
+# =========================================================
+
+def normalize_weights(
+    weights: Dict[str, float]
+) -> Dict[str, float]:
+
+    total = sum(
+        max(
+            0.0,
+            float(v)
+        )
+        for v in weights.values()
+    )
+
+    if total <= 0:
+
+        equal = 1.0 / len(
+            weights
+        )
+
+        return {
+            k: equal
+            for k in weights
+        }
+
+    return {
+        k:
+            max(
+                0.0,
+                float(v)
+            )
+            /
+            total
+
+        for k, v in weights.items()
+    }
+
+
+def dynamic_weights(
+    performance: Dict[str, float] = None
+) -> Dict[str, float]:
+
+    base = {
+
+        "frequency": 0.22,
+
+        "trend": 0.24,
+
+        "omission": 0.10,
+
+        "tail": 0.10,
+
+        "zone": 0.08,
+
+        "wave": 0.16,
+
+        "size": 0.05,
+
+        "parity": 0.05,
+    }
+
+    if not performance:
+
+        return normalize_weights(
+            base
+        )
+
+    adjusted = {}
+
+    for key, value in base.items():
+
+        score = performance.get(
+            key,
+            0.5
+        )
+
+        # 历史表现只作为调整因子
+        #
+        # 防止某个模块因为样本少
+        # 突然权重极端化
+
+        factor = 0.70 + (
+            max(
+                0.0,
+                min(
+                    1.0,
+                    score
+                )
+            )
+            * 0.60
+        )
+
+        adjusted[key] = (
+            value * factor
+        )
+
+    return normalize_weights(
+        adjusted
+    )
+
+
+# =========================================================
+# 完整策略输出
+# =========================================================
+
+def build_strategy_result(
+    rows: List[Dict[str, Any]],
+    performance: Dict[str, float] = None
+) -> Dict[str, Any]:
+
+    weights = dynamic_weights(
+        performance
+    )
+
+    scores = combine_strategies(
         rows,
+        weights
+    )
+
+    probabilities = calibrate_number_probabilities(
+        scores
+    )
+
+    top10 = rank_numbers(
+        probabilities,
+        10
+    )
+
+    top3 = rank_numbers(
+        probabilities,
         3
     )
 
-
-# =========================================================
-# 完整策略分析
-# =========================================================
-
-def analyze_strategies(
-    rows
-) -> Dict[str, Any]:
-
-    numbers = combined_number_score(
+    wave_p = wave_probabilities(
         rows
     )
 
-    ordered = sorted(
-        NUMBERS,
-        key=lambda n:
-        numbers[n],
-        reverse=True
+    wave_single = wave_single_pick(
+        wave_p
     )
 
-    wave = analyze_wave(
+    wave_double = wave_double_pick(
+        wave_p
+    )
+
+    size_p = size_probabilities(
+        rows
+    )
+
+    parity_p = parity_probabilities(
         rows
     )
 
     return {
 
-        "number_scores":
-            numbers,
+        "scores":
+            scores,
+
+        "probabilities":
+            probabilities,
 
         "top10":
-            ordered[:10],
+            top10,
 
         "top3":
-            ordered[:3],
+            top3,
 
-        "wave":
-            wave,
+        "weights":
+            weights,
+
+        "wave_probabilities":
+            wave_p,
 
         "wave_single":
-            wave_single_pick(rows),
+            wave_single,
 
         "wave_double":
-            wave_double_pick(rows),
+            wave_double,
 
-        "size":
-            size_score(rows),
+        "size_probabilities":
+            size_p,
 
-        "parity":
-            parity_score(rows),
-
+        "parity_probabilities":
+            parity_p,
     }
 
 
@@ -704,73 +877,44 @@ def analyze_strategies(
 
 if __name__ == "__main__":
 
-    rows = [
+    rows = []
 
-        {
+    for i in range(100):
+
+        rows.append({
+
             "numbers":
-                "38,26,08,06,29,18,23"
-        },
+                [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    (i % 49) + 1
+                ]
+        })
 
-        {
-            "numbers":
-                "33,27,16,28,04,25,14"
-        },
-
-        {
-            "numbers":
-                "01,12,19,24,30,35,46"
-        },
-
-        {
-            "numbers":
-                "05,11,17,22,38,43,49"
-        },
-
-    ]
-
-    print(
-        "=" * 70
+    result = build_strategy_result(
+        rows
     )
 
     print(
-        "V3.0 Strategies 测试"
+        "Top10:",
+        result["top10"]
     )
 
     print(
-        "=" * 70
+        "Top3:",
+        result["top3"]
     )
 
     print(
-        "Top10：",
-        top_numbers(rows)
+        "波色单推:",
+        result["wave_single"]
     )
 
     print(
-        "Top3：",
-        top_numbers_3(rows)
-    )
-
-    print(
-        "波色概率：",
-        wave_score(rows)
-    )
-
-    print(
-        "波色单推：",
-        wave_single_pick(rows)
-    )
-
-    print(
-        "波色双推：",
-        wave_double_pick(rows)
-    )
-
-    print(
-        "大小：",
-        size_score(rows)
-    )
-
-    print(
-        "单双：",
-        parity_score(rows)
+        "波色双推:",
+        result["wave_double"]
     )
