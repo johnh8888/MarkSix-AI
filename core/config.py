@@ -2,88 +2,132 @@
 
 from pathlib import Path
 
-# =========================
-# 基础目录
-# =========================
+
+# =========================================================
+# 项目目录
+# =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 
-DATA_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+OUTPUT_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
 
-# =========================
-# 数据库
-# =========================
+# =========================================================
+# SQLite
+# =========================================================
 
 DB_FILE = DATA_DIR / "lottery.db"
 
 
-# =========================
-# 三个彩种
-# =========================
+# =========================================================
+# 三个真实数据源
+# =========================================================
 
-LOTTERIES = {
+API_SOURCES = {
+
     "hk": {
         "name": "香港六合彩",
-        "api_type": "hk",
+
+        "url":
+            "https://api3.marksix6.net/"
+            "lottery_api.php?type=hk",
+
+        "wave_field":
+            "wave",
     },
 
-    "macau": {
-        "name": "澳门六合彩",
-        "api_type": "macau",
-    },
 
     "newMacau": {
         "name": "新澳门六合彩",
-        "api_type": "newMacau",
+
+        "url":
+            "https://api3.marksix6.net/"
+            "lottery_api.php?type=newMacau",
+
+        "wave_field":
+            "wave",
+    },
+
+
+    "oldMacau": {
+        "name": "老澳门六合彩",
+
+        "url":
+            "https://api3.marksix6.net/"
+            "lottery_api.php?type=oldMacau",
+
+        "wave_field":
+            "waveColors",
     },
 }
 
 
-# =========================
-# 数据源
-# =========================
+# =========================================================
+# HTTP
+# =========================================================
 
-API_URLS = [
-    "https://api3.marksix6.net/lottery_api.php",
-    "https://api2.marksix6.net/lottery_api.php",
-    "https://marksix6.net/api/lottery_api.php",
-]
+REQUEST_TIMEOUT = 20
 
+REQUEST_RETRIES = 3
 
-# =========================
-# 模型参数
-# =========================
-
-# 最近多少期用于主要趋势分析
-WINDOW_SHORT = 30
-
-# 中期
-WINDOW_MEDIUM = 100
-
-# 长期
-WINDOW_LONG = 300
-
-# 最大历史数据
-MAX_HISTORY = 3000
+RETRY_SLEEP = 2
 
 
-# =========================
+# =========================================================
+# SSL
+# =========================================================
+
+# 正常情况下必须验证证书
+SSL_VERIFY = True
+
+# 如果目标 API 证书临时异常，
+# 是否允许进入受控 fallback
+ALLOW_SSL_FALLBACK = True
+
+
+# =========================================================
+# 历史数据
+# =========================================================
+
+MAX_HISTORY = 5000
+
+
+# =========================================================
+# 分析窗口
+# =========================================================
+
+SHORT_WINDOW = 30
+
+MEDIUM_WINDOW = 100
+
+LONG_WINDOW = 300
+
+
+# =========================================================
 # 推荐数量
-# =========================
+# =========================================================
 
 TOP10_NUMBERS = 10
+
 TOP5_ZODIACS = 5
-TOP2_ZODIACS = 2
+
+TOP2_PINGTE_ZODIACS = 2
 
 
-# =========================
+# =========================================================
 # 回测
-# =========================
+# =========================================================
 
 BACKTEST_WINDOWS = [
     100,
@@ -91,11 +135,3 @@ BACKTEST_WINDOWS = [
     500,
     1000,
 ]
-
-
-# =========================
-# 输出文件
-# =========================
-
-PREDICTION_FILE = OUTPUT_DIR / "predictions.json"
-BACKTEST_FILE = OUTPUT_DIR / "backtest.json"
