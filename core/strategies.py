@@ -1,40 +1,88 @@
 # -*- coding: utf-8 -*-
 
-"""
-六合彩策略模块 V1.2
-
-功能：
-
-1. 近期频率
-2. 中期频率
-3. 长期频率
-4. 遗漏
-5. 大小
-6. 单双
-7. 波色
-8. 综合49码评分
-
-重要：
-
-数据库没有 special 字段。
-
-特码统一：
-
-numbers 第7个号码
-"""
-
 from collections import Counter
-
-from .features import (
-    get_special,
-    special_frequency,
-    special_omission,
-    get_wave,
-)
 
 
 # =========================================================
-# 分数归一化
+# 基础工具
+# =========================================================
+
+def get_special(row):
+
+    """
+    兼容：
+
+    {
+        "special": 27
+    }
+
+    或：
+
+    {
+        "numbers": "33,27,16,28,04,25,14"
+    }
+    """
+
+    try:
+
+        if isinstance(row, dict):
+
+            if "special" in row:
+
+                return int(
+                    row["special"]
+                )
+
+            if "special_number" in row:
+
+                return int(
+                    row["special_number"]
+                )
+
+            numbers = row.get(
+                "numbers"
+            )
+
+            if numbers:
+
+                if isinstance(
+                    numbers,
+                    str
+                ):
+
+                    values = [
+                        int(x.strip())
+                        for x in numbers.split(",")
+                        if x.strip()
+                    ]
+
+                    if values:
+
+                        return values[1] if len(values) >= 7 else values[0]
+
+                if isinstance(
+                    numbers,
+                    list
+                ):
+
+                    values = [
+                        int(x)
+                        for x in numbers
+                    ]
+
+                    if values:
+
+                        return values[1] if len(values) >= 7 else values[0]
+
+    except Exception:
+
+        pass
+
+    return 0
+
+
+# =========================================================
+# 归一化
 # =========================================================
 
 def normalize_scores(scores):
@@ -46,7 +94,9 @@ def normalize_scores(scores):
             for n in range(1, 50)
         }
 
-    values = list(scores.values())
+    values = list(
+        scores.values()
+    )
 
     low = min(values)
     high = max(values)
@@ -55,102 +105,222 @@ def normalize_scores(scores):
 
         return {
             n: 0.5
-            for n in range(1, 50)
+            for n in scores
         }
 
     return {
-        n: (
-            (scores.get(n, low) - low)
-            / (high - low)
-        )
-        for n in range(1, 50)
+
+        n:
+            (value - low)
+            /
+            (high - low)
+
+        for n, value
+        in scores.items()
     }
 
 
 # =========================================================
-# 策略1：近期频率
+# 平滑频率
+# =========================================================
+
+def smoothed_frequency(rows):
+
+    counter = Counter()
+
+    for row in rows:
+
+        n = get_special(row)
+
+        if 1 <= n <= 49:
+
+            counter[n] += 1
+
+    total = sum(
+        counter.values()
+    )
+
+    result = {}
+
+    for n in range(1, 50):
+
+        result[n] = (
+            counter[n] + 1
+        ) / (
+            total + 49
+        )
+
+    return result
+
+
+# =========================================================
+# 最近频率
 # =========================================================
 
 def strategy_recent(rows):
 
-    freq = special_frequency(
-        rows[:30]
+    data = rows[:20]
+
+    freq = smoothed_frequency(
+        data
     )
 
-    scores = normalize_scores(freq)
-
-    return {
-        n: scores.get(n, 0.0)
-        for n in range(1, 50)
-    }
+    return normalize_scores(
+        freq
+    )
 
 
 # =========================================================
-# 策略2：中期频率
+# 近期增强
+# =========================================================
+
+def strategy_recent10(rows):
+
+    data = rows[:10]
+
+    freq = smoothed_frequency(
+        data
+    )
+
+    return normalize_scores(
+        freq
+    )
+
+
+# =========================================================
+# 中短期
 # =========================================================
 
 def strategy_medium(rows):
 
-    freq = special_frequency(
-        rows[:100]
+    data = rows[:50]
+
+    freq = smoothed_frequency(
+        data
     )
 
-    scores = normalize_scores(freq)
-
-    return {
-        n: scores.get(n, 0.0)
-        for n in range(1, 50)
-    }
+    return normalize_scores(
+        freq
+    )
 
 
 # =========================================================
-# 策略3：长期频率
+# 长期基础
 # =========================================================
 
 def strategy_long(rows):
 
-    freq = special_frequency(
-        rows[:300]
+    data = rows[:200]
+
+    freq = smoothed_frequency(
+        data
     )
 
-    scores = normalize_scores(freq)
-
-    return {
-        n: scores.get(n, 0.0)
-        for n in range(1, 50)
-    }
+    return normalize_scores(
+        freq
+    )
 
 
 # =========================================================
-# 策略4：遗漏
+# 遗漏策略
 # =========================================================
 
 def strategy_omission(rows):
 
-    omission = special_omission(
-        rows[:300]
-    )
+    omission = {}
 
-    scores = normalize_scores(
+    seen = set()
+
+    for index, row in enumerate(rows[:200]):
+
+        n = get_special(row)
+
+        if not 1 <= n <= 49:
+            continue
+
+        if n not in seen:
+
+            omission[n] = (
+                index + 1
+            )
+
+            seen.add(n)
+
+    for n in range(1, 50):
+
+        omission.setdefault(
+            n,
+            201
+        )
+
+    return normalize_scores(
         omission
     )
 
-    return {
-        n: scores.get(n, 0.0)
-        for n in range(1, 50)
-    }
+
+# =========================================================
+# 遗漏压缩
+# =========================================================
+
+def strategy_omission_decay(rows):
+
+    """
+    避免极端遗漏号码获得过高分。
+
+    使用 sqrt 压缩。
+    """
+
+    import math
+
+    omission = {}
+
+    seen = set()
+
+    for index, row in enumerate(rows[:100]):
+
+        n = get_special(row)
+
+        if not 1 <= n <= 49:
+            continue
+
+        if n not in seen:
+
+            omission[n] = (
+                index + 1
+            )
+
+            seen.add(n)
+
+    result = {}
+
+    for n in range(1, 50):
+
+        value = omission.get(
+            n,
+            101
+        )
+
+        result[n] = math.sqrt(
+            value
+        )
+
+    return normalize_scores(
+        result
+    )
 
 
 # =========================================================
-# 策略5：大小
+# 大小
 # =========================================================
 
 def strategy_size(rows):
 
+    recent = rows[:20]
+
     big = 0
     small = 0
 
-    for row in rows[:100]:
+    for row in recent:
 
         n = get_special(row)
 
@@ -171,30 +341,45 @@ def strategy_size(rows):
             for n in range(1, 50)
         }
 
-    big_prob = big / total
-    small_prob = small / total
+    big_prob = (
+        big + 1
+    ) / (
+        total + 2
+    )
 
-    return {
+    small_prob = (
+        small + 1
+    ) / (
+        total + 2
+    )
 
-        n:
-            big_prob
-            if n >= 25
-            else small_prob
+    result = {}
 
-        for n in range(1, 50)
-    }
+    for n in range(1, 50):
+
+        if n >= 25:
+
+            result[n] = big_prob
+
+        else:
+
+            result[n] = small_prob
+
+    return result
 
 
 # =========================================================
-# 策略6：单双
+# 单双
 # =========================================================
 
 def strategy_parity(rows):
 
+    recent = rows[:20]
+
     odd = 0
     even = 0
 
-    for row in rows[:100]:
+    for row in recent:
 
         n = get_special(row)
 
@@ -202,8 +387,11 @@ def strategy_parity(rows):
             continue
 
         if n % 2:
+
             odd += 1
+
         else:
+
             even += 1
 
     total = odd + even
@@ -215,67 +403,110 @@ def strategy_parity(rows):
             for n in range(1, 50)
         }
 
-    odd_prob = odd / total
-    even_prob = even / total
+    odd_prob = (
+        odd + 1
+    ) / (
+        total + 2
+    )
 
-    return {
+    even_prob = (
+        even + 1
+    ) / (
+        total + 2
+    )
 
-        n:
-            odd_prob
-            if n % 2
-            else even_prob
+    result = {}
 
-        for n in range(1, 50)
-    }
+    for n in range(1, 50):
+
+        if n % 2:
+
+            result[n] = odd_prob
+
+        else:
+
+            result[n] = even_prob
+
+    return result
 
 
 # =========================================================
-# 策略7：波色
+# 尾数
 # =========================================================
 
-def strategy_wave(rows):
+def strategy_tail(rows):
 
     counter = Counter()
 
-    for row in rows[:100]:
+    for row in rows[:50]:
 
         n = get_special(row)
 
-        if not 1 <= n <= 49:
-            continue
+        if 1 <= n <= 49:
 
-        wave = get_wave(n)
+            counter[n % 10] += 1
 
-        if wave in ("红", "蓝", "绿"):
-            counter[wave] += 1
+    result = {}
 
-    total = sum(counter.values())
+    for n in range(1, 50):
 
-    if total == 0:
+        result[n] = (
+            counter[n % 10] + 1
+        )
 
-        return {
-            n: 1 / 3
-            for n in range(1, 50)
-        }
+    return normalize_scores(
+        result
+    )
 
-    wave_probability = {
 
-        wave:
-            counter.get(wave, 0) / total
+# =========================================================
+# 分区
+# =========================================================
 
-        for wave in ("红", "蓝", "绿")
-    }
+def get_zone(n):
 
-    return {
+    if n <= 10:
+        return 1
 
-        n:
-            wave_probability.get(
-                get_wave(n),
-                1 / 3
-            )
+    if n <= 20:
+        return 2
 
-        for n in range(1, 50)
-    }
+    if n <= 30:
+        return 3
+
+    if n <= 40:
+        return 4
+
+    return 5
+
+
+def strategy_zone(rows):
+
+    counter = Counter()
+
+    for row in rows[:50]:
+
+        n = get_special(row)
+
+        if 1 <= n <= 49:
+
+            counter[
+                get_zone(n)
+            ] += 1
+
+    result = {}
+
+    for n in range(1, 50):
+
+        result[n] = (
+            counter[
+                get_zone(n)
+            ] + 1
+        )
+
+    return normalize_scores(
+        result
+    )
 
 
 # =========================================================
@@ -293,10 +524,12 @@ def combine_strategies(rows):
 
         return empty, {}
 
-
     strategies = {
 
-        "recent":
+        "recent10":
+            strategy_recent10(rows),
+
+        "recent20":
             strategy_recent(rows),
 
         "medium":
@@ -308,72 +541,85 @@ def combine_strategies(rows):
         "omission":
             strategy_omission(rows),
 
+        "omission_decay":
+            strategy_omission_decay(rows),
+
         "size":
             strategy_size(rows),
 
         "parity":
             strategy_parity(rows),
 
-        "wave":
-            strategy_wave(rows),
+        "tail":
+            strategy_tail(rows),
+
+        "zone":
+            strategy_zone(rows),
     }
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # 权重
-    # =====================================================
+    # -----------------------------------------------------
 
     weights = {
 
-        "recent": 0.22,
+        "recent10":
+            0.18,
 
-        "medium": 0.18,
+        "recent20":
+            0.18,
 
-        "long": 0.12,
+        "medium":
+            0.12,
 
-        "omission": 0.10,
+        "long":
+            0.06,
 
-        "size": 0.13,
+        "omission":
+            0.08,
 
-        "parity": 0.10,
+        "omission_decay":
+            0.06,
 
-        "wave": 0.15,
+        "size":
+            0.10,
+
+        "parity":
+            0.08,
+
+        "tail":
+            0.07,
+
+        "zone":
+            0.07,
     }
-
-
-    # =====================================================
-    # 综合
-    # =====================================================
 
     final_scores = {
         n: 0.0
         for n in range(1, 50)
     }
 
-
-    for strategy_name, scores in strategies.items():
+    for name, scores in strategies.items():
 
         weight = weights.get(
-            strategy_name,
+            name,
             0.0
         )
 
         for n in range(1, 50):
 
             final_scores[n] += (
-                scores.get(n, 0.0)
-                * weight
+                scores.get(
+                    n,
+                    0.5
+                )
+                *
+                weight
             )
-
-
-    # =====================================================
-    # 最终归一化
-    # =====================================================
 
     final_scores = normalize_scores(
         final_scores
     )
-
 
     return (
         final_scores,
@@ -403,20 +649,15 @@ if __name__ == "__main__":
             "numbers":
                 "47,14,44,32,07,37,11"
         },
-
     ]
 
     print("=" * 70)
-    print("六合彩策略模块 V1.2")
+    print("strategies.py V1.4")
     print("=" * 70)
 
     scores, strategy_scores = combine_strategies(
         rows
     )
-
-    print()
-    print("49码综合评分 TOP10")
-    print("-" * 70)
 
     top10 = sorted(
         scores.items(),
@@ -424,13 +665,15 @@ if __name__ == "__main__":
         reverse=True
     )[:10]
 
-    for rank, (number, score) in enumerate(
+    print()
+
+    for index, (n, score) in enumerate(
         top10,
         1
     ):
 
         print(
-            f"{rank:02d}. "
-            f"{number:02d} "
-            f"-> {score:.6f}"
+            f"{index:02d}. "
+            f"{n:02d} -> "
+            f"{score:.6f}"
         )
