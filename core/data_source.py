@@ -1,32 +1,34 @@
 # -*- coding: utf-8 -*-
 
-import json
 import time
+from typing import Any, Dict, List, Optional
+
 import requests
 import urllib3
 
-from requests.exceptions import (
-    SSLError,
-    RequestException,
-)
-
-from .config import (
+from core.config import (
     API_SOURCES,
+    HISTORY_API_URL,
     REQUEST_TIMEOUT,
+    HISTORY_TIMEOUT,
     REQUEST_RETRIES,
     RETRY_SLEEP,
     SSL_VERIFY,
     ALLOW_SSL_FALLBACK,
+    MAX_HISTORY,
+    LOTTERIES,
 )
 
-from .database import (
+from core.database import (
+    init_database,
     insert_draw,
-    insert_fetch_log,
+    upsert_draw,
+    count_draws,
 )
 
 
 # =========================================================
-# SSL Warning
+# SSL 警告关闭
 # =========================================================
 
 urllib3.disable_warnings(
@@ -35,684 +37,80 @@ urllib3.disable_warnings(
 
 
 # =========================================================
-# Session
+# HTTP Session
 # =========================================================
 
 SESSION = requests.Session()
 
-SESSION.headers.update({
-
-    "User-Agent":
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/151.0.0.0 Safari/537.36",
-
-    "Accept":
-        "application/json,text/plain,*/*",
-
-    "Connection":
-        "close",
-})
-
-
-# =========================================================
-# 数字解析
-# =========================================================
-
-def normalize_number(value):
-
-    try:
-
-        value = str(value).strip()
-
-        value = (
-            value
-            .replace("号", "")
-            .replace(" ", "")
-            .replace("　", "")
-        )
-
-        return int(value)
-
-    except Exception:
-
-        return None
-
-
-# =========================================================
-# 从任意字典中寻找字段
-# =========================================================
-
-def get_first(data, keys):
-
-    if not isinstance(data, dict):
-        return None
-
-    for key in keys:
-
-        value = data.get(key)
-
-        if value is not None and value != "":
-            return value
-
-    return None
-
-
-# =========================================================
-# 数字解析
-# =========================================================
-
-def parse_numbers(payload):
-
-    if not isinstance(payload, dict):
-        return []
-
-
-    # -----------------------------------------------------
-    # 1. numbers
-    # -----------------------------------------------------
-
-    numbers = payload.get("numbers")
-
-    if isinstance(numbers, list):
-
-        result = []
-
-        for value in numbers:
-
-            number = normalize_number(value)
-
-            if number is not None:
-                result.append(number)
-
-        if len(result) == 7:
-            return result
-
-
-    # -----------------------------------------------------
-    # 2. openCode
-    # -----------------------------------------------------
-
-    open_code = payload.get("openCode")
-
-    if isinstance(open_code, list):
-
-        result = []
-
-        for value in open_code:
-
-            number = normalize_number(value)
-
-            if number is not None:
-                result.append(number)
-
-        if len(result) == 7:
-            return result
-
-
-    if isinstance(open_code, str):
-
-        text = (
-            open_code
-            .replace("|", ",")
-            .replace("/", ",")
-            .replace("\\", ",")
-            .replace(" ", ",")
-            .replace("，", ",")
-            .replace("-", ",")
-        )
-
-        parts = text.split(",")
-
-        result = []
-
-        for value in parts:
-
-            number = normalize_number(value)
-
-            if number is not None:
-                result.append(number)
-
-        if len(result) == 7:
-            return result
-
-
-    # -----------------------------------------------------
-    # 3. open_code
-    # -----------------------------------------------------
-
-    open_code = payload.get("open_code")
-
-    if isinstance(open_code, str):
-
-        parts = (
-            open_code
-            .replace("|", ",")
-            .replace("/", ",")
-            .replace(" ", ",")
-            .replace("，", ",")
-            .split(",")
-        )
-
-        result = []
-
-        for value in parts:
-
-            number = normalize_number(value)
-
-            if number is not None:
-                result.append(number)
-
-        if len(result) == 7:
-            return result
-
-
-    # -----------------------------------------------------
-    # 4. code / codes
-    # -----------------------------------------------------
-
-    for key in (
-        "code",
-        "codes",
-        "openNumbers",
-        "open_numbers",
-    ):
-
-        value = payload.get(key)
-
-        if isinstance(value, list):
-
-            result = []
-
-            for item in value:
-
-                number = normalize_number(item)
-
-                if number is not None:
-                    result.append(number)
-
-            if len(result) == 7:
-                return result
-
-
-    return []
-
-
-# =========================================================
-# 解析波色
-# =========================================================
-
-def parse_wave(payload):
-
-    if not isinstance(payload, dict):
-        return None
-
-    return get_first(
-        payload,
-        (
-            "wave",
-            "waveColor",
-            "wave_color",
-            "waveColors",
-            "wave_colors",
-        )
-    )
-
-
-# =========================================================
-# 解析生肖
-# =========================================================
-
-def parse_zodiac(payload):
-
-    if not isinstance(payload, dict):
-        return None
-
-    return get_first(
-        payload,
-        (
-            "zodiac",
-            "zodiacs",
-            "shengxiao",
-            "sheng_xiao",
-        )
-    )
-
-
-# =========================================================
-# 查找历史数组
-# =========================================================
-
-def extract_history(payload):
-
-    if not isinstance(payload, dict):
-        return []
-
-
-    # =====================================================
-    # 第一层 history
-    # =====================================================
-
-    history = payload.get("history")
-
-    if isinstance(history, list):
-        return history
-
-
-    if isinstance(history, dict):
-
-        for key in (
-            "data",
-            "list",
-            "records",
-            "items",
-            "history",
-        ):
-
-            value = history.get(key)
-
-            if isinstance(value, list):
-                return value
-
-
-    # =====================================================
-    # lottery_data
-    # =====================================================
-
-    lottery_data = payload.get(
-        "lottery_data"
-    )
-
-    if isinstance(lottery_data, dict):
-
-        history = lottery_data.get(
-            "history"
-        )
-
-        if isinstance(history, list):
-            return history
-
-        if isinstance(history, dict):
-
-            for key in (
-                "data",
-                "list",
-                "records",
-                "items",
-                "history",
-            ):
-
-                value = history.get(key)
-
-                if isinstance(value, list):
-                    return value
-
-
-    # =====================================================
-    # data
-    # =====================================================
-
-    data = payload.get("data")
-
-    if isinstance(data, dict):
-
-        history = data.get(
-            "history"
-        )
-
-        if isinstance(history, list):
-            return history
-
-        if isinstance(history, dict):
-
-            for key in (
-                "data",
-                "list",
-                "records",
-                "items",
-                "history",
-            ):
-
-                value = history.get(key)
-
-                if isinstance(value, list):
-                    return value
-
-
-    # =====================================================
-    # result
-    # =====================================================
-
-    result = payload.get("result")
-
-    if isinstance(result, dict):
-
-        history = result.get(
-            "history"
-        )
-
-        if isinstance(history, list):
-            return history
-
-        if isinstance(history, dict):
-
-            for key in (
-                "data",
-                "list",
-                "records",
-                "items",
-                "history",
-            ):
-
-                value = history.get(key)
-
-                if isinstance(value, list):
-                    return value
-
-
-    return []
-
-
-# =========================================================
-# 查找当前开奖数据
-# =========================================================
-
-def extract_current_payload(payload):
-
-    if not isinstance(payload, dict):
-        return None
-
-
-    # -----------------------------------------------------
-    # 顶层本身
-    # -----------------------------------------------------
-
-    if (
-        payload.get("expect")
-        or payload.get("issue")
-        or payload.get("issueNo")
-    ):
-
-        return payload
-
-
-    # -----------------------------------------------------
-    # lottery_data
-    # -----------------------------------------------------
-
-    lottery_data = payload.get(
-        "lottery_data"
-    )
-
-    if isinstance(lottery_data, dict):
-
-        if (
-            lottery_data.get("expect")
-            or lottery_data.get("issue")
-            or lottery_data.get("issueNo")
-        ):
-
-            return lottery_data
-
-
-    # -----------------------------------------------------
-    # data
-    # -----------------------------------------------------
-
-    data = payload.get("data")
-
-    if isinstance(data, dict):
-
-        if (
-            data.get("expect")
-            or data.get("issue")
-            or data.get("issueNo")
-        ):
-
-            return data
-
-
-    # -----------------------------------------------------
-    # result
-    # -----------------------------------------------------
-
-    result = payload.get("result")
-
-    if isinstance(result, dict):
-
-        if (
-            result.get("expect")
-            or result.get("issue")
-            or result.get("issueNo")
-        ):
-
-            return result
-
-
-    return None
-
-
-# =========================================================
-# 解析开奖
-# =========================================================
-
-def parse_draw(
-    payload,
-    lottery_key,
-    source
-):
-
-    if not isinstance(payload, dict):
-        return None
-
-
-    # -----------------------------------------------------
-    # 期号
-    # -----------------------------------------------------
-
-    issue = get_first(
-        payload,
-        (
-            "expect",
-            "issue",
-            "issueNo",
-            "issue_no",
-            "period",
-            "periodNo",
-        )
-    )
-
-    if issue is None:
-        return None
-
-
-    issue = str(issue).strip()
-
-    if not issue:
-        return None
-
-
-    # -----------------------------------------------------
-    # 开奖号码
-    # -----------------------------------------------------
-
-    numbers = parse_numbers(
-        payload
-    )
-
-    if len(numbers) != 7:
-        return None
-
-
-    # -----------------------------------------------------
-    # 范围
-    # -----------------------------------------------------
-
-    if any(
-        number < 1 or number > 49
-        for number in numbers
-    ):
-
-        return None
-
-
-    # -----------------------------------------------------
-    # 不允许重复
-    # -----------------------------------------------------
-
-    if len(set(numbers)) != 7:
-        return None
-
-
-    # -----------------------------------------------------
-    # 生肖
-    # -----------------------------------------------------
-
-    zodiac = parse_zodiac(
-        payload
-    )
-
-
-    # -----------------------------------------------------
-    # 波色
-    # -----------------------------------------------------
-
-    wave = parse_wave(
-        payload
-    )
-
-
-    # -----------------------------------------------------
-    # 开奖时间
-    # -----------------------------------------------------
-
-    open_time = get_first(
-        payload,
-        (
-            "openTime",
-            "open_time",
-            "drawTime",
-            "draw_time",
-            "openDate",
-            "date",
-        )
-    )
-
-
-    return {
-
-        "lottery":
-            lottery_key,
-
-        "issue":
-            issue,
-
-        "open_time":
-            open_time,
-
-        "numbers":
-            numbers,
-
-        "zodiac":
-            zodiac,
-
-        "wave":
-            wave,
-
-        "source":
-            source["url"],
+SESSION.headers.update(
+    {
+        "User-Agent":
+            (
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "Chrome/151.0 Safari/537.36"
+            ),
+
+        "Accept":
+            "application/json,text/plain,*/*",
     }
+)
 
 
 # =========================================================
-# 请求 API
+# 请求 JSON
 # =========================================================
 
-def fetch_api(
-    lottery_key,
-    source
-):
-
-    url = source["url"]
+def request_json(
+    url: str,
+    timeout: int = REQUEST_TIMEOUT,
+    retries: int = REQUEST_RETRIES,
+) -> Dict[str, Any]:
 
     last_error = None
 
 
     # =====================================================
-    # 正常 SSL
+    # 第一阶段：正常 SSL
     # =====================================================
 
     for attempt in range(
         1,
-        REQUEST_RETRIES + 1
+        retries + 1
     ):
 
         try:
 
-            print()
-
             print(
-                f"[{lottery_key}] "
-                f"请求API "
-                f"第{attempt}次"
+                f"请求API 第{attempt}次"
             )
 
-            print(url)
+            print(
+                url
+            )
 
 
             response = SESSION.get(
 
                 url,
 
-                timeout=
-                    REQUEST_TIMEOUT,
+                timeout=timeout,
 
-                verify=
-                    SSL_VERIFY,
+                verify=SSL_VERIFY,
 
                 allow_redirects=True,
-            )
-
-
-            print(
-                f"[{lottery_key}] "
-                f"HTTP {response.status_code}"
             )
 
 
             response.raise_for_status()
 
 
-            # -------------------------------------------------
-            # JSON
-            # -------------------------------------------------
-
-            try:
-
-                payload = response.json()
-
-            except ValueError:
-
-                # 有些服务器 Content-Type 不规范
-                # 但实际返回仍然是 JSON
-
-                text = response.text.strip()
-
-                if not text:
-
-                    raise ValueError(
-                        "API返回为空"
-                    )
-
-                payload = json.loads(
-                    text
-                )
+            data = response.json()
 
 
             if not isinstance(
-                payload,
+                data,
                 dict
             ):
 
@@ -721,10 +119,10 @@ def fetch_api(
                 )
 
 
-            return payload
+            return data
 
 
-        except SSLError as e:
+        except requests.exceptions.SSLError as e:
 
             last_error = e
 
@@ -736,20 +134,16 @@ def fetch_api(
             break
 
 
-        except (
-            RequestException,
-            ValueError
-        ) as e:
+        except Exception as e:
 
             last_error = e
 
             print(
-                "API请求失败:",
-                e
+                f"请求失败：{e}"
             )
 
 
-            if attempt < REQUEST_RETRIES:
+            if attempt < retries:
 
                 time.sleep(
                     RETRY_SLEEP
@@ -757,19 +151,10 @@ def fetch_api(
 
 
     # =====================================================
-    # SSL fallback
+    # 第二阶段：受控 SSL fallback
     # =====================================================
 
-    if (
-        isinstance(
-            last_error,
-            SSLError
-        )
-        and
-        ALLOW_SSL_FALLBACK
-    ):
-
-        print()
+    if ALLOW_SSL_FALLBACK:
 
         print(
             "⚠️ 正常SSL验证失败"
@@ -780,470 +165,886 @@ def fetch_api(
         )
 
 
-        try:
-
-            response = SESSION.get(
-
-                url,
-
-                timeout=
-                    REQUEST_TIMEOUT,
-
-                verify=False,
-
-                allow_redirects=True,
-            )
-
-
-            response.raise_for_status()
-
+        for attempt in range(
+            1,
+            retries + 1
+        ):
 
             try:
 
-                payload = response.json()
+                response = SESSION.get(
 
-            except ValueError:
+                    url,
 
-                payload = json.loads(
-                    response.text
+                    timeout=timeout,
+
+                    verify=False,
+
+                    allow_redirects=True,
                 )
 
 
-            if isinstance(
-                payload,
-                dict
-            ):
+                response.raise_for_status()
+
+
+                data = response.json()
+
+
+                if not isinstance(
+                    data,
+                    dict
+                ):
+
+                    raise ValueError(
+                        "API返回不是JSON对象"
+                    )
+
 
                 print(
                     "✅ SSL fallback成功"
                 )
 
-                return payload
+
+                return data
 
 
-        except Exception as e:
+            except Exception as e:
 
-            last_error = e
+                last_error = e
 
-            print(
-                "SSL fallback失败:",
-                e
-            )
+                print(
+                    f"fallback失败：{e}"
+                )
+
+
+                if attempt < retries:
+
+                    time.sleep(
+                        RETRY_SLEEP
+                    )
+
+
+    raise RuntimeError(
+        f"API请求最终失败：{url} | {last_error}"
+    )
+
+
+# =========================================================
+# 清洗号码
+# =========================================================
+
+def normalize_numbers(
+    numbers: Any
+) -> List[str]:
+
+    if numbers is None:
+
+        return []
+
+
+    if isinstance(
+        numbers,
+        list
+    ):
+
+        result = []
+
+        for number in numbers:
+
+            value = str(
+                number
+            ).strip()
+
+
+            if value:
+
+                result.append(
+                    value.zfill(2)
+                )
+
+
+        return result
+
+
+    if isinstance(
+        numbers,
+        str
+    ):
+
+        text = numbers.strip()
+
+
+        if not text:
+
+            return []
+
+
+        for separator in (
+            ",",
+            "，",
+            " ",
+            "|",
+            "/",
+        ):
+
+            if separator in text:
+
+                parts = (
+                    text
+                    .replace(
+                        "，",
+                        ","
+                    )
+                    .split(
+                        separator
+                    )
+                )
+
+                return [
+
+                    str(x).strip().zfill(2)
+
+                    for x in parts
+
+                    if str(x).strip()
+                ]
+
+
+        return [
+            text.zfill(2)
+        ]
+
+
+    return []
+
+
+# =========================================================
+# 号码字符串
+# =========================================================
+
+def numbers_to_string(
+    numbers: Any
+) -> str:
+
+    normalized = normalize_numbers(
+        numbers
+    )
+
+
+    return ",".join(
+        normalized
+    )
+
+
+# =========================================================
+# 字段转字符串
+# =========================================================
+
+def clean_text(
+    value: Any
+) -> Optional[str]:
+
+    if value is None:
+
+        return None
+
+
+    text = str(
+        value
+    ).strip()
+
+
+    if not text:
+
+        return None
+
+
+    return text
+
+
+# =========================================================
+# 历史行解析
+#
+# 例如：
+#
+# 2026089 期：33,27,16,28,04,25,14
+# =========================================================
+
+def parse_history_row(
+    row: Any
+):
+
+    if not isinstance(
+        row,
+        str
+    ):
+
+        return None
+
+
+    text = row.strip()
+
+
+    if not text:
+
+        return None
+
+
+    # -----------------------------------------------------
+    # 处理中文期号
+    # -----------------------------------------------------
+
+    if "期：" in text:
+
+        parts = text.split(
+            "期：",
+            1
+        )
+
+    elif "期:" in text:
+
+        parts = text.split(
+            "期:",
+            1
+        )
+
+    else:
+
+        return None
+
+
+    if len(parts) != 2:
+
+        return None
+
+
+    issue = (
+        parts[0]
+        .replace(
+            "期",
+            ""
+        )
+        .strip()
+    )
+
+
+    numbers_text = (
+        parts[1]
+        .strip()
+    )
+
+
+    if not issue:
+
+        return None
+
+
+    numbers = normalize_numbers(
+        numbers_text
+    )
+
+
+    if len(numbers) != 7:
+
+        return None
+
+
+    return {
+
+        "issue":
+            issue,
+
+        "numbers":
+            ",".join(numbers),
+    }
+
+
+# =========================================================
+# 读取历史 API
+# =========================================================
+
+def fetch_history_api():
+
+    print()
+    print("=" * 70)
+
+    print(
+        "正在获取历史数据"
+    )
+
+    print(
+        HISTORY_API_URL
+    )
+
+    print("=" * 70)
+
+
+    data = request_json(
+
+        HISTORY_API_URL,
+
+        timeout=HISTORY_TIMEOUT,
+
+        retries=REQUEST_RETRIES,
+    )
+
+
+    lottery_data = data.get(
+        "lottery_data",
+        []
+    )
+
+
+    if not isinstance(
+        lottery_data,
+        list
+    ):
+
+        raise ValueError(
+            "history API 的 lottery_data 不是list"
+        )
+
+
+    print(
+        "历史API彩种数量：",
+        len(lottery_data)
+    )
+
+
+    return lottery_data
+
+
+# =========================================================
+# 彩种历史代码识别
+# =========================================================
+
+def resolve_lottery_code(
+    item: Dict[str, Any]
+) -> Optional[str]:
+
+    code = clean_text(
+        item.get("code")
+    )
+
+
+    if code in LOTTERIES:
+
+        return code
+
+
+    name = clean_text(
+        item.get("name")
+    )
+
+
+    if name == "香港彩":
+
+        return "hk"
+
+
+    if name == "香港六合彩":
+
+        return "hk"
+
+
+    if name == "新澳门彩":
+
+        return "newMacau"
+
+
+    if name == "新澳门六合彩":
+
+        return "newMacau"
+
+
+    if name == "老澳门彩":
+
+        return "oldMacau"
+
+
+    if name == "老澳门六合彩":
+
+        return "oldMacau"
 
 
     return None
 
 
 # =========================================================
-# 解析历史数据
+# 同步历史
 # =========================================================
 
-def parse_history(
-    payload,
-    lottery_key,
-    source
-):
+def sync_history() -> int:
 
-    history = extract_history(
-        payload
-    )
-
-    if not history:
-        return []
+    lottery_data = fetch_history_api()
 
 
-    draws = []
+    total_inserted = 0
 
 
-    for item in history:
+    for item in lottery_data:
 
-        # -------------------------------------------------
-        # 字典
-        # -------------------------------------------------
+        if not isinstance(
+            item,
+            dict
+        ):
 
-        if isinstance(item, dict):
+            continue
 
-            draw = parse_draw(
-                item,
-                lottery_key,
-                source
+
+        lottery = resolve_lottery_code(
+            item
+        )
+
+
+        if lottery is None:
+
+            print(
+                "⚠️ 无法识别历史彩种：",
+                item.get("name"),
+                item.get("code")
             )
 
-            if draw is not None:
+            continue
 
-                draws.append(draw)
+
+        name = (
+            LOTTERIES
+            .get(
+                lottery,
+                {}
+            )
+            .get(
+                "name",
+                item.get("name")
+            )
+        )
+
+
+        history = item.get(
+            "history",
+            []
+        )
+
+
+        if not isinstance(
+            history,
+            list
+        ):
 
             continue
 
 
         # -------------------------------------------------
-        # JSON 字符串
+        # 限制最大历史
         # -------------------------------------------------
 
-        if isinstance(item, str):
+        history = history[
+            :MAX_HISTORY
+        ]
 
-            item = item.strip()
 
-            if not item:
+        print()
+        print(
+            f"同步历史：{name}"
+        )
+
+        print(
+            f"API返回：{len(history)}期"
+        )
+
+
+        for row in history:
+
+            parsed = parse_history_row(
+                row
+            )
+
+
+            if parsed is None:
+
+                print(
+                    "⚠️ 历史数据解析失败：",
+                    row
+                )
+
                 continue
 
 
-            try:
+            inserted = insert_draw(
 
-                item_payload = json.loads(
-                    item
-                )
+                lottery=lottery,
 
-            except Exception:
+                name=name,
 
-                continue
+                issue=parsed["issue"],
 
+                numbers=parsed["numbers"],
 
-            if isinstance(
-                item_payload,
-                dict
-            ):
+                open_time=None,
 
-                draw = parse_draw(
-                    item_payload,
-                    lottery_key,
-                    source
-                )
+                zodiac=None,
 
-                if draw is not None:
+                wave=None,
 
-                    draws.append(draw)
+                source="history_api",
+            )
 
 
-    # =====================================================
-    # 按期号去重
-    # =====================================================
+            if inserted:
 
-    unique = {}
-
-    for draw in draws:
-
-        unique[
-            draw["issue"]
-        ] = draw
+                total_inserted += 1
 
 
-    return list(
-        unique.values()
+        print(
+            f"{name} "
+            f"数据库现有："
+            f"{count_draws(lottery)}期"
+        )
+
+
+    return total_inserted
+
+
+# =========================================================
+# 获取实时 API
+# =========================================================
+
+def fetch_realtime(
+    lottery: str
+) -> Dict[str, Any]:
+
+    config = API_SOURCES.get(
+        lottery
     )
 
 
-# =========================================================
-# 更新一个彩种
-# =========================================================
+    if not config:
 
-def update_lottery(
-    lottery_key
-):
+        raise ValueError(
+            f"不存在彩种配置：{lottery}"
+        )
 
-    source = API_SOURCES[
-        lottery_key
-    ]
+
+    url = config["url"]
 
 
     print()
-
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
     print(
         f"正在更新："
-        f"{source['name']}"
+        f"{config['name']}"
     )
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
 
-    payload = fetch_api(
-        lottery_key,
-        source
-    )
+    data = request_json(
 
+        url,
 
-    if payload is None:
+        timeout=REQUEST_TIMEOUT,
 
-        print(
-            f"❌ {source['name']} "
-            f"API获取失败"
-        )
-
-        insert_fetch_log(
-
-            lottery_key,
-
-            False,
-
-            error=
-                "API获取失败"
-        )
-
-        return False
-
-
-    # =====================================================
-    # 当前开奖
-    # =====================================================
-
-    current_payload = (
-        extract_current_payload(
-            payload
-        )
+        retries=REQUEST_RETRIES,
     )
 
 
-    current_draw = None
+    return data
 
 
-    if current_payload is not None:
+# =========================================================
+# 同步实时数据
+# =========================================================
 
-        current_draw = parse_draw(
+def sync_realtime(
+    lottery: str
+) -> int:
 
-            current_payload,
-
-            lottery_key,
-
-            source
-        )
-
-
-    # =====================================================
-    # 历史开奖
-    # =====================================================
-
-    history_draws = parse_history(
-
-        payload,
-
-        lottery_key,
-
-        source
+    data = fetch_realtime(
+        lottery
     )
 
 
-    # =====================================================
-    # 合并
-    # =====================================================
-
-    all_draws = []
+    config = API_SOURCES[
+        lottery
+    ]
 
 
-    if current_draw is not None:
-
-        all_draws.append(
-            current_draw
-        )
+    name = config[
+        "name"
+    ]
 
 
-    all_draws.extend(
-        history_draws
+    issue = clean_text(
+        data.get("expect")
     )
 
 
-    # =====================================================
-    # 按期号去重
-    # =====================================================
-
-    unique_draws = {}
-
-    for draw in all_draws:
-
-        unique_draws[
-            draw["issue"]
-        ] = draw
-
-
-    all_draws = list(
-        unique_draws.values()
+    open_time = clean_text(
+        data.get("openTime")
     )
 
 
-    if not all_draws:
+    numbers = numbers_to_string(
+        data.get("numbers")
+        or data.get("openCode")
+    )
 
-        print(
-            f"❌ {source['name']} "
-            f"没有解析到任何开奖数据"
+
+    zodiac = clean_text(
+        data.get("zodiac")
+    )
+
+
+    wave_field = config[
+        "wave_field"
+    ]
+
+
+    wave = clean_text(
+        data.get(
+            wave_field
+        )
+    )
+
+
+    # -----------------------------------------------------
+    # 如果 numbers 没有
+    # -----------------------------------------------------
+
+    if not numbers:
+
+        numbers = numbers_to_string(
+            data.get(
+                "openCode"
+            )
         )
 
-        insert_fetch_log(
-
-            lottery_key,
-
-            False,
-
-            error=
-                "没有解析到开奖数据"
-        )
-
-        return False
-
-
-    # =====================================================
-    # 写入数据库
-    # =====================================================
-
-    inserted_count = 0
-
-
-    for draw in all_draws:
-
-        inserted = insert_draw(
-            draw
-        )
-
-
-        if inserted:
-
-            inserted_count += 1
-
-
-    # =====================================================
-    # 输出
-    # =====================================================
-
-    print()
 
     print(
         f"解析开奖："
-        f"{len(all_draws)} 期"
+        f"{1 if issue else 0} 期"
     )
+
 
     print(
-        f"本次新增："
-        f"{inserted_count} 期"
+        "期号：",
+        issue
     )
 
 
-    # =====================================================
-    # 当前期
-    # =====================================================
-
-    if current_draw is not None:
-
-        print()
-
-        print(
-            f"最新期："
-            f"{current_draw['issue']}"
+    print(
+        "开奖号码：",
+        numbers.replace(
+            ",",
+            " "
         )
-
-        print(
-            "开奖号码：",
-            " ".join(
-                f"{n:02d}"
-                for n in
-                current_draw["numbers"]
-            )
-        )
-
-        print(
-            "生肖：",
-            current_draw["zodiac"]
-        )
-
-        print(
-            "波色：",
-            current_draw["wave"]
-        )
-
-    else:
-
-        print()
-
-        print(
-            "⚠️ 未解析到当前开奖，"
-            "但历史数据仍可入库。"
-        )
-
-
-    # =====================================================
-    # 抓取日志
-    # =====================================================
-
-    insert_fetch_log(
-
-        lottery_key,
-
-        True,
-
-        issue=(
-
-            current_draw["issue"]
-
-            if current_draw
-
-            else None
-        ),
-
-        source=
-            source["url"]
     )
 
 
-    return True
+    print(
+        "生肖：",
+        zodiac
+    )
+
+
+    print(
+        "波色：",
+        wave
+    )
+
+
+    if not issue:
+
+        print(
+            "⚠️ API没有返回期号"
+        )
+
+        return 0
+
+
+    # -----------------------------------------------------
+    # 更新数据库
+    # -----------------------------------------------------
+
+    upsert_draw(
+
+        lottery=lottery,
+
+        name=name,
+
+        issue=issue,
+
+        numbers=numbers,
+
+        open_time=open_time,
+
+        zodiac=zodiac,
+
+        wave=wave,
+
+        source="realtime_api",
+    )
+
+
+    print(
+        "数据库现有：",
+        count_draws(lottery),
+        "期"
+    )
+
+
+    return 1
 
 
 # =========================================================
-# 更新三个彩种
+# 更新单个彩种
 # =========================================================
 
-def update_all():
+def update_lottery(
+    lottery: str
+) -> int:
 
-    success = 0
+    # -----------------------------------------------------
+    # 先历史
+    # -----------------------------------------------------
+
+    # 历史统一在 update_all() 中完成
+    # 这里负责实时数据
 
 
-    for lottery_key in API_SOURCES:
+    return sync_realtime(
+        lottery
+    )
+
+
+# =========================================================
+# 更新全部数据
+# =========================================================
+
+def update_all() -> int:
+
+    print()
+    print("=" * 70)
+
+    print(
+        "开始同步六合彩数据"
+    )
+
+    print("=" * 70)
+
+
+    # -----------------------------------------------------
+    # 初始化数据库
+    # -----------------------------------------------------
+
+    init_database()
+
+
+    total_inserted = 0
+
+
+    # =====================================================
+    # 第一阶段：历史
+    # =====================================================
+
+    try:
+
+        total_inserted += sync_history()
+
+    except Exception as e:
+
+        print()
+        print(
+            "❌ 历史数据同步失败：",
+            e
+        )
+
+
+    # =====================================================
+    # 第二阶段：实时
+    # =====================================================
+
+    realtime_success = 0
+
+
+    for lottery in API_SOURCES:
 
         try:
 
-            result = update_lottery(
-                lottery_key
+            sync_realtime(
+                lottery
             )
 
-
-            if result:
-
-                success += 1
+            realtime_success += 1
 
 
         except Exception as e:
 
+            print()
             print(
-                f"{lottery_key} "
-                f"更新异常：",
-                e
+                f"❌ {lottery} "
+                f"实时数据同步失败："
+                f"{e}"
             )
 
 
-            insert_fetch_log(
+    # =====================================================
+    # 最终统计
+    # =====================================================
 
-                lottery_key,
+    print()
+    print("=" * 70)
 
-                False,
+    print(
+        "数据同步完成"
+    )
 
-                error=str(e)
-            )
+    print("=" * 70)
 
 
-        time.sleep(1)
+    for lottery, config in API_SOURCES.items():
+
+        print(
+            f"{config['name']}: "
+            f"{count_draws(lottery)}期"
+        )
 
 
     print()
+    print(
+        f"实时API成功："
+        f"{realtime_success}/"
+        f"{len(API_SOURCES)}"
+    )
 
+
+    print(
+        f"历史新增："
+        f"{total_inserted}"
+    )
+
+
+    print("=" * 70)
+
+
+    return total_inserted
+
+
+# =========================================================
+# 测试
+# =========================================================
+
+if __name__ == "__main__":
+
+    print()
     print(
         "=" * 70
     )
 
     print(
-        f"三个数据源更新完成："
-        f"{success}/3"
+        "MarkSix 数据源测试"
     )
 
     print(
@@ -1251,4 +1052,26 @@ def update_all():
     )
 
 
-    return success
+    try:
+
+        inserted = update_all()
+
+
+        print()
+        print(
+            "测试完成"
+        )
+
+        print(
+            "本次新增：",
+            inserted
+        )
+
+
+    except Exception as e:
+
+        print()
+        print(
+            "❌ 测试失败：",
+            e
+        )
