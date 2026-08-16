@@ -2,9 +2,9 @@
 
 """
 六合彩 AI V3.0
-核心配置
+全局配置
 
-V3.0 特点：
+V3.0 核心：
 
 1. 动态 12 / 36 / 120 窗口
 2. Walk-Forward
@@ -12,7 +12,9 @@ V3.0 特点：
 4. 动态模块权重
 5. 波色转移模型
 6. 概率校准
-7. 防止未来数据泄漏
+7. 防止虚假 1.0000 概率
+8. SQLite
+9. API SSL fallback
 """
 
 from pathlib import Path
@@ -27,6 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 OUTPUT_DIR = BASE_DIR / "output"
+
 
 DATA_DIR.mkdir(
     parents=True,
@@ -47,7 +50,7 @@ DB_FILE = DATA_DIR / "lottery.db"
 
 
 # =========================================================
-# API
+# 三彩种 API
 # =========================================================
 
 API_BASE_URL = (
@@ -64,11 +67,13 @@ API_SOURCES = {
             "香港六合彩",
 
         "url":
-            API_BASE_URL + "?type=hk",
+            API_BASE_URL
+            + "?type=hk",
 
         "wave_field":
             "wave",
     },
+
 
     "newMacau": {
 
@@ -76,11 +81,13 @@ API_SOURCES = {
             "新澳门六合彩",
 
         "url":
-            API_BASE_URL + "?type=newMacau",
+            API_BASE_URL
+            + "?type=newMacau",
 
         "wave_field":
             "wave",
     },
+
 
     "oldMacau": {
 
@@ -88,11 +95,13 @@ API_SOURCES = {
             "老澳门六合彩",
 
         "url":
-            API_BASE_URL + "?type=oldMacau",
+            API_BASE_URL
+            + "?type=oldMacau",
 
         "wave_field":
             "waveColors",
     },
+
 }
 
 
@@ -103,16 +112,25 @@ API_SOURCES = {
 LOTTERIES = {
 
     "hk": {
-        "name": "香港六合彩",
+
+        "name":
+            "香港六合彩",
     },
+
 
     "newMacau": {
-        "name": "新澳门六合彩",
+
+        "name":
+            "新澳门六合彩",
     },
 
+
     "oldMacau": {
-        "name": "老澳门六合彩",
+
+        "name":
+            "老澳门六合彩",
     },
+
 }
 
 
@@ -122,7 +140,7 @@ LOTTERIES = {
 
 HISTORY_API_URL = (
     "https://api3.marksix6.net/"
-    "lottery_api.php?type=history"
+    "index.php?api=1"
 )
 
 
@@ -136,6 +154,7 @@ HISTORY_CODE_MAP = {
 
     "oldMacau":
         "oldMacau",
+
 }
 
 
@@ -162,7 +181,7 @@ ALLOW_SSL_FALLBACK = True
 
 
 # =========================================================
-# 最大历史数据
+# 历史最大数据量
 # =========================================================
 
 MAX_HISTORY = 5000
@@ -180,12 +199,10 @@ LONG_WINDOW = 120
 
 
 # =========================================================
-# 最低历史要求
+# 状态识别
 # =========================================================
 
-MIN_HISTORY_FOR_PREDICTION = 40
-
-MIN_HISTORY_FOR_BACKTEST = 80
+STATE_WINDOW = 36
 
 
 # =========================================================
@@ -202,62 +219,162 @@ TOP2_PINGTE_ZODIACS = 2
 
 
 # =========================================================
+# 波色
+# =========================================================
+
+WAVES = (
+    "红",
+    "蓝",
+    "绿",
+)
+
+
+# =========================================================
 # Walk Forward
 # =========================================================
 
-# 每次至少使用多少期历史
-WALK_FORWARD_MIN_TRAIN = 60
+# 最低训练数据
+MIN_TRAIN_SIZE = 120
 
-# 每隔多少期测试一次
-WALK_FORWARD_STEP = 1
+
+# 每次测试多少期
+WF_TEST_SIZE = 20
+
 
 # 最大测试次数
-WALK_FORWARD_MAX_TESTS = 500
+WF_MAX_TESTS = 20
 
 
-# =========================================================
-# 回测目标
-# =========================================================
-
-BACKTEST_TARGETS = [
-
-    "number",
-
-    "zodiac",
-
-    "pingte",
-
-    "size",
-
-    "parity",
-
-    "wave_single",
-
-    "wave_double",
-]
-
-
-# =========================================================
-# 概率
-# =========================================================
-
-# 防止出现 0 / 1 极端概率
-PROBABILITY_FLOOR = 0.02
-
-PROBABILITY_CEILING = 0.98
+# 最低有效测试次数
+WF_MIN_VALID_TESTS = 5
 
 
 # =========================================================
 # 动态权重
 # =========================================================
 
-WEIGHT_FLOOR = 0.03
+# 权重最低限制
+MIN_MODULE_WEIGHT = 0.04
 
-WEIGHT_CEILING = 0.30
+
+# 权重最高限制
+MAX_MODULE_WEIGHT = 0.30
+
+
+# 历史表现平滑
+WEIGHT_SMOOTHING = 0.15
 
 
 # =========================================================
-# 输出
+# 概率校准
+# =========================================================
+
+PROBABILITY_FLOOR = 0.01
+
+PROBABILITY_CEILING = 0.99
+
+PROBABILITY_TEMPERATURE = 1.15
+
+
+# =========================================================
+# 模块
+# =========================================================
+
+MODULES = (
+
+    "recent",
+
+    "medium",
+
+    "long",
+
+    "omission",
+
+    "trend",
+
+    "transition",
+
+    "size",
+
+    "parity",
+
+    "wave",
+
+    "tail",
+
+    "zone",
+
+)
+
+
+# =========================================================
+# 默认模块权重
+#
+# 注意：
+# 这只是冷启动权重。
+#
+# 一旦 Walk-Forward 有足够数据，
+# V3 会自动根据历史表现调整。
+# =========================================================
+
+DEFAULT_MODULE_WEIGHTS = {
+
+    "recent":
+        0.13,
+
+    "medium":
+        0.10,
+
+    "long":
+        0.07,
+
+    "omission":
+        0.06,
+
+    "trend":
+        0.15,
+
+    "transition":
+        0.12,
+
+    "size":
+        0.10,
+
+    "parity":
+        0.10,
+
+    "wave":
+        0.08,
+
+    "tail":
+        0.05,
+
+    "zone":
+        0.04,
+
+}
+
+
+# =========================================================
+# 默认分类模型权重
+# =========================================================
+
+CATEGORY_DEFAULT_WEIGHTS = {
+
+    "size":
+        1.0,
+
+    "parity":
+        1.0,
+
+    "wave":
+        1.0,
+
+}
+
+
+# =========================================================
+# 输出文件
 # =========================================================
 
 PREDICTION_FILE = (
@@ -265,19 +382,17 @@ PREDICTION_FILE = (
     "prediction.json"
 )
 
+
 BACKTEST_FILE = (
     OUTPUT_DIR /
     "backtest.json"
 )
 
-MODEL_FILE = (
-    OUTPUT_DIR /
-    "model_state.json"
-)
-
 
 # =========================================================
-# 日志
+# JSON 编码
 # =========================================================
 
-VERBOSE = True
+JSON_ENSURE_ASCII = False
+
+JSON_INDENT = 2
