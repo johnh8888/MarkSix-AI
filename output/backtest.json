@@ -1,157 +1,37 @@
 {
   "hk": {
     "name": "香港六合彩",
-    "generated_at": "2026-08-16T17:39:33.899118",
+    "generated_at": "2026-08-16T17:48:57.918880",
     "results": {
       "10": {
-        "tests": 10,
-        "number_top10_hit_rate": 0.2,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": -0.004081632653061218,
-        "zodiac_top5_hit_rate": 0.5,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.4,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.5,
-        "parity_hit_rate": 0.6,
-        "wave_single_hit_rate": 0.2,
-        "wave_double_hit_rate": 0.6,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": -0.1333333333333333,
-        "wave_double_edge": -0.06666666666666665,
-        "wave_pair_rates": {
-          "红+蓝": 0.8,
-          "红+绿": 0.6,
-          "蓝+绿": 0.6
-        }
+        "error": "没有有效测试"
       },
       "20": {
-        "tests": 20,
-        "number_top10_hit_rate": 0.25,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": 0.04591836734693877,
-        "zodiac_top5_hit_rate": 0.45,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.35,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.55,
-        "parity_hit_rate": 0.5,
-        "wave_single_hit_rate": 0.15,
-        "wave_double_hit_rate": 0.8,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": -0.18333333333333332,
-        "wave_double_edge": 0.13333333333333341,
-        "wave_pair_rates": {
-          "红+蓝": 0.55,
-          "红+绿": 0.8,
-          "蓝+绿": 0.65
-        }
+        "error": "没有有效测试"
       }
     }
   },
   "newMacau": {
     "name": "新澳门六合彩",
-    "generated_at": "2026-08-16T17:39:33.930391",
+    "generated_at": "2026-08-16T17:48:57.926798",
     "results": {
       "10": {
-        "tests": 10,
-        "number_top10_hit_rate": 0.5,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": 0.29591836734693877,
-        "zodiac_top5_hit_rate": 0.5,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.1,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.7,
-        "parity_hit_rate": 0.7,
-        "wave_single_hit_rate": 0.4,
-        "wave_double_hit_rate": 0.6,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": 0.06666666666666671,
-        "wave_double_edge": -0.06666666666666665,
-        "wave_pair_rates": {
-          "红+蓝": 0.7,
-          "红+绿": 0.7,
-          "蓝+绿": 0.6
-        }
+        "error": "没有有效测试"
       },
       "20": {
-        "tests": 20,
-        "number_top10_hit_rate": 0.25,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": 0.04591836734693877,
-        "zodiac_top5_hit_rate": 0.4,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.1,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.55,
-        "parity_hit_rate": 0.6,
-        "wave_single_hit_rate": 0.4,
-        "wave_double_hit_rate": 0.65,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": 0.06666666666666671,
-        "wave_double_edge": -0.016666666666666607,
-        "wave_pair_rates": {
-          "红+蓝": 0.7,
-          "红+绿": 0.65,
-          "蓝+绿": 0.65
-        }
+        "error": "没有有效测试"
       }
     }
   },
   "oldMacau": {
     "name": "老澳门六合彩",
-    "generated_at": "2026-08-16T17:39:33.960419",
+    "generated_at": "2026-08-16T17:48:57.933053",
     "results": {
       "10": {
-        "tests": 10,
-        "number_top10_hit_rate": 0.2,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": -0.004081632653061218,
-        "zodiac_top5_hit_rate": 0.3,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.0,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.4,
-        "parity_hit_rate": 0.6,
-        "wave_single_hit_rate": 0.2,
-        "wave_double_hit_rate": 0.6,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": -0.1333333333333333,
-        "wave_double_edge": -0.06666666666666665,
-        "wave_pair_rates": {
-          "红+蓝": 0.8,
-          "红+绿": 0.6,
-          "蓝+绿": 0.6
-        }
+        "error": "没有有效测试"
       },
       "20": {
-        "tests": 20,
-        "number_top10_hit_rate": 0.3,
-        "number_top10_random_baseline": 0.20408163265306123,
-        "number_top10_edge": 0.09591836734693876,
-        "zodiac_top5_hit_rate": 0.5,
-        "zodiac_top5_random_baseline": 0.4166666666666667,
-        "pingte_top2_hit_rate": 0.0,
-        "pingte_top2_random_baseline": 0.16666666666666666,
-        "size_hit_rate": 0.4,
-        "parity_hit_rate": 0.6,
-        "wave_single_hit_rate": 0.3,
-        "wave_double_hit_rate": 0.65,
-        "wave_single_random_baseline": 0.3333333333333333,
-        "wave_double_random_baseline": 0.6666666666666666,
-        "wave_single_edge": -0.033333333333333326,
-        "wave_double_edge": -0.016666666666666607,
-        "wave_pair_rates": {
-          "红+蓝": 0.75,
-          "红+绿": 0.6,
-          "蓝+绿": 0.65
-        }
+        "error": "没有有效测试"
       }
     }
   }

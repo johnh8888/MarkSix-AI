@@ -1,9 +1,10 @@
 {
   "hk": {
     "name": "香港六合彩",
-    "generated_at": "2026-08-16T17:39:33.874949",
+    "generated_at": "2026-08-16T17:48:57.918804",
     "history_count": 277,
     "prediction": {
+      "model_version": "V2.0-AUTO",
       "top10_numbers": [
         {
           "number": 23,
@@ -11,39 +12,39 @@
         },
         {
           "number": 13,
-          "score": 0.656971
-        },
-        {
-          "number": 43,
-          "score": 0.515386
+          "score": 0.774417
         },
         {
           "number": 27,
-          "score": 0.512609
+          "score": 0.735356
         },
         {
-          "number": 48,
-          "score": 0.49593
-        },
-        {
-          "number": 3,
-          "score": 0.481836
-        },
-        {
-          "number": 47,
-          "score": 0.473384
-        },
-        {
-          "number": 8,
-          "score": 0.424494
-        },
-        {
-          "number": 14,
-          "score": 0.402931
+          "number": 43,
+          "score": 0.65296
         },
         {
           "number": 34,
-          "score": 0.400731
+          "score": 0.641004
+        },
+        {
+          "number": 8,
+          "score": 0.570167
+        },
+        {
+          "number": 45,
+          "score": 0.482403
+        },
+        {
+          "number": 46,
+          "score": 0.429967
+        },
+        {
+          "number": 49,
+          "score": 0.394224
+        },
+        {
+          "number": 29,
+          "score": 0.391015
         }
       ],
       "top3_numbers": [
@@ -53,1005 +54,347 @@
         },
         {
           "number": 13,
-          "score": 0.656971
-        },
-        {
-          "number": 43,
-          "score": 0.515386
-        }
-      ],
-      "first_number": {
-        "number": 23,
-        "score": 1.0
-      },
-      "number_ranking": [
-        {
-          "number": 23,
-          "score": 1.0
-        },
-        {
-          "number": 13,
-          "score": 0.656971
-        },
-        {
-          "number": 43,
-          "score": 0.515386
+          "score": 0.774417
         },
         {
           "number": 27,
-          "score": 0.512609
-        },
-        {
-          "number": 48,
-          "score": 0.49593
-        },
-        {
-          "number": 3,
-          "score": 0.481836
-        },
-        {
-          "number": 47,
-          "score": 0.473384
-        },
-        {
-          "number": 8,
-          "score": 0.424494
-        },
-        {
-          "number": 14,
-          "score": 0.402931
-        },
-        {
-          "number": 34,
-          "score": 0.400731
-        },
-        {
-          "number": 28,
-          "score": 0.389116
-        },
-        {
-          "number": 11,
-          "score": 0.379607
-        },
-        {
-          "number": 38,
-          "score": 0.374821
-        },
-        {
-          "number": 44,
-          "score": 0.349205
-        },
-        {
-          "number": 21,
-          "score": 0.267716
-        },
-        {
-          "number": 26,
-          "score": 0.260383
-        },
-        {
-          "number": 17,
-          "score": 0.257185
-        },
-        {
-          "number": 18,
-          "score": 0.252324
-        },
-        {
-          "number": 24,
-          "score": 0.247386
-        },
-        {
-          "number": 49,
-          "score": 0.239758
-        },
-        {
-          "number": 25,
-          "score": 0.238488
-        },
-        {
-          "number": 9,
-          "score": 0.23651
-        },
-        {
-          "number": 7,
-          "score": 0.218855
-        },
-        {
-          "number": 41,
-          "score": 0.218314
-        },
-        {
-          "number": 4,
-          "score": 0.215448
-        },
-        {
-          "number": 29,
-          "score": 0.213388
-        },
-        {
-          "number": 37,
-          "score": 0.210831
-        },
-        {
-          "number": 30,
-          "score": 0.208872
-        },
-        {
-          "number": 6,
-          "score": 0.191777
-        },
-        {
-          "number": 45,
-          "score": 0.188162
-        },
-        {
-          "number": 33,
-          "score": 0.187746
-        },
-        {
-          "number": 19,
-          "score": 0.183927
-        },
-        {
-          "number": 46,
-          "score": 0.181972
-        },
-        {
-          "number": 39,
-          "score": 0.170029
-        },
-        {
-          "number": 20,
-          "score": 0.161468
-        },
-        {
-          "number": 15,
-          "score": 0.161091
-        },
-        {
-          "number": 5,
-          "score": 0.15612
-        },
-        {
-          "number": 22,
-          "score": 0.151076
-        },
-        {
-          "number": 42,
-          "score": 0.139537
-        },
-        {
-          "number": 40,
-          "score": 0.124919
-        },
-        {
-          "number": 10,
-          "score": 0.1246
-        },
-        {
-          "number": 36,
-          "score": 0.116845
-        },
-        {
-          "number": 12,
-          "score": 0.115027
-        },
-        {
-          "number": 16,
-          "score": 0.112951
-        },
-        {
-          "number": 1,
-          "score": 0.111384
-        },
-        {
-          "number": 32,
-          "score": 0.107505
-        },
-        {
-          "number": 2,
-          "score": 0.100232
-        },
-        {
-          "number": 31,
-          "score": 0.051472
-        },
-        {
-          "number": 35,
-          "score": 0.0
+          "score": 0.735356
         }
       ],
       "top5_zodiac": [
         {
           "zodiac": "猴",
-          "score": 0.359681
-        },
-        {
-          "zodiac": "龙",
-          "score": 0.254118
+          "score": 1.888838
         },
         {
           "zodiac": "马",
-          "score": 0.21565
+          "score": 1.766707
         },
-        {
-          "zodiac": "猪",
-          "score": 0.207353
-        },
-        {
-          "zodiac": "蛇",
-          "score": 0.206088
-        }
-      ],
-      "top2_pingte_zodiac": [
-        {
-          "zodiac": "猴",
-          "score": 0.524122
-        },
-        {
-          "zodiac": "兔",
-          "score": 0.520252
-        }
-      ],
-      "size": {
-        "prediction": "小",
-        "probability": {
-          "大": 0.45,
-          "小": 0.55
-        }
-      },
-      "parity": {
-        "prediction": "单",
-        "probability": {
-          "单": 0.604545,
-          "双": 0.395455
-        }
-      },
-      "wave": {
-        "prediction": "红",
-        "single_prediction": "红",
-        "double_prediction": [
-          "红",
-          "绿"
-        ],
-        "probability": {
-          "红": 0.38709,
-          "蓝": 0.301859,
-          "绿": 0.311052
-        },
-        "double_combinations": [
-          {
-            "pair": [
-              "红",
-              "绿"
-            ],
-            "score": 0.698141
-          },
-          {
-            "pair": [
-              "红",
-              "蓝"
-            ],
-            "score": 0.688948
-          },
-          {
-            "pair": [
-              "蓝",
-              "绿"
-            ],
-            "score": 0.61291
-          }
-        ]
-      },
-      "random_baseline": {
-        "number_top10": 0.20408163265306123,
-        "wave_single": 0.3333333333333333,
-        "wave_double": 0.6666666666666666
-      }
-    }
-  },
-  "newMacau": {
-    "name": "新澳门六合彩",
-    "generated_at": "2026-08-16T17:39:33.905921",
-    "history_count": 668,
-    "prediction": {
-      "top10_numbers": [
-        {
-          "number": 1,
-          "score": 1.0
-        },
-        {
-          "number": 23,
-          "score": 0.715736
-        },
-        {
-          "number": 26,
-          "score": 0.594265
-        },
-        {
-          "number": 9,
-          "score": 0.49373
-        },
-        {
-          "number": 17,
-          "score": 0.485753
-        },
-        {
-          "number": 16,
-          "score": 0.466942
-        },
-        {
-          "number": 6,
-          "score": 0.333774
-        },
-        {
-          "number": 43,
-          "score": 0.275399
-        },
-        {
-          "number": 11,
-          "score": 0.271204
-        },
-        {
-          "number": 8,
-          "score": 0.257968
-        }
-      ],
-      "top3_numbers": [
-        {
-          "number": 1,
-          "score": 1.0
-        },
-        {
-          "number": 23,
-          "score": 0.715736
-        },
-        {
-          "number": 26,
-          "score": 0.594265
-        }
-      ],
-      "first_number": {
-        "number": 1,
-        "score": 1.0
-      },
-      "number_ranking": [
-        {
-          "number": 1,
-          "score": 1.0
-        },
-        {
-          "number": 23,
-          "score": 0.715736
-        },
-        {
-          "number": 26,
-          "score": 0.594265
-        },
-        {
-          "number": 9,
-          "score": 0.49373
-        },
-        {
-          "number": 17,
-          "score": 0.485753
-        },
-        {
-          "number": 16,
-          "score": 0.466942
-        },
-        {
-          "number": 6,
-          "score": 0.333774
-        },
-        {
-          "number": 43,
-          "score": 0.275399
-        },
-        {
-          "number": 11,
-          "score": 0.271204
-        },
-        {
-          "number": 8,
-          "score": 0.257968
-        },
-        {
-          "number": 21,
-          "score": 0.239005
-        },
-        {
-          "number": 48,
-          "score": 0.234989
-        },
-        {
-          "number": 5,
-          "score": 0.221645
-        },
-        {
-          "number": 15,
-          "score": 0.212972
-        },
-        {
-          "number": 25,
-          "score": 0.211033
-        },
-        {
-          "number": 4,
-          "score": 0.210531
-        },
-        {
-          "number": 29,
-          "score": 0.20188
-        },
-        {
-          "number": 19,
-          "score": 0.20084
-        },
-        {
-          "number": 35,
-          "score": 0.198022
-        },
-        {
-          "number": 7,
-          "score": 0.196514
-        },
-        {
-          "number": 27,
-          "score": 0.195614
-        },
-        {
-          "number": 13,
-          "score": 0.192387
-        },
-        {
-          "number": 3,
-          "score": 0.186943
-        },
-        {
-          "number": 39,
-          "score": 0.175878
-        },
-        {
-          "number": 49,
-          "score": 0.174271
-        },
-        {
-          "number": 37,
-          "score": 0.172751
-        },
-        {
-          "number": 46,
-          "score": 0.170474
-        },
-        {
-          "number": 36,
-          "score": 0.169005
-        },
-        {
-          "number": 22,
-          "score": 0.167677
-        },
-        {
-          "number": 33,
-          "score": 0.158335
-        },
-        {
-          "number": 24,
-          "score": 0.158205
-        },
-        {
-          "number": 14,
-          "score": 0.155153
-        },
-        {
-          "number": 38,
-          "score": 0.153579
-        },
-        {
-          "number": 2,
-          "score": 0.151387
-        },
-        {
-          "number": 12,
-          "score": 0.146704
-        },
-        {
-          "number": 34,
-          "score": 0.143791
-        },
-        {
-          "number": 20,
-          "score": 0.140179
-        },
-        {
-          "number": 30,
-          "score": 0.13505
-        },
-        {
-          "number": 41,
-          "score": 0.132135
-        },
-        {
-          "number": 10,
-          "score": 0.126378
-        },
-        {
-          "number": 31,
-          "score": 0.125875
-        },
-        {
-          "number": 45,
-          "score": 0.117565
-        },
-        {
-          "number": 28,
-          "score": 0.115222
-        },
-        {
-          "number": 18,
-          "score": 0.092663
-        },
-        {
-          "number": 42,
-          "score": 0.008529
-        },
-        {
-          "number": 44,
-          "score": 0.007363
-        },
-        {
-          "number": 47,
-          "score": 0.006206
-        },
-        {
-          "number": 40,
-          "score": 0.00303
-        },
-        {
-          "number": 32,
-          "score": 0.0
-        }
-      ],
-      "top5_zodiac": [
-        {
-          "zodiac": "马",
-          "score": 0.306098
-        },
-        {
-          "zodiac": "猴",
-          "score": 0.235639
-        },
-        {
-          "zodiac": "蛇",
-          "score": 0.213946
-        },
-        {
-          "zodiac": "虎",
-          "score": 0.201411
-        },
-        {
-          "zodiac": "狗",
-          "score": 0.177498
-        }
-      ],
-      "top2_pingte_zodiac": [
         {
           "zodiac": "鼠",
-          "score": 0.50243
-        },
-        {
-          "zodiac": "虎",
-          "score": 0.493002
-        }
-      ],
-      "size": {
-        "prediction": "小",
-        "probability": {
-          "大": 0.345455,
-          "小": 0.654545
-        }
-      },
-      "parity": {
-        "prediction": "单",
-        "probability": {
-          "单": 0.636364,
-          "双": 0.363636
-        }
-      },
-      "wave": {
-        "prediction": "蓝",
-        "single_prediction": "蓝",
-        "double_prediction": [
-          "红",
-          "蓝"
-        ],
-        "probability": {
-          "红": 0.345311,
-          "蓝": 0.372088,
-          "绿": 0.282601
-        },
-        "double_combinations": [
-          {
-            "pair": [
-              "红",
-              "蓝"
-            ],
-            "score": 0.717399
-          },
-          {
-            "pair": [
-              "蓝",
-              "绿"
-            ],
-            "score": 0.654689
-          },
-          {
-            "pair": [
-              "红",
-              "绿"
-            ],
-            "score": 0.627912
-          }
-        ]
-      },
-      "random_baseline": {
-        "number_top10": 0.20408163265306123,
-        "wave_single": 0.3333333333333333,
-        "wave_double": 0.6666666666666666
-      }
-    }
-  },
-  "oldMacau": {
-    "name": "老澳门六合彩",
-    "generated_at": "2026-08-16T17:39:33.936594",
-    "history_count": 650,
-    "prediction": {
-      "top10_numbers": [
-        {
-          "number": 30,
-          "score": 1.0
-        },
-        {
-          "number": 18,
-          "score": 0.680575
-        },
-        {
-          "number": 41,
-          "score": 0.671341
-        },
-        {
-          "number": 32,
-          "score": 0.605229
-        },
-        {
-          "number": 11,
-          "score": 0.551076
-        },
-        {
-          "number": 47,
-          "score": 0.490269
-        },
-        {
-          "number": 20,
-          "score": 0.485647
-        },
-        {
-          "number": 48,
-          "score": 0.470033
-        },
-        {
-          "number": 10,
-          "score": 0.465711
-        },
-        {
-          "number": 25,
-          "score": 0.454477
-        }
-      ],
-      "top3_numbers": [
-        {
-          "number": 30,
-          "score": 1.0
-        },
-        {
-          "number": 18,
-          "score": 0.680575
-        },
-        {
-          "number": 41,
-          "score": 0.671341
-        }
-      ],
-      "first_number": {
-        "number": 30,
-        "score": 1.0
-      },
-      "number_ranking": [
-        {
-          "number": 30,
-          "score": 1.0
-        },
-        {
-          "number": 18,
-          "score": 0.680575
-        },
-        {
-          "number": 41,
-          "score": 0.671341
-        },
-        {
-          "number": 32,
-          "score": 0.605229
-        },
-        {
-          "number": 11,
-          "score": 0.551076
-        },
-        {
-          "number": 47,
-          "score": 0.490269
-        },
-        {
-          "number": 20,
-          "score": 0.485647
-        },
-        {
-          "number": 48,
-          "score": 0.470033
-        },
-        {
-          "number": 10,
-          "score": 0.465711
-        },
-        {
-          "number": 25,
-          "score": 0.454477
-        },
-        {
-          "number": 1,
-          "score": 0.423899
-        },
-        {
-          "number": 16,
-          "score": 0.35429
-        },
-        {
-          "number": 22,
-          "score": 0.324804
-        },
-        {
-          "number": 17,
-          "score": 0.297008
-        },
-        {
-          "number": 21,
-          "score": 0.282148
-        },
-        {
-          "number": 28,
-          "score": 0.271962
-        },
-        {
-          "number": 46,
-          "score": 0.256397
-        },
-        {
-          "number": 34,
-          "score": 0.256372
-        },
-        {
-          "number": 49,
-          "score": 0.255867
-        },
-        {
-          "number": 26,
-          "score": 0.250329
-        },
-        {
-          "number": 42,
-          "score": 0.247996
-        },
-        {
-          "number": 2,
-          "score": 0.241664
-        },
-        {
-          "number": 12,
-          "score": 0.236089
-        },
-        {
-          "number": 23,
-          "score": 0.23467
-        },
-        {
-          "number": 27,
-          "score": 0.231604
-        },
-        {
-          "number": 44,
-          "score": 0.223961
-        },
-        {
-          "number": 43,
-          "score": 0.223178
-        },
-        {
-          "number": 40,
-          "score": 0.222771
-        },
-        {
-          "number": 38,
-          "score": 0.215855
-        },
-        {
-          "number": 31,
-          "score": 0.21448
-        },
-        {
-          "number": 8,
-          "score": 0.208831
-        },
-        {
-          "number": 33,
-          "score": 0.208151
-        },
-        {
-          "number": 14,
-          "score": 0.203969
-        },
-        {
-          "number": 24,
-          "score": 0.201893
-        },
-        {
-          "number": 19,
-          "score": 0.17451
-        },
-        {
-          "number": 37,
-          "score": 0.1683
-        },
-        {
-          "number": 29,
-          "score": 0.167948
-        },
-        {
-          "number": 15,
-          "score": 0.165138
-        },
-        {
-          "number": 13,
-          "score": 0.157671
-        },
-        {
-          "number": 39,
-          "score": 0.146447
-        },
-        {
-          "number": 36,
-          "score": 0.14398
-        },
-        {
-          "number": 6,
-          "score": 0.143671
-        },
-        {
-          "number": 7,
-          "score": 0.138532
-        },
-        {
-          "number": 45,
-          "score": 0.130713
-        },
-        {
-          "number": 35,
-          "score": 0.114758
-        },
-        {
-          "number": 5,
-          "score": 0.086691
-        },
-        {
-          "number": 3,
-          "score": 0.07586
-        },
-        {
-          "number": 9,
-          "score": 0.03065
-        },
-        {
-          "number": 4,
-          "score": 0.0
-        }
-      ],
-      "top5_zodiac": [
-        {
-          "zodiac": "牛",
-          "score": 0.373308
+          "score": 1.379014
         },
         {
           "zodiac": "猪",
-          "score": 0.284242
+          "score": 1.32211
         },
         {
           "zodiac": "鸡",
-          "score": 0.251055
-        },
-        {
-          "zodiac": "猴",
-          "score": 0.249448
-        },
-        {
-          "zodiac": "虎",
-          "score": 0.242899
+          "score": 1.29361
         }
       ],
       "top2_pingte_zodiac": [
         {
-          "zodiac": "狗",
-          "score": 0.532651
+          "zodiac": "猴",
+          "score": 0.392768
         },
         {
           "zodiac": "马",
-          "score": 0.513276
+          "score": 0.305673
         }
       ],
       "size": {
         "prediction": "大",
         "probability": {
-          "大": 0.55,
-          "小": 0.45
+          "大": 0.5,
+          "小": 0.5
+        }
+      },
+      "parity": {
+        "prediction": "单",
+        "probability": {
+          "单": 0.65,
+          "双": 0.35
+        }
+      },
+      "wave": {
+        "prediction": "红",
+        "single": "红",
+        "double": [
+          "红",
+          "绿"
+        ],
+        "probability": {
+          "红": 0.488689,
+          "蓝": 0.200026,
+          "绿": 0.311284
+        }
+      },
+      "dynamic_weights": {
+        "recent": 0.214286,
+        "medium": 0.152381,
+        "long": 0.095238,
+        "omission": 0.095238,
+        "trend": 0.171429,
+        "size": 0.07619,
+        "parity": 0.1,
+        "wave": 0.095238
+      }
+    }
+  },
+  "newMacau": {
+    "name": "新澳门六合彩",
+    "generated_at": "2026-08-16T17:48:57.926704",
+    "history_count": 668,
+    "prediction": {
+      "model_version": "V2.0-AUTO",
+      "top10_numbers": [
+        {
+          "number": 1,
+          "score": 1.0
+        },
+        {
+          "number": 23,
+          "score": 0.738333
+        },
+        {
+          "number": 17,
+          "score": 0.639577
+        },
+        {
+          "number": 26,
+          "score": 0.575637
+        },
+        {
+          "number": 9,
+          "score": 0.541534
+        },
+        {
+          "number": 15,
+          "score": 0.454131
+        },
+        {
+          "number": 3,
+          "score": 0.451278
+        },
+        {
+          "number": 14,
+          "score": 0.403469
+        },
+        {
+          "number": 4,
+          "score": 0.401415
+        },
+        {
+          "number": 37,
+          "score": 0.39304
+        }
+      ],
+      "top3_numbers": [
+        {
+          "number": 1,
+          "score": 1.0
+        },
+        {
+          "number": 23,
+          "score": 0.738333
+        },
+        {
+          "number": 17,
+          "score": 0.639577
+        }
+      ],
+      "top5_zodiac": [
+        {
+          "zodiac": "马",
+          "score": 2.180819
+        },
+        {
+          "zodiac": "虎",
+          "score": 1.418229
+        },
+        {
+          "zodiac": "猴",
+          "score": 1.418126
+        },
+        {
+          "zodiac": "龙",
+          "score": 1.248291
+        },
+        {
+          "zodiac": "蛇",
+          "score": 1.161226
+        }
+      ],
+      "top2_pingte_zodiac": [
+        {
+          "zodiac": "马",
+          "score": 0.379931
+        },
+        {
+          "zodiac": "虎",
+          "score": 0.304646
+        }
+      ],
+      "size": {
+        "prediction": "小",
+        "probability": {
+          "大": 0.35,
+          "小": 0.65
+        }
+      },
+      "parity": {
+        "prediction": "单",
+        "probability": {
+          "单": 0.6,
+          "双": 0.4
+        }
+      },
+      "wave": {
+        "prediction": "蓝",
+        "single": "蓝",
+        "double": [
+          "蓝",
+          "红"
+        ],
+        "probability": {
+          "红": 0.353358,
+          "蓝": 0.390557,
+          "绿": 0.256084
+        }
+      },
+      "dynamic_weights": {
+        "recent": 0.214286,
+        "medium": 0.152381,
+        "long": 0.095238,
+        "omission": 0.095238,
+        "trend": 0.171429,
+        "size": 0.1,
+        "parity": 0.07619,
+        "wave": 0.095238
+      }
+    }
+  },
+  "oldMacau": {
+    "name": "老澳门六合彩",
+    "generated_at": "2026-08-16T17:48:57.933001",
+    "history_count": 650,
+    "prediction": {
+      "model_version": "V2.0-AUTO",
+      "top10_numbers": [
+        {
+          "number": 41,
+          "score": 1.0
+        },
+        {
+          "number": 30,
+          "score": 0.861931
+        },
+        {
+          "number": 18,
+          "score": 0.855014
+        },
+        {
+          "number": 10,
+          "score": 0.849779
+        },
+        {
+          "number": 48,
+          "score": 0.573737
+        },
+        {
+          "number": 32,
+          "score": 0.549993
+        },
+        {
+          "number": 47,
+          "score": 0.537862
+        },
+        {
+          "number": 16,
+          "score": 0.502612
+        },
+        {
+          "number": 38,
+          "score": 0.485806
+        },
+        {
+          "number": 26,
+          "score": 0.472124
+        }
+      ],
+      "top3_numbers": [
+        {
+          "number": 41,
+          "score": 1.0
+        },
+        {
+          "number": 30,
+          "score": 0.861931
+        },
+        {
+          "number": 18,
+          "score": 0.855014
+        }
+      ],
+      "top5_zodiac": [
+        {
+          "zodiac": "牛",
+          "score": 2.502419
+        },
+        {
+          "zodiac": "鸡",
+          "score": 1.880622
+        },
+        {
+          "zodiac": "猪",
+          "score": 1.633
+        },
+        {
+          "zodiac": "虎",
+          "score": 1.591858
+        },
+        {
+          "zodiac": "兔",
+          "score": 1.42706
+        }
+      ],
+      "top2_pingte_zodiac": [
+        {
+          "zodiac": "牛",
+          "score": 0.522484
+        },
+        {
+          "zodiac": "鸡",
+          "score": 0.395124
+        }
+      ],
+      "size": {
+        "prediction": "大",
+        "probability": {
+          "大": 0.5,
+          "小": 0.5
         }
       },
       "parity": {
         "prediction": "双",
         "probability": {
-          "单": 0.413636,
-          "双": 0.586364
+          "单": 0.4,
+          "双": 0.6
         }
       },
       "wave": {
         "prediction": "蓝",
-        "single_prediction": "蓝",
-        "double_prediction": [
-          "红",
-          "蓝"
+        "single": "蓝",
+        "double": [
+          "蓝",
+          "绿"
         ],
         "probability": {
-          "红": 0.334851,
-          "蓝": 0.372142,
-          "绿": 0.293007
-        },
-        "double_combinations": [
-          {
-            "pair": [
-              "红",
-              "蓝"
-            ],
-            "score": 0.706993
-          },
-          {
-            "pair": [
-              "蓝",
-              "绿"
-            ],
-            "score": 0.665149
-          },
-          {
-            "pair": [
-              "红",
-              "绿"
-            ],
-            "score": 0.627858
-          }
-        ]
+          "红": 0.251152,
+          "蓝": 0.415128,
+          "绿": 0.33372
+        }
       },
-      "random_baseline": {
-        "number_top10": 0.20408163265306123,
-        "wave_single": 0.3333333333333333,
-        "wave_double": 0.6666666666666666
+      "dynamic_weights": {
+        "recent": 0.219512,
+        "medium": 0.156098,
+        "long": 0.097561,
+        "omission": 0.097561,
+        "trend": 0.17561,
+        "size": 0.078049,
+        "parity": 0.078049,
+        "wave": 0.097561
       }
     }
   }
