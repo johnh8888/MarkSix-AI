@@ -1,45 +1,27 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩 AI V3.0
-波色独立模型
+六合彩 V3.0 波色模型
 
 功能：
 
-1. 红/蓝/绿基础频率
-2. 12 / 36 / 120 动态窗口
+1. 波色基础统计
+2. 动态 12 / 36 / 120 窗口
 3. 波色转移矩阵
-4. 上一期波色
-5. 连续波色
-6. 反转
-7. 非反转
-8. 波色熵
-9. 近期偏离程度
-10. 波色单推
-11. 波色双推
-12. 波色概率
-13. 与 strategies.py 兼容
+4. 连续波色
+5. 反转概率
+6. 波色熵
+7. 近期偏离程度
+8. 波色单推
+9. 波色双推
+10. 兼容 strategies.py / predictor.py
 
-注意：
-
-本模块用于统计建模与历史回测，
-不代表下一期开奖可以被确定预测。
+红 / 蓝 / 绿采用香港六合彩标准波色。
 """
 
 from collections import Counter
-import math
-from typing import Dict, List, Any, Tuple
-
-
-# =========================================================
-# 常量
-# =========================================================
-
-WAVES = (
-    "红",
-    "蓝",
-    "绿",
-)
+from math import log2
+from typing import Any, Dict, List, Tuple
 
 
 # =========================================================
@@ -53,13 +35,11 @@ RED = {
     46
 }
 
-
 BLUE = {
     3, 4, 9, 10, 14, 15,
     20, 25, 26, 31, 36,
     37, 41, 42, 47, 48
 }
-
 
 GREEN = {
     5, 6, 11, 16, 17,
@@ -68,6 +48,17 @@ GREEN = {
     49
 }
 
+
+WAVES = (
+    "红",
+    "蓝",
+    "绿",
+)
+
+
+# =========================================================
+# 号码 → 波色
+# =========================================================
 
 NUMBER_TO_WAVE = {}
 
@@ -82,37 +73,42 @@ for n in GREEN:
 
 
 # =========================================================
-# 基础工具
+# 获取波色
 # =========================================================
 
-def safe_special(row) -> int:
+def get_wave(number: int) -> str:
 
-    """
-    从数据库 row 中读取特码。
+    try:
+        number = int(number)
+    except (TypeError, ValueError):
+        return "未知"
 
-    兼容：
+    return NUMBER_TO_WAVE.get(
+        number,
+        "未知"
+    )
 
-    numbers = [33,27,...,14]
 
-    numbers = "33,27,...,14"
+# =========================================================
+# 从 row 获取特码
+# =========================================================
 
-    special = 14
-    """
+def get_special(row: Any) -> int:
 
     if row is None:
         return 0
 
     # -----------------------------------------------------
-    # 优先读取 special
+    # 优先 special
     # -----------------------------------------------------
 
     try:
 
-        special = row.get("special")
+        value = row.get("special")
 
-        if special is not None:
+        if value is not None:
 
-            n = int(special)
+            n = int(value)
 
             if 1 <= n <= 49:
                 return n
@@ -125,39 +121,26 @@ def safe_special(row) -> int:
     # -----------------------------------------------------
 
     try:
+
         numbers = row.get("numbers")
+
     except Exception:
-        numbers = None
+
+        try:
+            numbers = row["numbers"]
+        except Exception:
+            return 0
 
     if numbers is None:
-        return 0
-
-    if isinstance(numbers, (list, tuple)):
-
-        if len(numbers) >= 7:
-
-            try:
-
-                n = int(
-                    str(
-                        numbers[-1]
-                    ).strip()
-                )
-
-                if 1 <= n <= 49:
-                    return n
-
-            except Exception:
-                pass
-
         return 0
 
     if isinstance(numbers, str):
 
         text = (
             numbers
-            .strip()
             .replace("，", ",")
+            .replace("|", ",")
+            .replace(" ", ",")
         )
 
         parts = [
@@ -166,11 +149,14 @@ def safe_special(row) -> int:
             if x.strip()
         ]
 
-        if len(parts) >= 7:
+        numbers = parts
+
+    if isinstance(numbers, (list, tuple)):
+
+        if len(numbers) >= 7:
 
             try:
-
-                n = int(parts[-1])
+                n = int(numbers[6])
 
                 if 1 <= n <= 49:
                     return n
@@ -182,61 +168,52 @@ def safe_special(row) -> int:
 
 
 # =========================================================
-# 号码 → 波色
+# 获取历史波色序列
+#
+# rows:
+# 最新 → 最旧
 # =========================================================
 
-def number_to_wave(
-    number: int
-) -> str:
-
-    try:
-
-        n = int(number)
-
-    except Exception:
-
-        return "未知"
-
-    return NUMBER_TO_WAVE.get(
-        n,
-        "未知"
-    )
-
-
-# =========================================================
-# rows → 波色序列
-# =========================================================
-
-def get_wave_sequence(
-    rows
+def extract_wave_history(
+    rows: List[Dict[str, Any]],
+    limit: int = None
 ) -> List[str]:
 
-    sequence = []
+    if not rows:
+        return []
+
+    if limit is not None:
+        rows = rows[:limit]
+
+    result = []
 
     for row in rows:
 
-        n = safe_special(row)
+        n = get_special(row)
 
-        wave = number_to_wave(n)
+        wave = get_wave(n)
 
         if wave in WAVES:
+            result.append(wave)
 
-            sequence.append(wave)
-
-    return sequence
+    return result
 
 
 # =========================================================
-# 波色频率
+# 基础波色统计
 # =========================================================
 
-def wave_frequency(
-    rows
+def wave_counts(
+    rows: List[Dict[str, Any]],
+    limit: int = None
 ) -> Dict[str, int]:
 
-    counter = Counter(
-        get_wave_sequence(rows)
+    waves = extract_wave_history(
+        rows,
+        limit
     )
+
+    counter = Counter(waves)
 
     return {
         wave: counter.get(wave, 0)
@@ -245,465 +222,306 @@ def wave_frequency(
 
 
 # =========================================================
-# 波色概率
+# 平滑概率
 # =========================================================
 
-def wave_probabilities(
-    rows,
-    window: int = 36
+def smoothed_probabilities(
+    counts: Dict[str, int],
+    alpha: float = 1.0
 ) -> Dict[str, float]:
 
-    """
-    V3.0 核心接口。
-
-    strategies.py 会直接调用：
-
-        wave_probabilities(rows)
-
-    返回：
-
-        {
-            "红": 0.xx,
-            "蓝": 0.xx,
-            "绿": 0.xx
-        }
-    """
-
-    data = rows[:window]
-
-    sequence = get_wave_sequence(data)
-
-    if not sequence:
-
-        return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-
-    counter = Counter(sequence)
-
     total = sum(
-        counter.values()
+        counts.get(w, 0)
+        for w in WAVES
     )
 
-    if total <= 0:
+    denominator = (
+        total +
+        alpha * len(WAVES)
+    )
 
+    if denominator <= 0:
         return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-
-    probabilities = {
-
-        wave:
-            counter.get(
-                wave,
-                0
-            ) / total
-
-        for wave in WAVES
-    }
-
-    return probabilities
-
-
-# =========================================================
-# 动态多窗口概率
-# =========================================================
-
-def dynamic_wave_probabilities(
-    rows
-) -> Dict[str, float]:
-
-    """
-    12 / 36 / 120 动态窗口。
-
-    默认权重：
-
-        12期  50%
-        36期  30%
-        120期 20%
-
-    实际状态调整在上层模型完成。
-    """
-
-    p12 = wave_probabilities(
-        rows,
-        12
-    )
-
-    p36 = wave_probabilities(
-        rows,
-        36
-    )
-
-    p120 = wave_probabilities(
-        rows,
-        120
-    )
-
-    result = {}
-
-    for wave in WAVES:
-
-        result[wave] = (
-
-            p12[wave] * 0.50
-
-            +
-
-            p36[wave] * 0.30
-
-            +
-
-            p120[wave] * 0.20
-        )
-
-    total = sum(
-        result.values()
-    )
-
-    if total <= 0:
-
-        return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
+            w: 1.0 / 3.0
+            for w in WAVES
         }
 
     return {
-        wave:
-            result[wave] / total
+        w:
+        (
+            counts.get(w, 0) +
+            alpha
+        ) / denominator
 
+        for w in WAVES
+    }
+
+
+# =========================================================
+# 单纯历史概率
+# =========================================================
+
+def wave_frequency(
+    rows: List[Dict[str, Any]],
+    limit: int = None
+) -> Dict[str, float]:
+
+    counts = wave_counts(
+        rows,
+        limit
+    )
+
+    return smoothed_probabilities(
+        counts
+    )
+
+
+# =========================================================
+# 动态窗口波色概率
+# =========================================================
+
+def dynamic_wave_probabilities(
+    rows: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+
+    windows = {
+        "short": 12,
+        "medium": 36,
+        "long": 120,
+    }
+
+    result = {}
+
+    for name, window in windows.items():
+
+        result[name] = wave_frequency(
+            rows,
+            window
+        )
+
+    # -----------------------------------------------------
+    # 默认状态权重
+    # -----------------------------------------------------
+
+    weights = {
+        "short": 0.35,
+        "medium": 0.35,
+        "long": 0.30,
+    }
+
+    final = {
+        wave: 0.0
         for wave in WAVES
+    }
+
+    for window, probability in result.items():
+
+        weight = weights[window]
+
+        for wave in WAVES:
+
+            final[wave] += (
+                probability[wave] *
+                weight
+            )
+
+    return {
+        "windows": result,
+        "weights": weights,
+        "probabilities": normalize_probability(
+            final
+        ),
+    }
+
+
+# =========================================================
+# 概率归一化
+# =========================================================
+
+def normalize_probability(
+    values: Dict[str, float]
+) -> Dict[str, float]:
+
+    cleaned = {}
+
+    for key in WAVES:
+
+        try:
+            value = float(
+                values.get(key, 0)
+            )
+        except Exception:
+            value = 0.0
+
+        if value < 0:
+            value = 0.0
+
+        cleaned[key] = value
+
+    total = sum(
+        cleaned.values()
+    )
+
+    if total <= 0:
+
+        return {
+            w: 1.0 / 3.0
+            for w in WAVES
+        }
+
+    return {
+        w:
+        cleaned[w] / total
+
+        for w in WAVES
     }
 
 
 # =========================================================
 # 波色转移矩阵
+#
+# 当前 → 下一期
 # =========================================================
 
-def wave_transition_matrix(
-    rows
+def transition_matrix(
+    rows: List[Dict[str, Any]],
+    limit: int = 120
 ) -> Dict[str, Dict[str, float]]:
 
-    """
-    计算：
-
-        红 → 红/蓝/绿
-        蓝 → 红/蓝/绿
-        绿 → 红/蓝/绿
-    """
-
-    sequence = get_wave_sequence(
-        rows
+    waves = extract_wave_history(
+        rows,
+        limit
     )
 
-    matrix = {
+    result = {}
 
-        wave: {
-            target: 0.0
-            for target in WAVES
-        }
+    for current in WAVES:
 
-        for wave in WAVES
-    }
+        counter = Counter()
 
-    counts = {
-
-        wave: Counter()
-        for wave in WAVES
-    }
-
-    if len(sequence) < 2:
-
-        return {
-
-            wave: {
-                target: 1.0 / 3.0
-                for target in WAVES
-            }
-
-            for wave in WAVES
-        }
-
-    for i in range(
-        len(sequence) - 1
-    ):
-
-        current = sequence[i]
-
-        next_wave = sequence[i + 1]
-
-        if (
-            current in WAVES
-            and
-            next_wave in WAVES
+        for i in range(
+            len(waves) - 1
         ):
 
-            counts[current][
-                next_wave
-            ] += 1
+            # rows 是最新 → 最旧
+            # 因此 i+1 是上一期
+            newer = waves[i]
+            older = waves[i + 1]
 
-    for wave in WAVES:
+            if older == current:
+
+                counter[newer] += 1
 
         total = sum(
-            counts[wave].values()
+            counter.values()
         )
 
         if total <= 0:
 
-            matrix[wave] = {
-
-                target: 1.0 / 3.0
-
-                for target in WAVES
+            result[current] = {
+                w: 1.0 / 3.0
+                for w in WAVES
             }
 
         else:
 
-            matrix[wave] = {
+            result[current] = {
+                w:
+                (
+                    counter.get(w, 0) + 1
+                ) / (
+                    total + 3
+                )
 
-                target:
-                    counts[wave].get(
-                        target,
-                        0
-                    ) / total
-
-                for target in WAVES
+                for w in WAVES
             }
 
-    return matrix
+    return result
 
 
 # =========================================================
-# 上一期波色预测
+# 上一期波色
 # =========================================================
 
-def previous_wave_prediction(
-    rows
-) -> Dict[str, float]:
+def latest_wave(
+    rows: List[Dict[str, Any]]
+) -> str:
 
-    sequence = get_wave_sequence(
-        rows
+    if not rows:
+        return "未知"
+
+    n = get_special(
+        rows[0]
     )
 
-    if not sequence:
-
-        return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-
-    previous = sequence[0]
-
-    matrix = wave_transition_matrix(
-        rows
-    )
-
-    return dict(
-        matrix.get(
-            previous,
-            {
-                wave: 1.0 / 3.0
-                for wave in WAVES
-            }
-        )
-    )
+    return get_wave(n)
 
 
 # =========================================================
-# 连续波色
+# 连续长度
 # =========================================================
 
 def wave_streak(
-    rows
-) -> Tuple[str, int]:
+    rows: List[Dict[str, Any]]
+) -> int:
 
-    sequence = get_wave_sequence(
-        rows
+    waves = extract_wave_history(
+        rows,
+        120
     )
 
-    if not sequence:
+    if not waves:
+        return 0
 
-        return (
-            "未知",
-            0
-        )
+    first = waves[0]
 
-    current = sequence[0]
+    count = 0
 
-    streak = 1
+    for wave in waves:
 
-    for wave in sequence[1:]:
-
-        if wave == current:
-
-            streak += 1
-
+        if wave == first:
+            count += 1
         else:
-
             break
 
+    return count
+
+
+# =========================================================
+# 反转概率
+# =========================================================
+
+def reversal_probability(
+    rows: List[Dict[str, Any]],
+    limit: int = 120
+) -> float:
+
+    waves = extract_wave_history(
+        rows,
+        limit
+    )
+
+    if len(waves) < 2:
+        return 1.0 / 3.0
+
+    reverse_count = 0
+    total = 0
+
+    for i in range(
+        len(waves) - 1
+    ):
+
+        if waves[i] != waves[i + 1]:
+
+            reverse_count += 1
+
+        total += 1
+
     return (
-        current,
-        streak
+        reverse_count / total
+        if total
+        else 1.0 / 3.0
     )
-
-
-# =========================================================
-# 连续状态调整
-# =========================================================
-
-def streak_adjustment(
-    rows
-) -> Dict[str, float]:
-
-    probabilities = {
-        wave: 1.0 / 3.0
-        for wave in WAVES
-    }
-
-    current, streak = wave_streak(
-        rows
-    )
-
-    if current not in WAVES:
-
-        return probabilities
-
-    # -----------------------------------------------------
-    # 连续2期
-    # -----------------------------------------------------
-
-    if streak == 2:
-
-        probabilities[current] += 0.015
-
-    # -----------------------------------------------------
-    # 连续3期
-    # -----------------------------------------------------
-
-    elif streak == 3:
-
-        probabilities[current] -= 0.025
-
-        for wave in WAVES:
-
-            if wave != current:
-                probabilities[wave] += 0.0125
-
-    # -----------------------------------------------------
-    # 连续4期+
-    # -----------------------------------------------------
-
-    elif streak >= 4:
-
-        probabilities[current] -= 0.045
-
-        for wave in WAVES:
-
-            if wave != current:
-                probabilities[wave] += 0.0225
-
-    # -----------------------------------------------------
-    # 防止负数
-    # -----------------------------------------------------
-
-    probabilities = {
-
-        wave:
-            max(
-                0.001,
-                value
-            )
-
-        for wave, value
-        in probabilities.items()
-    }
-
-    total = sum(
-        probabilities.values()
-    )
-
-    return {
-
-        wave:
-            probabilities[wave] / total
-
-        for wave in WAVES
-    }
-
-
-# =========================================================
-# 反转模型
-# =========================================================
-
-def reversal_probabilities(
-    rows
-) -> Dict[str, float]:
-
-    sequence = get_wave_sequence(
-        rows
-    )
-
-    if len(sequence) < 2:
-
-        return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-
-    matrix = wave_transition_matrix(
-        rows
-    )
-
-    previous = sequence[0]
-
-    transition = matrix.get(
-        previous,
-        {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-    )
-
-    same_probability = transition.get(
-        previous,
-        0.0
-    )
-
-    result = dict(
-        transition
-    )
-
-    # 如果历史同色概率偏低，
-    # 反转模型提高非同色结果。
-    if same_probability < 0.34:
-
-        result[previous] *= 0.85
-
-    elif same_probability > 0.50:
-
-        result[previous] *= 1.05
-
-    total = sum(
-        result.values()
-    )
-
-    if total <= 0:
-
-        return {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
-
-    return {
-
-        wave:
-            result[wave] / total
-
-        for wave in WAVES
-    }
 
 
 # =========================================================
@@ -711,182 +529,201 @@ def reversal_probabilities(
 # =========================================================
 
 def wave_entropy(
-    rows,
-    window: int = 36
+    rows: List[Dict[str, Any]],
+    limit: int = 36
 ) -> float:
 
-    probabilities = wave_probabilities(
+    probabilities = wave_frequency(
         rows,
-        window
+        limit
     )
 
     entropy = 0.0
 
-    for probability in probabilities.values():
+    for wave in WAVES:
 
-        if probability > 0:
+        p = probabilities[wave]
+
+        if p > 0:
 
             entropy -= (
-                probability
-                *
-                math.log(
-                    probability,
-                    3
-                )
+                p *
+                log2(p)
             )
 
-    return max(
-        0.0,
-        min(
-            1.0,
-            entropy
-        )
-    )
+    # 最大熵 = log2(3)
+    max_entropy = log2(3)
+
+    if max_entropy <= 0:
+        return 0.0
+
+    return entropy / max_entropy
 
 
 # =========================================================
-# 波色偏离程度
+# 近期偏离
 # =========================================================
 
 def wave_deviation(
-    rows,
-    window: int = 36
+    rows: List[Dict[str, Any]],
+    limit: int = 12
 ) -> Dict[str, float]:
 
-    probabilities = wave_probabilities(
+    probability = wave_frequency(
         rows,
-        window
+        limit
     )
 
-    expected = 1.0 / 3.0
+    baseline = 1.0 / 3.0
 
     return {
-
         wave:
-            probabilities[wave]
-            - expected
+        probability[wave] -
+        baseline
 
         for wave in WAVES
     }
 
 
 # =========================================================
-# 波色综合模型
+# 核心波色预测
 # =========================================================
 
-def combined_wave_model(
-    rows
-) -> Dict[str, Any]:
+def wave_probabilities(
+    rows: List[Dict[str, Any]]
+) -> Dict[str, float]:
 
-    base = dynamic_wave_probabilities(
+    """
+    V3.0 对外统一接口。
+
+    这个函数专门解决：
+
+        strategies.py
+            ↓
+        wave_model.py
+
+    的接口问题。
+    """
+
+    dynamic = dynamic_wave_probabilities(
         rows
     )
 
-    transition = previous_wave_prediction(
+    probabilities = dict(
+        dynamic["probabilities"]
+    )
+
+    # -----------------------------------------------------
+    # 转移矩阵
+    # -----------------------------------------------------
+
+    last_wave = latest_wave(
         rows
     )
 
-    streak = streak_adjustment(
+    matrix = transition_matrix(
         rows
     )
 
-    reversal = reversal_probabilities(
+    transition = matrix.get(
+        last_wave
+    )
+
+    if transition:
+
+        # 历史概率 70%
+        # 转移概率 30%
+        for wave in WAVES:
+
+            probabilities[wave] = (
+                probabilities[wave] * 0.70
+                +
+                transition[wave] * 0.30
+            )
+
+    return normalize_probability(
+        probabilities
+    )
+
+
+# =========================================================
+# 波色单推
+# =========================================================
+
+def wave_single_pick(
+    rows: List[Dict[str, Any]]
+) -> str:
+
+    probabilities = wave_probabilities(
         rows
     )
 
-    # -----------------------------------------------------
-    # 综合
-    # -----------------------------------------------------
-
-    result = {}
-
-    for wave in WAVES:
-
-        result[wave] = (
-
-            base[wave] * 0.40
-
-            +
-
-            transition[wave] * 0.30
-
-            +
-
-            streak[wave] * 0.15
-
-            +
-
-            reversal[wave] * 0.15
-        )
-
-    # -----------------------------------------------------
-    # 归一化
-    # -----------------------------------------------------
-
-    total = sum(
-        result.values()
+    return max(
+        probabilities,
+        key=probabilities.get
     )
 
-    if total <= 0:
 
-        result = {
-            wave: 1.0 / 3.0
-            for wave in WAVES
-        }
+# =========================================================
+# 波色双推
+# =========================================================
 
-    else:
+def wave_double_pick(
+    rows: List[Dict[str, Any]]
+) -> List[str]:
 
-        result = {
+    probabilities = wave_probabilities(
+        rows
+    )
 
-            wave:
-                result[wave] / total
-
-            for wave in WAVES
-        }
-
-    # -----------------------------------------------------
-    # 排名
-    # -----------------------------------------------------
-
-    ranking = sorted(
-
-        result.items(),
-
-        key=lambda x: x[1],
-
+    ordered = sorted(
+        WAVES,
+        key=lambda x:
+        probabilities[x],
         reverse=True
     )
 
-    single_pick = ranking[0][0]
+    return ordered[:2]
 
-    double_pick = [
-        ranking[0][0],
-        ranking[1][0],
-    ]
 
-    current_wave, streak_count = wave_streak(
+# =========================================================
+# 完整波色模型
+# =========================================================
+
+def analyze_wave(
+    rows: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+
+    probabilities = wave_probabilities(
         rows
+    )
+
+    ordered = sorted(
+        WAVES,
+        key=lambda x:
+        probabilities[x],
+        reverse=True
     )
 
     return {
 
         "probabilities":
-            result,
-
-        "ranking":
-            ranking,
+            probabilities,
 
         "single":
-            single_pick,
+            ordered[0],
 
         "double":
-            double_pick,
+            ordered[:2],
 
-        "current_wave":
-            current_wave,
+        "latest":
+            latest_wave(rows),
 
         "streak":
-            streak_count,
+            wave_streak(rows),
+
+        "reversal_probability":
+            reversal_probability(rows),
 
         "entropy":
             wave_entropy(rows),
@@ -895,128 +732,13 @@ def combined_wave_model(
             wave_deviation(rows),
 
         "transition":
-            transition,
+            transition_matrix(rows),
 
-        "base":
-            base,
+        "dynamic":
+            dynamic_wave_probabilities(
+                rows
+            ),
     }
-
-
-# =========================================================
-# 波色单推
-# =========================================================
-
-def wave_single_pick(
-    rows
-) -> str:
-
-    model = combined_wave_model(
-        rows
-    )
-
-    return model["single"]
-
-
-# =========================================================
-# 波色双推
-# =========================================================
-
-def wave_double_pick(
-    rows
-) -> List[str]:
-
-    model = combined_wave_model(
-        rows
-    )
-
-    return model["double"]
-
-
-# =========================================================
-# 波色评分
-#
-# 提供给 strategies.py
-# =========================================================
-
-def wave_scores(
-    rows
-) -> Dict[str, float]:
-
-    return combined_wave_model(
-        rows
-    )["probabilities"]
-
-
-# =========================================================
-# 兼容旧接口
-# =========================================================
-
-def strategy_wave(
-    rows
-) -> Dict[int, float]:
-
-    """
-    将波色概率映射回49个号码。
-
-    这样旧版 strategies.py 也可以继续使用。
-    """
-
-    probabilities = combined_wave_model(
-        rows
-    )["probabilities"]
-
-    scores = {}
-
-    for number in range(
-        1,
-        50
-    ):
-
-        wave = NUMBER_TO_WAVE.get(
-            number
-        )
-
-        scores[number] = probabilities.get(
-            wave,
-            1.0 / 3.0
-        )
-
-    # -----------------------------------------------------
-    # 归一化到 0~1
-    # -----------------------------------------------------
-
-    values = list(
-        scores.values()
-    )
-
-    low = min(values)
-    high = max(values)
-
-    if high > low:
-
-        scores = {
-
-            n:
-                (
-                    value - low
-                )
-                /
-                (
-                    high - low
-                )
-
-            for n, value
-            in scores.items()
-        }
-
-    else:
-
-        scores = {
-            n: 0.5
-            for n in scores
-        }
-
-    return scores
 
 
 # =========================================================
@@ -1039,126 +761,57 @@ if __name__ == "__main__":
 
         {
             "numbers":
-                "47,14,44,32,07,37,11"
+                "01,12,19,24,30,35,46"
         },
 
         {
             "numbers":
-                "21,09,15,34,42,18,49"
-        },
-
-        {
-            "numbers":
-                "02,13,27,31,40,06,08"
+                "05,11,17,22,38,43,49"
         },
 
     ]
 
-    print("=" * 70)
-
     print(
-        "六合彩 AI V3.0 波色模型测试"
-    )
-
-    print("=" * 70)
-
-    print()
-
-    print(
-        "波色序列："
+        "=" * 70
     )
 
     print(
-        get_wave_sequence(
-            test_rows
-        )
-    )
-
-    print()
-
-    print(
-        "基础概率："
+        "V3.0 波色模型测试"
     )
 
     print(
+        "=" * 70
+    )
+
+    print(
+        "NUMBER_TO_WAVE：",
+        len(NUMBER_TO_WAVE)
+    )
+
+    print(
+        "波色概率：",
         wave_probabilities(
-            test_rows,
-            36
-        )
-    )
-
-    print()
-
-    print(
-        "动态概率："
-    )
-
-    print(
-        dynamic_wave_probabilities(
             test_rows
         )
     )
-
-    print()
-
-    print(
-        "转移矩阵："
-    )
-
-    for wave, values in wave_transition_matrix(
-        test_rows
-    ).items():
-
-        print(
-            wave,
-            values
-        )
-
-    print()
-
-    model = combined_wave_model(
-        test_rows
-    )
-
-    print(
-        "综合概率："
-    )
-
-    for wave, probability in model[
-        "probabilities"
-    ].items():
-
-        print(
-            f"{wave}："
-            f"{probability:.4f}"
-        )
-
-    print()
 
     print(
         "波色单推：",
-        model["single"]
+        wave_single_pick(
+            test_rows
+        )
     )
 
     print(
         "波色双推：",
-        " + ".join(
-            model["double"]
+        wave_double_pick(
+            test_rows
         )
     )
 
-    print()
-
     print(
-        "当前连续：",
-        model["current_wave"],
-        model["streak"],
-        "期"
+        "完整分析：",
+        analyze_wave(
+            test_rows
+        )
     )
-
-    print(
-        "波色熵：",
-        f"{model['entropy']:.4f}"
-    )
-
-    print("=" * 70)
