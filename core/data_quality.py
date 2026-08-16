@@ -5,100 +5,228 @@
 数据质量检查
 """
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
-from core.features import (
-    get_special,
-    parse_numbers,
+
+VALID_NUMBERS = set(
+    range(1, 50)
 )
 
 
 # =========================================================
-# 单条数据检查
+# 单行检查
 # =========================================================
 
-def validate_row(
-    row: Dict[str, Any]
-) -> Dict[str, Any]:
+def validate_row(row) -> Dict:
 
     errors = []
 
     warnings = []
 
-    # -----------------------------------------------------
-    # 期号
-    # -----------------------------------------------------
+
+    if not isinstance(
+        row,
+        dict
+    ):
+
+        return {
+
+            "valid": False,
+
+            "errors":
+                ["row不是dict"],
+
+            "warnings":
+                [],
+
+        }
+
 
     issue = row.get(
         "issue"
     )
 
+
     if issue is None:
+
         errors.append(
-            "缺少期号"
+            "缺少issue"
         )
 
-    # -----------------------------------------------------
-    # 号码
-    # -----------------------------------------------------
 
-    numbers = parse_numbers(
-        row
+    numbers = row.get(
+        "numbers"
     )
 
-    if len(numbers) != 7:
+
+    # -----------------------------------------------------
+    # numbers
+    # -----------------------------------------------------
+
+    if isinstance(
+        numbers,
+        str
+    ):
+
+        text = (
+            numbers
+            .replace(
+                "，",
+                ","
+            )
+            .strip()
+        )
+
+        parts = [
+            x.strip()
+            for x in text.split(",")
+            if x.strip()
+        ]
+
+
+        parsed = []
+
+        for item in parts:
+
+            try:
+
+                parsed.append(
+                    int(item)
+                )
+
+            except Exception:
+
+                errors.append(
+                    f"号码无法解析:{item}"
+                )
+
+
+    elif isinstance(
+        numbers,
+        (list, tuple)
+    ):
+
+        parsed = []
+
+        for item in numbers:
+
+            try:
+
+                parsed.append(
+                    int(item)
+                )
+
+            except Exception:
+
+                errors.append(
+                    f"号码无法解析:{item}"
+                )
+
+    else:
+
+        parsed = []
+
+
+        if numbers is not None:
+
+            errors.append(
+                "numbers类型错误"
+            )
+
+
+    # -----------------------------------------------------
+    # 数量
+    # -----------------------------------------------------
+
+    if len(parsed) != 7:
 
         errors.append(
-            f"号码数量异常：{len(numbers)}"
+            f"号码数量异常:{len(parsed)}"
         )
+
 
     # -----------------------------------------------------
     # 范围
     # -----------------------------------------------------
 
-    for n in numbers:
+    invalid = [
 
-        if not 1 <= n <= 49:
+        n
 
-            errors.append(
-                f"号码超出范围：{n}"
-            )
+        for n in parsed
 
-    # -----------------------------------------------------
-    # 重复号码
-    # -----------------------------------------------------
+        if n not in VALID_NUMBERS
 
-    if len(numbers) != len(
-        set(numbers)
-    ):
+    ]
+
+
+    if invalid:
 
         errors.append(
-            "开奖号码存在重复"
+            f"号码超范围:{invalid}"
         )
+
+
+    # -----------------------------------------------------
+    # 重复
+    # -----------------------------------------------------
+
+    if len(parsed) == 7:
+
+        if len(set(parsed)) != 7:
+
+            errors.append(
+                "开奖号码存在重复"
+            )
+
 
     # -----------------------------------------------------
     # 特码
     # -----------------------------------------------------
 
-    special = get_special(
-        row
-    )
+    if len(parsed) >= 7:
 
-    if not 1 <= special <= 49:
+        special = parsed[6]
 
-        errors.append(
-            "特码无效"
-        )
+        if special not in VALID_NUMBERS:
+
+            errors.append(
+                "特码非法"
+            )
+
 
     # -----------------------------------------------------
-    # 号码不足
+    # issue
     # -----------------------------------------------------
 
-    if len(numbers) < 7:
+    if issue is not None:
+
+        issue_text = str(
+            issue
+        ).strip()
+
+
+        if not issue_text:
+
+            errors.append(
+                "issue为空"
+            )
+
+
+    # -----------------------------------------------------
+    # warning
+    # -----------------------------------------------------
+
+    if (
+        len(parsed) == 7
+        and parsed == sorted(parsed)
+    ):
 
         warnings.append(
-            "开奖号码不足7个"
+            "开奖号码已经排序，"
+            "请确认数据源是否改变了原始顺序"
         )
+
 
     return {
 
@@ -111,33 +239,32 @@ def validate_row(
         "warnings":
             warnings,
 
-        "issue":
-            issue,
-
-        "special":
-            special,
     }
 
 
 # =========================================================
-# 批量检查
+# 全部检查
 # =========================================================
 
-def validate_rows(
-    rows: List[Dict[str, Any]]
+def validate_history(
+    rows
 ):
 
     valid_rows = []
 
     invalid_rows = []
 
-    warning_count = 0
+    all_warnings = []
 
-    for row in rows:
+
+    for index, row in enumerate(
+        rows
+    ):
 
         result = validate_row(
             row
         )
+
 
         if result["valid"]:
 
@@ -149,24 +276,33 @@ def validate_rows(
 
             invalid_rows.append({
 
-                "row":
-                    row,
+                "index":
+                    index,
+
+                "issue":
+                    row.get(
+                        "issue"
+                    )
+                    if isinstance(
+                        row,
+                        dict
+                    )
+                    else None,
 
                 "errors":
                     result["errors"],
 
-                "warnings":
-                    result["warnings"],
             })
 
-        warning_count += len(
-            result["warnings"]
-        )
+
+        if result["warnings"]:
+
+            all_warnings.extend(
+                result["warnings"]
+            )
+
 
     return {
-
-        "total":
-            len(rows),
 
         "valid":
             len(valid_rows),
@@ -175,13 +311,14 @@ def validate_rows(
             len(invalid_rows),
 
         "warnings":
-            warning_count,
+            len(all_warnings),
 
         "valid_rows":
             valid_rows,
 
         "invalid_rows":
             invalid_rows,
+
     }
 
 
@@ -189,7 +326,7 @@ def validate_rows(
 # 去重
 # =========================================================
 
-def remove_duplicate_issues(
+def deduplicate_history(
     rows
 ):
 
@@ -197,20 +334,31 @@ def remove_duplicate_issues(
 
     result = []
 
+
     for row in rows:
+
+        if not isinstance(
+            row,
+            dict
+        ):
+            continue
+
 
         issue = str(
             row.get(
                 "issue",
                 ""
             )
-        )
+        ).strip()
+
 
         if not issue:
             continue
 
+
         if issue in seen:
             continue
+
 
         seen.add(issue)
 
@@ -218,25 +366,58 @@ def remove_duplicate_issues(
             row
         )
 
+
     return result
 
 
 # =========================================================
-# 最终清洗
+# 数据清洗
 # =========================================================
 
 def clean_history(
     rows
 ):
 
-    rows = remove_duplicate_issues(
+    rows = deduplicate_history(
         rows
     )
 
-    result = validate_rows(
+
+    quality = validate_history(
         rows
     )
 
-    return result[
+
+    valid_rows = quality[
         "valid_rows"
     ]
+
+
+    # 保持最新 -> 最旧
+    #
+    # 如果 issue 是纯数字，
+    # 按期号倒序。
+
+    try:
+
+        valid_rows.sort(
+
+            key=lambda row:
+                int(
+                    str(
+                        row.get(
+                            "issue"
+                        )
+                    )
+                ),
+
+            reverse=True
+
+        )
+
+    except Exception:
+
+        pass
+
+
+    return valid_rows, quality
