@@ -1,117 +1,49 @@
 {
   "hk": {
     "name": "香港六合彩",
-    "generated_at": "2026-08-16T17:19:15.084955",
+    "generated_at": "2026-08-16T17:28:10.167178",
     "history_count": 277,
     "prediction": {
-      "recommendation": {
-        "first": {
-          "number": 27,
-          "score": 0.790467
-        },
-        "second": {
-          "number": 23,
-          "score": 0.729746
-        },
-        "third": {
-          "number": 13,
-          "score": 0.729564
-        }
-      },
       "top10_numbers": [
         {
-          "rank": 1,
           "number": 27,
           "score": 0.790467
         },
         {
-          "rank": 2,
           "number": 23,
           "score": 0.729746
         },
         {
-          "rank": 3,
           "number": 13,
           "score": 0.729564
         },
         {
-          "rank": 4,
           "number": 46,
           "score": 0.634553
         },
         {
-          "rank": 5,
           "number": 8,
           "score": 0.58861
         },
         {
-          "rank": 6,
           "number": 45,
           "score": 0.556248
         },
         {
-          "rank": 7,
           "number": 43,
           "score": 0.542817
         },
         {
-          "rank": 8,
           "number": 34,
           "score": 0.514908
         },
         {
-          "rank": 9,
           "number": 44,
           "score": 0.469772
         },
         {
-          "rank": 10,
           "number": 1,
           "score": 0.457341
-        }
-      ],
-      "top5_numbers": [
-        {
-          "rank": 1,
-          "number": 27,
-          "score": 0.790467
-        },
-        {
-          "rank": 2,
-          "number": 23,
-          "score": 0.729746
-        },
-        {
-          "rank": 3,
-          "number": 13,
-          "score": 0.729564
-        },
-        {
-          "rank": 4,
-          "number": 46,
-          "score": 0.634553
-        },
-        {
-          "rank": 5,
-          "number": 8,
-          "score": 0.58861
-        }
-      ],
-      "top3_numbers": [
-        {
-          "rank": 1,
-          "number": 27,
-          "score": 0.790467
-        },
-        {
-          "rank": 2,
-          "number": 23,
-          "score": 0.729746
-        },
-        {
-          "rank": 3,
-          "number": 13,
-          "score": 0.729564
         }
       ],
       "top5_zodiac": [
@@ -162,127 +94,69 @@
       },
       "wave": {
         "prediction": "红",
+        "top2": [
+          {
+            "wave": "红",
+            "probability": 0.460333
+          },
+          {
+            "wave": "绿",
+            "probability": 0.338333
+          }
+        ],
         "probability": {
-          "红": 0.46,
-          "蓝": 0.24,
-          "绿": 0.3
+          "红": 0.460333,
+          "蓝": 0.201333,
+          "绿": 0.338333
         }
       }
     }
   },
   "newMacau": {
     "name": "新澳门六合彩",
-    "generated_at": "2026-08-16T17:19:15.447950",
+    "generated_at": "2026-08-16T17:28:10.960700",
     "history_count": 668,
     "prediction": {
-      "recommendation": {
-        "first": {
-          "number": 1,
-          "score": 0.788533
-        },
-        "second": {
-          "number": 26,
-          "score": 0.638044
-        },
-        "third": {
-          "number": 23,
-          "score": 0.609471
-        }
-      },
       "top10_numbers": [
         {
-          "rank": 1,
           "number": 1,
           "score": 0.788533
         },
         {
-          "rank": 2,
           "number": 26,
           "score": 0.638044
         },
         {
-          "rank": 3,
           "number": 23,
           "score": 0.609471
         },
         {
-          "rank": 4,
           "number": 17,
           "score": 0.493126
         },
         {
-          "rank": 5,
           "number": 41,
           "score": 0.483649
         },
         {
-          "rank": 6,
           "number": 16,
           "score": 0.478048
         },
         {
-          "rank": 7,
           "number": 37,
           "score": 0.444438
         },
         {
-          "rank": 8,
           "number": 9,
           "score": 0.441901
         },
         {
-          "rank": 9,
           "number": 3,
           "score": 0.438578
         },
         {
-          "rank": 10,
           "number": 15,
           "score": 0.438104
-        }
-      ],
-      "top5_numbers": [
-        {
-          "rank": 1,
-          "number": 1,
-          "score": 0.788533
-        },
-        {
-          "rank": 2,
-          "number": 26,
-          "score": 0.638044
-        },
-        {
-          "rank": 3,
-          "number": 23,
-          "score": 0.609471
-        },
-        {
-          "rank": 4,
-          "number": 17,
-          "score": 0.493126
-        },
-        {
-          "rank": 5,
-          "number": 41,
-          "score": 0.483649
-        }
-      ],
-      "top3_numbers": [
-        {
-          "rank": 1,
-          "number": 1,
-          "score": 0.788533
-        },
-        {
-          "rank": 2,
-          "number": 26,
-          "score": 0.638044
-        },
-        {
-          "rank": 3,
-          "number": 23,
-          "score": 0.609471
         }
       ],
       "top5_zodiac": [
@@ -333,127 +207,69 @@
       },
       "wave": {
         "prediction": "蓝",
+        "top2": [
+          {
+            "wave": "蓝",
+            "probability": 0.408
+          },
+          {
+            "wave": "红",
+            "probability": 0.313
+          }
+        ],
         "probability": {
-          "红": 0.34,
-          "蓝": 0.39,
-          "绿": 0.27
+          "红": 0.313,
+          "蓝": 0.408,
+          "绿": 0.279
         }
       }
     }
   },
   "oldMacau": {
     "name": "老澳门六合彩",
-    "generated_at": "2026-08-16T17:19:15.819069",
+    "generated_at": "2026-08-16T17:28:11.758388",
     "history_count": 650,
     "prediction": {
-      "recommendation": {
-        "first": {
-          "number": 41,
-          "score": 0.789883
-        },
-        "second": {
-          "number": 18,
-          "score": 0.554843
-        },
-        "third": {
-          "number": 30,
-          "score": 0.541303
-        }
-      },
       "top10_numbers": [
         {
-          "rank": 1,
           "number": 41,
           "score": 0.789883
         },
         {
-          "rank": 2,
           "number": 18,
           "score": 0.554843
         },
         {
-          "rank": 3,
           "number": 30,
           "score": 0.541303
         },
         {
-          "rank": 4,
           "number": 16,
           "score": 0.502403
         },
         {
-          "rank": 5,
           "number": 10,
           "score": 0.467133
         },
         {
-          "rank": 6,
           "number": 38,
           "score": 0.461617
         },
         {
-          "rank": 7,
           "number": 47,
           "score": 0.433911
         },
         {
-          "rank": 8,
           "number": 26,
           "score": 0.40825
         },
         {
-          "rank": 9,
           "number": 34,
           "score": 0.405981
         },
         {
-          "rank": 10,
           "number": 31,
           "score": 0.395796
-        }
-      ],
-      "top5_numbers": [
-        {
-          "rank": 1,
-          "number": 41,
-          "score": 0.789883
-        },
-        {
-          "rank": 2,
-          "number": 18,
-          "score": 0.554843
-        },
-        {
-          "rank": 3,
-          "number": 30,
-          "score": 0.541303
-        },
-        {
-          "rank": 4,
-          "number": 16,
-          "score": 0.502403
-        },
-        {
-          "rank": 5,
-          "number": 10,
-          "score": 0.467133
-        }
-      ],
-      "top3_numbers": [
-        {
-          "rank": 1,
-          "number": 41,
-          "score": 0.789883
-        },
-        {
-          "rank": 2,
-          "number": 18,
-          "score": 0.554843
-        },
-        {
-          "rank": 3,
-          "number": 30,
-          "score": 0.541303
         }
       ],
       "top5_zodiac": [
@@ -503,11 +319,21 @@
         }
       },
       "wave": {
-        "prediction": "绿",
+        "prediction": "蓝",
+        "top2": [
+          {
+            "wave": "蓝",
+            "probability": 0.411333
+          },
+          {
+            "wave": "绿",
+            "probability": 0.318333
+          }
+        ],
         "probability": {
-          "红": 0.31,
-          "蓝": 0.34,
-          "绿": 0.35
+          "红": 0.270333,
+          "蓝": 0.411333,
+          "绿": 0.318333
         }
       }
     }
