@@ -1,48 +1,185 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩 V3.0 策略层
+六合彩 AI V3.0
+策略引擎
 
-负责：
+功能：
 
-1. 号码频率
-2. 近期趋势
-3. 遗漏
-4. 尾数
-5. 分区
-6. 大小
-7. 单双
-8. 波色
-9. 综合策略
-10. 动态权重
+1. 12期近期统计
+2. 36期中期统计
+3. 120期长期统计
+4. 遗漏策略
+5. 趋势策略
+6. 转移策略
+7. 大小策略
+8. 单双策略
+9. 波色策略
+10. 尾数策略
+11. 分区策略
+12. 动态模块权重
+13. 49码综合评分
+14. Top10 / Top3
+15. 生肖统计
+16. 平特生肖
+17. 大小概率
+18. 单双概率
+19. 波色单推 / 双推
+
+注意：
+本模块属于历史数据统计模型，不代表可以确定预测随机开奖结果。
 """
 
+from __future__ import annotations
+
 from collections import Counter
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence, Tuple
+import math
 
 
-from .wave_model import (
-    RED,
-    BLUE,
-    GREEN,
+# =========================================================
+# 导入配置
+# =========================================================
+
+from core.config import (
+    SHORT_WINDOW,
+    MEDIUM_WINDOW,
+    LONG_WINDOW,
+    MIN_MODULE_WEIGHT,
+    MAX_MODULE_WEIGHT,
+    DEFAULT_MODULE_WEIGHTS,
     WAVES,
-    NUMBER_TO_WAVE,
-    get_wave,
-    wave_probabilities,
-    wave_single_pick,
-    wave_double_pick,
+    TOP10_NUMBERS,
+    TOP3_NUMBERS,
+    TOP5_ZODIACS,
+    TOP2_PINGTE_ZODIACS,
+    PROBABILITY_FLOOR,
+    PROBABILITY_CEILING,
+    PROBABILITY_TEMPERATURE,
 )
 
 
 # =========================================================
-# 工具
+# 波色模型
 # =========================================================
 
-def extract_special(
-    row: Dict[str, Any]
-) -> int:
+from core.wave_model import (
+    NUMBER_TO_WAVE,
+    number_to_wave,
+    wave_probabilities,
+    transition_probabilities,
+    analyze_wave,
+)
 
-    special = row.get(
+
+# =========================================================
+# 基础常量
+# =========================================================
+
+NUMBERS = tuple(
+    range(1, 50)
+)
+
+
+# =========================================================
+# 安全浮点
+# =========================================================
+
+def safe_float(
+    value: Any,
+    default: float = 0.0,
+) -> float:
+
+    try:
+
+        value = float(value)
+
+        if not math.isfinite(value):
+
+            return default
+
+        return value
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return default
+
+
+# =========================================================
+# 限制概率
+# =========================================================
+
+def clamp_probability(
+    value: float,
+) -> float:
+
+    value = safe_float(
+        value
+    )
+
+    return max(
+        PROBABILITY_FLOOR,
+        min(
+            PROBABILITY_CEILING,
+            value,
+        ),
+    )
+
+
+# =========================================================
+# 号码解析
+# =========================================================
+
+def extract_numbers(
+    draw: Dict[str, Any],
+) -> List[int]:
+
+    numbers = draw.get(
+        "numbers",
+        []
+    )
+
+    result = []
+
+    if isinstance(
+        numbers,
+        (list, tuple)
+    ):
+
+        for value in numbers:
+
+            try:
+
+                number = int(value)
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                continue
+
+            if 1 <= number <= 49:
+
+                result.append(
+                    number
+                )
+
+    return result
+
+
+# =========================================================
+# 获取特码
+# =========================================================
+
+def get_special(
+    draw: Dict[str, Any],
+) -> int | None:
+
+    special = draw.get(
         "special"
     )
 
@@ -50,825 +187,1598 @@ def extract_special(
 
         try:
 
-            n = int(special)
+            number = int(
+                special
+            )
 
-            if 1 <= n <= 49:
-                return n
+            if 1 <= number <= 49:
 
-        except Exception:
+                return number
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
             pass
 
-    numbers = row.get(
-        "numbers",
-        []
+
+    numbers = extract_numbers(
+        draw
     )
 
-    if isinstance(
-        numbers,
-        str
-    ):
-
-        numbers = (
-            numbers
-            .replace("，", ",")
-            .split(",")
-        )
-
-    try:
-
-        numbers = [
-            int(str(x).strip())
-            for x in numbers
-            if str(x).strip()
-        ]
-
-    except Exception:
-
-        return 0
 
     if len(numbers) >= 7:
 
-        return numbers[6]
+        return numbers[-1]
 
-    return 0
+
+    return None
 
 
 # =========================================================
-# 提取特码
+# 提取历史特码
 # =========================================================
 
-def special_sequence(
-    rows: List[Dict[str, Any]]
+def special_history(
+    draws: Sequence[Dict[str, Any]],
+    window: int | None = None,
 ) -> List[int]:
+
+    source = draws
+
+    if window is not None:
+
+        source = draws[
+            :window
+        ]
+
 
     result = []
 
-    for row in rows:
+    for draw in source:
 
-        n = extract_special(row)
+        number = get_special(
+            draw
+        )
 
-        if 1 <= n <= 49:
-            result.append(n)
+        if number is not None:
+
+            result.append(
+                number
+            )
 
     return result
 
 
 # =========================================================
-# 频率
+# 归一化分数
 # =========================================================
 
-def frequency_scores(
-    rows: List[Dict[str, Any]],
-    window: int = 120
-) -> Dict[int, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    counts = Counter(
-        sequence
-    )
-
-    total = max(
-        len(sequence),
-        1
-    )
-
-    return {
-        n:
-            (
-                counts.get(n, 0)
-                + 1.0
-            )
-            /
-            (
-                total
-                + 49.0
-            )
-
-        for n in range(1, 50)
-    }
-
-
-# =========================================================
-# 近期趋势
-# =========================================================
-
-def trend_scores(
-    rows: List[Dict[str, Any]],
-    window: int = 36
-) -> Dict[int, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    scores = {
-        n: 0.0
-        for n in range(1, 50)
-    }
-
-    if not sequence:
-        return scores
-
-    total = len(sequence)
-
-    # 越近权重越高
-    for index, number in enumerate(
-        sequence
-    ):
-
-        weight = (
-            total - index
-        ) / total
-
-        scores[number] += weight
-
-    maximum = max(
-        scores.values()
-    )
-
-    if maximum > 0:
-
-        for n in scores:
-
-            scores[n] /= maximum
-
-    return scores
-
-
-# =========================================================
-# 遗漏
-# =========================================================
-
-def omission_scores(
-    rows: List[Dict[str, Any]],
-    window: int = 120
-) -> Dict[int, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    scores = {}
-
-    for n in range(1, 50):
-
-        omission = window
-
-        for index, value in enumerate(
-            sequence
-        ):
-
-            if value == n:
-
-                omission = index
-                break
-
-        scores[n] = omission
-
-    # 适度降权极端遗漏
-    maximum = max(
-        scores.values()
-    ) if scores else 1
-
-    result = {}
-
-    for n in range(1, 50):
-
-        omission = scores[n]
-
-        result[n] = (
-            1.0
-            -
-            omission / max(
-                maximum,
-                1
-            )
-        )
-
-    return result
-
-
-# =========================================================
-# 尾数
-# =========================================================
-
-def tail_scores(
-    rows: List[Dict[str, Any]],
-    window: int = 36
-) -> Dict[int, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    counts = Counter(
-        n % 10
-        for n in sequence
-    )
-
-    result = {}
-
-    for n in range(1, 50):
-
-        result[n] = (
-            counts.get(
-                n % 10,
-                0
-            )
-            + 1
-        )
-
-    maximum = max(
-        result.values()
-    )
-
-    for n in result:
-
-        result[n] /= maximum
-
-    return result
-
-
-# =========================================================
-# 分区
-# =========================================================
-
-def zone(
-    number: int
-) -> int:
-
-    if 1 <= number <= 10:
-        return 1
-
-    if 11 <= number <= 20:
-        return 2
-
-    if 21 <= number <= 30:
-        return 3
-
-    if 31 <= number <= 40:
-        return 4
-
-    if 41 <= number <= 49:
-        return 5
-
-    return 0
-
-
-def zone_scores(
-    rows: List[Dict[str, Any]],
-    window: int = 36
-) -> Dict[int, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    counts = Counter(
-        zone(n)
-        for n in sequence
-    )
-
-    result = {}
-
-    for n in range(1, 50):
-
-        result[n] = (
-            counts.get(
-                zone(n),
-                0
-            )
-            + 1
-        )
-
-    maximum = max(
-        result.values()
-    )
-
-    for n in result:
-
-        result[n] /= maximum
-
-    return result
-
-
-# =========================================================
-# 大小
-# =========================================================
-
-def get_size(
-    number: int
-) -> str:
-
-    return "大" if number >= 25 else "小"
-
-
-def size_probabilities(
-    rows: List[Dict[str, Any]],
-    window: int = 36
-) -> Dict[str, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    counts = Counter(
-        get_size(n)
-        for n in sequence
-    )
-
-    total = sum(
-        counts.values()
-    )
-
-    if total <= 0:
-
-        return {
-            "大": 0.5,
-            "小": 0.5
-        }
-
-    return {
-
-        "大":
-            (
-                counts.get("大", 0)
-                + 1
-            )
-            /
-            (
-                total + 2
-            ),
-
-        "小":
-            (
-                counts.get("小", 0)
-                + 1
-            )
-            /
-            (
-                total + 2
-            ),
-    }
-
-
-# =========================================================
-# 单双
-# =========================================================
-
-def get_parity(
-    number: int
-) -> str:
-
-    return "单" if number % 2 else "双"
-
-
-def parity_probabilities(
-    rows: List[Dict[str, Any]],
-    window: int = 36
-) -> Dict[str, float]:
-
-    sequence = special_sequence(
-        rows[:window]
-    )
-
-    counts = Counter(
-        get_parity(n)
-        for n in sequence
-    )
-
-    total = sum(
-        counts.values()
-    )
-
-    if total <= 0:
-
-        return {
-            "单": 0.5,
-            "双": 0.5
-        }
-
-    return {
-
-        "单":
-            (
-                counts.get("单", 0)
-                + 1
-            )
-            /
-            (
-                total + 2
-            ),
-
-        "双":
-            (
-                counts.get("双", 0)
-                + 1
-            )
-            /
-            (
-                total + 2
-            ),
-    }
-
-
-# =========================================================
-# 号码策略综合
-# =========================================================
-
-def combine_strategies(
-    rows: List[Dict[str, Any]],
-    weights: Dict[str, float] = None
-) -> Dict[int, float]:
-
-    if weights is None:
-
-        weights = {
-
-            "frequency": 0.22,
-
-            "trend": 0.24,
-
-            "omission": 0.10,
-
-            "tail": 0.10,
-
-            "zone": 0.08,
-
-            "wave": 0.16,
-
-            "size": 0.05,
-
-            "parity": 0.05,
-        }
-
-    frequency = frequency_scores(
-        rows,
-        120
-    )
-
-    trend = trend_scores(
-        rows,
-        36
-    )
-
-    omission = omission_scores(
-        rows,
-        120
-    )
-
-    tail = tail_scores(
-        rows,
-        36
-    )
-
-    zone_s = zone_scores(
-        rows,
-        36
-    )
-
-    wave = wave_probabilities(
-        rows
-    )
-
-    size_p = size_probabilities(
-        rows
-    )
-
-    parity_p = parity_probabilities(
-        rows
-    )
-
-    result = {}
-
-    for number in range(1, 50):
-
-        wave_p = wave.get(
-            get_wave(number),
-            1.0 / 3.0
-        )
-
-        size_pn = size_p.get(
-            get_size(number),
-            0.5
-        )
-
-        parity_pn = parity_p.get(
-            get_parity(number),
-            0.5
-        )
-
-        score = (
-
-            frequency[number]
-            * weights["frequency"]
-
-            +
-
-            trend[number]
-            * weights["trend"]
-
-            +
-
-            omission[number]
-            * weights["omission"]
-
-            +
-
-            tail[number]
-            * weights["tail"]
-
-            +
-
-            zone_s[number]
-            * weights["zone"]
-
-            +
-
-            wave_p
-            * weights["wave"]
-
-            +
-
-            size_pn
-            * weights["size"]
-
-            +
-
-            parity_pn
-            * weights["parity"]
-        )
-
-        result[number] = score
-
-    return result
-
-
-# =========================================================
-# 排名
-# =========================================================
-
-def rank_numbers(
+def normalize_scores(
     scores: Dict[int, float],
-    top_n: int = 10
-) -> List[int]:
-
-    ordered = sorted(
-        scores.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    return [
-        number
-        for number, _ in ordered[:top_n]
-    ]
-
-
-# =========================================================
-# 号码概率
-# =========================================================
-
-def calibrate_number_probabilities(
-    scores: Dict[int, float]
 ) -> Dict[int, float]:
 
     if not scores:
 
-        return {}
+        return {
+            number: 0.0
+            for number in NUMBERS
+        }
 
-    # -----------------------------------------------------
-    # 防止 1.0000
-    #
-    # 不把 raw score 直接当概率
-    # -----------------------------------------------------
+
+    values = [
+        safe_float(
+            scores.get(
+                number,
+                0.0
+            )
+        )
+        for number in NUMBERS
+    ]
+
 
     minimum = min(
-        scores.values()
+        values
     )
 
-    shifted = {
-        n:
-            max(
-                score - minimum,
-                0.000001
-            )
+    maximum = max(
+        values
+    )
 
-        for n, score in scores.items()
+
+    if abs(
+        maximum - minimum
+    ) < 1e-12:
+
+        return {
+            number: 0.5
+            for number in NUMBERS
+        }
+
+
+    result = {}
+
+
+    for number in NUMBERS:
+
+        value = safe_float(
+            scores.get(
+                number,
+                0.0
+            )
+        )
+
+
+        result[number] = (
+            value - minimum
+        ) / (
+            maximum - minimum
+        )
+
+
+    return result
+
+
+# =========================================================
+# 近期策略
+# =========================================================
+
+def recent_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        SHORT_WINDOW
+    )
+
+
+    counter = Counter(
+        history
+    )
+
+
+    total = max(
+        len(history),
+        1
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        frequency = (
+            counter.get(
+                number,
+                0
+            ) / total
+        )
+
+
+        scores[number] = frequency
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 中期策略
+# =========================================================
+
+def medium_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    counter = Counter(
+        history
+    )
+
+
+    total = max(
+        len(history),
+        1
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        scores[number] = (
+            counter.get(
+                number,
+                0
+            ) / total
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 长期策略
+# =========================================================
+
+def long_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        LONG_WINDOW
+    )
+
+
+    counter = Counter(
+        history
+    )
+
+
+    total = max(
+        len(history),
+        1
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        scores[number] = (
+            counter.get(
+                number,
+                0
+            ) / total
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 遗漏策略
+# =========================================================
+
+def omission_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        LONG_WINDOW
+    )
+
+
+    position = {
+        number: None
+        for number in NUMBERS
     }
 
-    total = sum(
-        shifted.values()
+
+    for index, number in enumerate(
+        history
+    ):
+
+        if position[number] is None:
+
+            position[number] = index
+
+
+    scores = {}
+
+
+    max_omission = max(
+        [
+            value
+            for value in position.values()
+            if value is not None
+        ]
+        or [1]
     )
+
+
+    for number in NUMBERS:
+
+        value = position[number]
+
+
+        if value is None:
+
+            omission = (
+                max_omission + 1
+            )
+
+        else:
+
+            omission = value
+
+
+        # 平滑遗漏，避免极端值
+        scores[number] = math.log1p(
+            omission
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 趋势策略
+# =========================================================
+
+def trend_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    short = Counter(
+        special_history(
+            draws,
+            SHORT_WINDOW
+        )
+    )
+
+
+    medium = Counter(
+        special_history(
+            draws,
+            MEDIUM_WINDOW
+        )
+    )
+
+
+    long = Counter(
+        special_history(
+            draws,
+            LONG_WINDOW
+        )
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        scores[number] = (
+
+            short.get(
+                number,
+                0
+            ) * 0.50
+
+            + medium.get(
+                number,
+                0
+            ) * 0.30
+
+            + long.get(
+                number,
+                0
+            ) * 0.20
+
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 转移策略
+# =========================================================
+
+def transition_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        LONG_WINDOW
+    )
+
+
+    scores = {
+        number: 0.0
+        for number in NUMBERS
+    }
+
+
+    if len(history) < 2:
+
+        return {
+            number: 0.5
+            for number in NUMBERS
+        }
+
+
+    previous = history[0]
+
+
+    # -----------------------------------------------------
+    # 根据上一期号码的属性建立条件偏好
+    # -----------------------------------------------------
+
+    previous_wave = number_to_wave(
+        previous
+    )
+
+
+    previous_size = (
+        "大"
+        if previous >= 25
+        else "小"
+    )
+
+
+    previous_parity = (
+        "单"
+        if previous % 2
+        else "双"
+    )
+
+
+    for number in NUMBERS:
+
+        score = 0.0
+
+
+        # 波色转移
+        current_wave = number_to_wave(
+            number
+        )
+
+
+        wave_prob = wave_probabilities(
+            draws
+        )
+
+
+        score += (
+            wave_prob.get(
+                current_wave,
+                1 / 3
+            ) * 0.45
+        )
+
+
+        # 大小切换
+        current_size = (
+            "大"
+            if number >= 25
+            else "小"
+        )
+
+
+        if current_size != previous_size:
+
+            score += 0.15
+
+
+        # 单双切换
+        current_parity = (
+            "单"
+            if number % 2
+            else "双"
+        )
+
+
+        if current_parity != previous_parity:
+
+            score += 0.15
+
+
+        # 避免简单复制上一特码
+        if number != previous:
+
+            score += 0.10
+
+
+        # 尾数变化
+        if number % 10 != previous % 10:
+
+            score += 0.15
+
+
+        scores[number] = score
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 大小策略
+# =========================================================
+
+def size_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    big = sum(
+        1
+        for number in history
+        if number >= 25
+    )
+
+
+    small = sum(
+        1
+        for number in history
+        if number < 25
+    )
+
+
+    total = max(
+        big + small,
+        1
+    )
+
+
+    big_rate = big / total
+
+    small_rate = small / total
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        if number >= 25:
+
+            scores[number] = (
+                big_rate
+            )
+
+        else:
+
+            scores[number] = (
+                small_rate
+            )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 单双策略
+# =========================================================
+
+def parity_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    odd = sum(
+        1
+        for number in history
+        if number % 2 == 1
+    )
+
+
+    even = sum(
+        1
+        for number in history
+        if number % 2 == 0
+    )
+
+
+    total = max(
+        odd + even,
+        1
+    )
+
+
+    odd_rate = odd / total
+
+    even_rate = even / total
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        if number % 2:
+
+            scores[number] = odd_rate
+
+        else:
+
+            scores[number] = even_rate
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 波色策略
+# =========================================================
+
+def wave_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    probabilities = wave_probabilities(
+        draws
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        wave = number_to_wave(
+            number
+        )
+
+
+        scores[number] = probabilities.get(
+            wave,
+            1 / 3
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 尾数策略
+# =========================================================
+
+def tail_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    counter = Counter(
+        number % 10
+        for number in history
+    )
+
+
+    total = max(
+        len(history),
+        1
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        tail = number % 10
+
+        scores[number] = (
+            counter.get(
+                tail,
+                0
+            ) / total
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 分区策略
+# =========================================================
+
+def zone_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    def zone(
+        number: int
+    ) -> int:
+
+        if number <= 16:
+
+            return 1
+
+        if number <= 32:
+
+            return 2
+
+        return 3
+
+
+    counter = Counter(
+        zone(number)
+        for number in history
+    )
+
+
+    total = max(
+        len(history),
+        1
+    )
+
+
+    scores = {}
+
+
+    for number in NUMBERS:
+
+        scores[number] = (
+            counter.get(
+                zone(number),
+                0
+            ) / total
+        )
+
+
+    return normalize_scores(
+        scores
+    )
+
+
+# =========================================================
+# 获取所有策略
+# =========================================================
+
+def calculate_all_strategies(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[str, Dict[int, float]]:
+
+    return {
+
+        "recent":
+            recent_strategy(draws),
+
+        "medium":
+            medium_strategy(draws),
+
+        "long":
+            long_strategy(draws),
+
+        "omission":
+            omission_strategy(draws),
+
+        "trend":
+            trend_strategy(draws),
+
+        "transition":
+            transition_strategy(draws),
+
+        "size":
+            size_strategy(draws),
+
+        "parity":
+            parity_strategy(draws),
+
+        "wave":
+            wave_strategy(draws),
+
+        "tail":
+            tail_strategy(draws),
+
+        "zone":
+            zone_strategy(draws),
+
+    }
+
+
+# =========================================================
+# 权重归一化
+# =========================================================
+
+def normalize_weights(
+    weights: Dict[str, float],
+) -> Dict[str, float]:
+
+    result = {}
+
+
+    for name in DEFAULT_MODULE_WEIGHTS:
+
+        value = safe_float(
+            weights.get(
+                name,
+                DEFAULT_MODULE_WEIGHTS[name]
+            )
+        )
+
+
+        value = max(
+            MIN_MODULE_WEIGHT,
+            min(
+                MAX_MODULE_WEIGHT,
+                value,
+            ),
+        )
+
+
+        result[name] = value
+
+
+    total = sum(
+        result.values()
+    )
+
 
     if total <= 0:
 
-        return {
-            n: 1.0 / 49.0
-            for n in scores
-        }
+        return dict(
+            DEFAULT_MODULE_WEIGHTS
+        )
 
-    probabilities = {
 
-        n:
+    return {
+
+        name:
             value / total
 
-        for n, value in shifted.items()
-    }
+        for name, value
+        in result.items()
 
-    return probabilities
+    }
 
 
 # =========================================================
 # 动态模块权重
 # =========================================================
 
-def normalize_weights(
-    weights: Dict[str, float]
+def calculate_dynamic_weights(
+    draws: Sequence[Dict[str, Any]],
 ) -> Dict[str, float]:
 
-    total = sum(
-        max(
-            0.0,
-            float(v)
-        )
-        for v in weights.values()
+    """
+    V3冷启动权重。
+
+    当历史不足以进行稳定Walk-Forward学习时，
+    使用配置文件默认权重。
+
+    后续backtest可以把历史表现反馈给这里。
+    """
+
+    weights = dict(
+        DEFAULT_MODULE_WEIGHTS
     )
 
-    if total <= 0:
 
-        equal = 1.0 / len(
-            weights
-        )
-
-        return {
-            k: equal
-            for k in weights
-        }
-
-    return {
-        k:
-            max(
-                0.0,
-                float(v)
-            )
-            /
-            total
-
-        for k, v in weights.items()
-    }
+    history_count = len(
+        draws
+    )
 
 
-def dynamic_weights(
-    performance: Dict[str, float] = None
-) -> Dict[str, float]:
+    # -----------------------------------------------------
+    # 数据越多，近期模块略微提高
+    # -----------------------------------------------------
 
-    base = {
+    if history_count >= 300:
 
-        "frequency": 0.22,
+        weights["recent"] += 0.02
 
-        "trend": 0.24,
+        weights["medium"] += 0.01
 
-        "omission": 0.10,
+        weights["long"] -= 0.01
 
-        "tail": 0.10,
+        weights["trend"] += 0.01
 
-        "zone": 0.08,
+        weights["omission"] -= 0.01
 
-        "wave": 0.16,
 
-        "size": 0.05,
+    elif history_count >= 200:
 
-        "parity": 0.05,
-    }
+        weights["recent"] += 0.01
 
-    if not performance:
+        weights["trend"] += 0.01
 
-        return normalize_weights(
-            base
-        )
 
-    adjusted = {}
+    # -----------------------------------------------------
+    # 波色模块
+    # -----------------------------------------------------
 
-    for key, value in base.items():
+    if history_count >= 120:
 
-        score = performance.get(
-            key,
-            0.5
-        )
+        weights["wave"] += 0.01
 
-        # 历史表现只作为调整因子
-        #
-        # 防止某个模块因为样本少
-        # 突然权重极端化
+        weights["transition"] += 0.01
 
-        factor = 0.70 + (
-            max(
-                0.0,
-                min(
-                    1.0,
-                    score
-                )
-            )
-            * 0.60
-        )
-
-        adjusted[key] = (
-            value * factor
-        )
 
     return normalize_weights(
-        adjusted
-    )
-
-
-# =========================================================
-# 完整策略输出
-# =========================================================
-
-def build_strategy_result(
-    rows: List[Dict[str, Any]],
-    performance: Dict[str, float] = None
-) -> Dict[str, Any]:
-
-    weights = dynamic_weights(
-        performance
-    )
-
-    scores = combine_strategies(
-        rows,
         weights
     )
 
-    probabilities = calibrate_number_probabilities(
+
+# =========================================================
+# 综合策略
+# =========================================================
+
+def combine_strategies(
+    strategies: Dict[str, Dict[int, float]],
+    weights: Dict[str, float] | None = None,
+) -> Dict[int, float]:
+
+    if weights is None:
+
+        weights = dict(
+            DEFAULT_MODULE_WEIGHTS
+        )
+
+
+    weights = normalize_weights(
+        weights
+    )
+
+
+    scores = {
+        number: 0.0
+        for number in NUMBERS
+    }
+
+
+    for module_name, module_scores in strategies.items():
+
+        weight = weights.get(
+            module_name,
+            0.0
+        )
+
+
+        if weight <= 0:
+
+            continue
+
+
+        for number in NUMBERS:
+
+            scores[number] += (
+
+                safe_float(
+                    module_scores.get(
+                        number,
+                        0.0
+                    )
+                )
+                * weight
+
+            )
+
+
+    return normalize_scores(
         scores
     )
 
-    top10 = rank_numbers(
-        probabilities,
-        10
+
+# =========================================================
+# 综合策略 V2兼容接口
+# =========================================================
+
+def combined_strategy(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    strategies = calculate_all_strategies(
+        draws
     )
 
-    top3 = rank_numbers(
-        probabilities,
-        3
+
+    weights = calculate_dynamic_weights(
+        draws
     )
 
-    wave_p = wave_probabilities(
-        rows
+
+    return combine_strategies(
+        strategies,
+        weights,
     )
 
-    wave_single = wave_single_pick(
-        wave_p
+
+# =========================================================
+# 49码排名
+# =========================================================
+
+def rank_numbers(
+    scores: Dict[int, float],
+) -> List[Dict[str, Any]]:
+
+    ranked = sorted(
+
+        NUMBERS,
+
+        key=lambda number: (
+            safe_float(
+                scores.get(
+                    number,
+                    0.0
+                )
+            ),
+            -number,
+        ),
+
+        reverse=True,
     )
 
-    wave_double = wave_double_pick(
-        wave_p
+
+    result = []
+
+
+    for index, number in enumerate(
+        ranked,
+        1
+    ):
+
+        result.append({
+
+            "rank":
+                index,
+
+            "number":
+                number,
+
+            "score":
+                round(
+                    safe_float(
+                        scores[number]
+                    ),
+                    6
+                ),
+
+            "wave":
+                number_to_wave(
+                    number
+                ),
+
+        })
+
+
+    return result
+
+
+# =========================================================
+# Top10
+# =========================================================
+
+def get_top10(
+    scores: Dict[int, float],
+) -> List[Dict[str, Any]]:
+
+    return rank_numbers(
+        scores
+    )[
+        :TOP10_NUMBERS
+    ]
+
+
+# =========================================================
+# Top3
+# =========================================================
+
+def get_top3(
+    scores: Dict[int, float],
+) -> List[Dict[str, Any]]:
+
+    return rank_numbers(
+        scores
+    )[
+        :TOP3_NUMBERS
+    ]
+
+
+# =========================================================
+# 大小概率
+# =========================================================
+
+def calculate_size_probability(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
     )
 
-    size_p = size_probabilities(
-        rows
+
+    big = sum(
+        1
+        for number in history
+        if number >= 25
     )
 
-    parity_p = parity_probabilities(
-        rows
+
+    small = sum(
+        1
+        for number in history
+        if number < 25
     )
+
+
+    total = max(
+        big + small,
+        1
+    )
+
+
+    big_probability = (
+        big / total
+    )
+
+
+    small_probability = (
+        small / total
+    )
+
+
+    prediction = (
+        "大"
+        if big_probability >= small_probability
+        else "小"
+    )
+
 
     return {
 
-        "scores":
-            scores,
+        "prediction":
+            prediction,
 
-        "probabilities":
-            probabilities,
+        "probability": {
 
-        "top10":
-            top10,
+            "大":
+                round(
+                    big_probability,
+                    6
+                ),
 
-        "top3":
-            top3,
+            "小":
+                round(
+                    small_probability,
+                    6
+                ),
 
-        "weights":
+        },
+
+        "sample_size":
+            len(history),
+
+    }
+
+
+# =========================================================
+# 单双概率
+# =========================================================
+
+def calculate_parity_probability(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+
+    history = special_history(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    odd = sum(
+        1
+        for number in history
+        if number % 2
+    )
+
+
+    even = sum(
+        1
+        for number in history
+        if number % 2 == 0
+    )
+
+
+    total = max(
+        odd + even,
+        1
+    )
+
+
+    odd_probability = (
+        odd / total
+    )
+
+
+    even_probability = (
+        even / total
+    )
+
+
+    prediction = (
+        "单"
+        if odd_probability >= even_probability
+        else "双"
+    )
+
+
+    return {
+
+        "prediction":
+            prediction,
+
+        "probability": {
+
+            "单":
+                round(
+                    odd_probability,
+                    6
+                ),
+
+            "双":
+                round(
+                    even_probability,
+                    6
+                ),
+
+        },
+
+        "sample_size":
+            len(history),
+
+    }
+
+
+# =========================================================
+# 生肖名称提取
+# =========================================================
+
+def extract_zodiac(
+    draw: Dict[str, Any],
+) -> str | None:
+
+    zodiac = draw.get(
+        "zodiac"
+    )
+
+
+    if isinstance(
+        zodiac,
+        list
+    ):
+
+        if zodiac:
+
+            return str(
+                zodiac[-1]
+            ).strip()
+
+
+    if isinstance(
+        zodiac,
+        str
+    ):
+
+        text = zodiac.strip()
+
+        if not text:
+
+            return None
+
+
+        parts = (
+            text
+            .replace("，", ",")
+            .replace(" ", ",")
+            .split(",")
+        )
+
+
+        valid = [
+            x.strip()
+            for x in parts
+            if x.strip()
+        ]
+
+
+        if valid:
+
+            return valid[-1]
+
+
+    return None
+
+
+# =========================================================
+# 生肖历史统计
+# =========================================================
+
+def zodiac_frequency(
+    draws: Sequence[Dict[str, Any]],
+    window: int = 120,
+) -> Dict[str, float]:
+
+    counter = Counter()
+
+
+    for draw in draws[
+        :window
+    ]:
+
+        zodiac = extract_zodiac(
+            draw
+        )
+
+
+        if zodiac:
+
+            counter[zodiac] += 1
+
+
+    total = sum(
+        counter.values()
+    )
+
+
+    if total <= 0:
+
+        return {}
+
+
+    return {
+
+        zodiac:
+            count / total
+
+        for zodiac, count
+        in counter.items()
+
+    }
+
+
+# =========================================================
+# 生肖Top5
+# =========================================================
+
+def get_top5_zodiac(
+    draws: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+
+    frequency = zodiac_frequency(
+        draws,
+        LONG_WINDOW
+    )
+
+
+    ranked = sorted(
+
+        frequency.items(),
+
+        key=lambda item: item[1],
+
+        reverse=True,
+    )
+
+
+    return [
+
+        {
+            "zodiac":
+                zodiac,
+
+            "score":
+                round(
+                    probability,
+                    6
+                ),
+
+            "probability":
+                round(
+                    probability,
+                    6
+                ),
+
+        }
+
+        for zodiac, probability
+        in ranked[
+            :TOP5_ZODIACS
+        ]
+
+    ]
+
+
+# =========================================================
+# 平特Top2
+# =========================================================
+
+def get_pingte_zodiac(
+    draws: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+
+    frequency = zodiac_frequency(
+        draws,
+        MEDIUM_WINDOW
+    )
+
+
+    ranked = sorted(
+
+        frequency.items(),
+
+        key=lambda item: item[1],
+
+        reverse=True,
+    )
+
+
+    return [
+
+        {
+            "zodiac":
+                zodiac,
+
+            "score":
+                round(
+                    probability,
+                    6
+                ),
+
+            "probability":
+                round(
+                    probability,
+                    6
+                ),
+
+        }
+
+        for zodiac, probability
+        in ranked[
+            :TOP2_PINGTE_ZODIACS
+        ]
+
+    ]
+
+
+# =========================================================
+# 完整策略分析
+# =========================================================
+
+def analyze_strategies(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+
+    strategies = calculate_all_strategies(
+        draws
+    )
+
+
+    weights = calculate_dynamic_weights(
+        draws
+    )
+
+
+    combined = combine_strategies(
+        strategies,
+        weights
+    )
+
+
+    return {
+
+        "strategies":
+            strategies,
+
+        "dynamic_weights":
             weights,
 
-        "wave_probabilities":
-            wave_p,
+        "combined_scores":
+            combined,
 
-        "wave_single":
-            wave_single,
+        "ranked":
+            rank_numbers(
+                combined
+            ),
 
-        "wave_double":
-            wave_double,
+        "top10":
+            get_top10(
+                combined
+            ),
 
-        "size_probabilities":
-            size_p,
+        "top3":
+            get_top3(
+                combined
+            ),
 
-        "parity_probabilities":
-            parity_p,
+        "size":
+            calculate_size_probability(
+                draws
+            ),
+
+        "parity":
+            calculate_parity_probability(
+                draws
+            ),
+
+        "wave":
+            analyze_wave(
+                draws
+            ),
+
+        "top5_zodiac":
+            get_top5_zodiac(
+                draws
+            ),
+
+        "top2_pingte_zodiac":
+            get_pingte_zodiac(
+                draws
+            ),
+
     }
+
+
+# =========================================================
+# 兼容旧代码
+# =========================================================
+
+def get_strategy_scores(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    return combined_strategy(
+        draws
+    )
+
+
+# =========================================================
+# 兼容旧代码
+# =========================================================
+
+def calculate_scores(
+    draws: Sequence[Dict[str, Any]],
+) -> Dict[int, float]:
+
+    return combined_strategy(
+        draws
+    )
 
 
 # =========================================================
@@ -877,44 +1787,201 @@ def build_strategy_result(
 
 if __name__ == "__main__":
 
-    rows = []
+    print("=" * 70)
 
-    for i in range(100):
+    print(
+        "六合彩 AI V3.0 strategies.py 测试"
+    )
 
-        rows.append({
+    print("=" * 70)
+
+
+    test_draws = []
+
+
+    # -----------------------------------------------------
+    # 创建模拟数据
+    # -----------------------------------------------------
+
+    for issue in range(
+        300,
+        0,
+        -1
+    ):
+
+        numbers = [
+
+            (issue * 3) % 49 + 1,
+
+            (issue * 5) % 49 + 1,
+
+            (issue * 7) % 49 + 1,
+
+            (issue * 11) % 49 + 1,
+
+            (issue * 13) % 49 + 1,
+
+            (issue * 17) % 49 + 1,
+
+            (issue * 19) % 49 + 1,
+
+        ]
+
+
+        # 去重
+        unique = []
+
+
+        for number in numbers:
+
+            if number not in unique:
+
+                unique.append(
+                    number
+                )
+
+
+        while len(unique) < 7:
+
+            for number in NUMBERS:
+
+                if number not in unique:
+
+                    unique.append(
+                        number
+                    )
+
+                if len(unique) >= 7:
+
+                    break
+
+
+        test_draws.append({
+
+            "issue":
+                str(issue),
 
             "numbers":
-                [
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    (i % 49) + 1
-                ]
+                unique[:7],
+
+            "special":
+                unique[6],
+
         })
 
-    result = build_strategy_result(
-        rows
+
+    # -----------------------------------------------------
+    # 测试
+    # -----------------------------------------------------
+
+    result = analyze_strategies(
+        test_draws
     )
 
-    print(
-        "Top10:",
-        result["top10"]
-    )
+
+    print()
 
     print(
-        "Top3:",
-        result["top3"]
+        "历史数据：",
+        len(test_draws)
     )
 
-    print(
-        "波色单推:",
-        result["wave_single"]
-    )
+
+    print()
 
     print(
-        "波色双推:",
-        result["wave_double"]
+        "动态权重："
     )
+
+
+    for name, weight in result[
+        "dynamic_weights"
+    ].items():
+
+        print(
+            f"{name:<12}"
+            f"{weight:.6f}"
+        )
+
+
+    print()
+
+    print(
+        "Top10："
+    )
+
+
+    for item in result[
+        "top10"
+    ]:
+
+        print(
+            f"{item['rank']:02d} "
+            f"{item['number']:02d} "
+            f"{item['wave']} "
+            f"{item['score']:.6f}"
+        )
+
+
+    print()
+
+    print(
+        "Top3：",
+        [
+            item["number"]
+            for item in result[
+                "top3"
+            ]
+        ]
+    )
+
+
+    print()
+
+    print(
+        "大小：",
+        result["size"]
+    )
+
+
+    print()
+
+    print(
+        "单双：",
+        result["parity"]
+    )
+
+
+    print()
+
+    print(
+        "波色：",
+        result["wave"]
+    )
+
+
+    print()
+
+    print(
+        "生肖5肖：",
+        result["top5_zodiac"]
+    )
+
+
+    print()
+
+    print(
+        "平特2肖：",
+        result["top2_pingte_zodiac"]
+    )
+
+
+    print()
+
+    print("=" * 70)
+
+    print(
+        "strategies.py 测试完成"
+    )
+
+    print("=" * 70)
