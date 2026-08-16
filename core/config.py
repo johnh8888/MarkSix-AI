@@ -12,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 
+
 DATA_DIR.mkdir(
     parents=True,
     exist_ok=True
@@ -35,72 +36,56 @@ DB_FILE = DATA_DIR / "lottery.db"
 # =========================================================
 
 API_BASE_URL = (
-    "https://marksix6.net/api/lottery_api.php"
+    "https://marksix6.net/"
+    "api/lottery_api.php"
+)
+
+
+HISTORY_API_URL = (
+    "https://marksix6.net/"
+    "index.php?api=1"
 )
 
 
 # =========================================================
 # 三个真实数据源
 # =========================================================
-#
-# 香港：
-# https://marksix6.net/api/lottery_api.php?type=hk
-#
-# 新澳门：
-# https://marksix6.net/api/lottery_api.php?type=newMacau
-#
-# 老澳门：
-# https://marksix6.net/api/lottery_api.php?type=oldMacau
-#
-# =========================================================
 
 API_SOURCES = {
 
-    # -----------------------------------------------------
-    # 香港六合彩
-    # -----------------------------------------------------
-
     "hk": {
 
-        "name":
-            "香港六合彩",
+        "name": "香港六合彩",
 
         "url":
-            f"{API_BASE_URL}?type=hk",
+            API_BASE_URL
+            + "?type=hk",
 
         "wave_field":
             "wave",
     },
 
-
-    # -----------------------------------------------------
-    # 新澳门六合彩
-    # -----------------------------------------------------
 
     "newMacau": {
 
-        "name":
-            "新澳门六合彩",
+        "name": "新澳门六合彩",
 
         "url":
-            f"{API_BASE_URL}?type=newMacau",
+            API_BASE_URL
+            + "?type=newMacau",
 
         "wave_field":
             "wave",
     },
 
 
-    # -----------------------------------------------------
-    # 老澳门六合彩
-    # -----------------------------------------------------
-
     "oldMacau": {
 
-        "name":
-            "老澳门六合彩",
+        "name": "老澳门六合彩",
 
         "url":
-            f"{API_BASE_URL}?type=oldMacau",
+            API_BASE_URL
+            + "?type=oldMacau",
 
         "wave_field":
             "waveColors",
@@ -120,11 +105,13 @@ LOTTERIES = {
             "香港六合彩",
     },
 
+
     "newMacau": {
 
         "name":
             "新澳门六合彩",
     },
+
 
     "oldMacau": {
 
@@ -135,10 +122,29 @@ LOTTERIES = {
 
 
 # =========================================================
+# 历史 API 彩种名称映射
+# =========================================================
+
+HISTORY_CODE_MAP = {
+
+    "hk":
+        "hk",
+
+    "newMacau":
+        "newMacau",
+
+    "oldMacau":
+        "oldMacau",
+}
+
+
+# =========================================================
 # HTTP
 # =========================================================
 
-REQUEST_TIMEOUT = 20
+REQUEST_TIMEOUT = 30
+
+HISTORY_TIMEOUT = 60
 
 REQUEST_RETRIES = 3
 
@@ -149,10 +155,21 @@ RETRY_SLEEP = 2
 # SSL
 # =========================================================
 
-# 正常情况下验证 HTTPS 证书
+# 正常情况下验证证书
 SSL_VERIFY = True
 
-# 如果证书异常，允许进入 fallback
+
+# marksix6.net 当前存在证书过期问题
+#
+# GitHub Actions 中：
+#
+# verify=True
+#       ↓
+# 证书错误
+#       ↓
+# verify=False
+#
+# 只作为受控 fallback
 ALLOW_SSL_FALLBACK = True
 
 
@@ -190,9 +207,13 @@ TOP2_PINGTE_ZODIACS = 2
 # =========================================================
 
 BACKTEST_WINDOWS = [
+
     100,
+
     300,
+
     500,
+
     1000,
 ]
 
@@ -202,9 +223,12 @@ BACKTEST_WINDOWS = [
 # =========================================================
 
 PREDICTION_FILE = (
-    OUTPUT_DIR / "prediction.json"
+    OUTPUT_DIR /
+    "prediction.json"
 )
 
+
 BACKTEST_FILE = (
-    OUTPUT_DIR / "backtest.json"
+    OUTPUT_DIR /
+    "backtest.json"
 )
