@@ -1,188 +1,83 @@
 # -*- coding: utf-8 -*-
 
+"""
+六合彩回测模块
+
+功能：
+
+1. 特码10码命中率
+2. 特码生肖5肖命中率
+3. 平特生肖2肖命中率
+4. 大小命中率
+5. 单双命中率
+
+同时计算：
+
+10期
+20期
+30期
+60期
+100期
+
+滚动命中率。
+
+重要：
+
+数据库没有 special 字段。
+
+特码统一通过：
+
+    get_special(row)
+
+从 numbers 第7个号码获取。
+"""
+
+from typing import Dict, Any, List
+
 from .predictor import (
     generate_prediction,
     NUMBER_TO_ZODIAC,
 )
 
-
-# =========================================================
-# 从数据库 row 获取特码
-# =========================================================
-#
-# 数据库没有 special 字段。
-#
-# numbers:
-# 38,26,08,06,29,18,23
-#
-# 第7个号码就是特码：
-# 23
-#
-# =========================================================
-
-def get_special_from_row(row):
-
-    # -----------------------------------------
-    # 优先兼容旧数据库
-    # -----------------------------------------
-
-    if row.get("special") is not None:
-
-        try:
-            return int(row["special"])
-        except Exception:
-            pass
-
-    # -----------------------------------------
-    # 从 numbers 获取
-    # -----------------------------------------
-
-    numbers = row.get(
-        "numbers",
-        ""
-    )
-
-    if numbers is None:
-        return None
-
-    # 如果已经是 list
-    if isinstance(numbers, list):
-
-        values = numbers
-
-    else:
-
-        values = str(
-            numbers
-        ).replace(
-            "，",
-            ","
-        ).split(",")
-
-    values = [
-        str(x).strip()
-        for x in values
-        if str(x).strip()
-    ]
-
-    # 必须至少7个号码
-    if len(values) < 7:
-        return None
-
-    try:
-
-        return int(
-            values[6]
-        )
-
-    except Exception:
-
-        return None
+from .features import (
+    get_special,
+)
 
 
 # =========================================================
-# 获取波色
-# =========================================================
-
-def get_wave(number):
-
-    # 香港六合彩标准波色
-    #
-    # 红波：
-    # 1 2 7 8 12 13 18 19 23 24
-    # 29 30 34 35 40 45 46
-    #
-    # 蓝波：
-    # 3 4 9 10 14 15 20 25 26
-    # 31 36 37 41 42 47 48
-    #
-    # 绿波：
-    # 5 6 11 16 17 21 22 27 28
-    # 32 33 38 39 43 44 49
-
-    red = {
-        1, 2, 7, 8,
-        12, 13, 18, 19,
-        23, 24, 29, 30,
-        34, 35, 40,
-        45, 46
-    }
-
-    blue = {
-        3, 4, 9, 10,
-        14, 15, 20,
-        25, 26, 31,
-        36, 37, 41,
-        42, 47, 48
-    }
-
-    green = {
-        5, 6, 11,
-        16, 17, 21,
-        22, 27, 28,
-        32, 33, 38,
-        39, 43, 44,
-        49
-    }
-
-    if number in red:
-        return "红"
-
-    if number in blue:
-        return "蓝"
-
-    if number in green:
-        return "绿"
-
-    return None
-
-
-# =========================================================
-# 获取实际开奖结果
+# 获取真实开奖结果
 # =========================================================
 
 def get_actual_result(row):
 
-    number = get_special_from_row(
-        row
-    )
+    number = get_special(row)
 
-    if number is None:
-
+    if not (1 <= number <= 49):
         raise ValueError(
-            f"无法获取特码: "
-            f"issue={row.get('issue')}"
+            f"无法获取有效特码：{row}"
         )
 
     zodiac = NUMBER_TO_ZODIAC.get(
         number
     )
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 大小
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     if number >= 25:
         size = "大"
     else:
         size = "小"
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 单双
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     if number % 2:
         parity = "单"
     else:
         parity = "双"
-
-    # -----------------------------------------
-    # 波色
-    # -----------------------------------------
-
-    wave = get_wave(
-        number
-    )
 
     return {
 
@@ -197,14 +92,11 @@ def get_actual_result(row):
 
         "parity":
             parity,
-
-        "wave":
-            wave,
     }
 
 
 # =========================================================
-# 测试单期预测
+# 检查一次预测
 # =========================================================
 
 def test_one_prediction(
@@ -212,24 +104,26 @@ def test_one_prediction(
     actual
 ):
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 特码10码
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     top10 = [
 
-        item["number"]
+        int(item["number"])
 
         for item in prediction.get(
             "top10_numbers",
             []
         )
 
+        if isinstance(item, dict)
+        and "number" in item
     ]
 
-    # -----------------------------------------
-    # 特码生肖5肖
-    # -----------------------------------------
+    # -----------------------------------------------------
+    # 生肖5肖
+    # -----------------------------------------------------
 
     top5_zodiac = [
 
@@ -240,11 +134,13 @@ def test_one_prediction(
             []
         )
 
+        if isinstance(item, dict)
+        and "zodiac" in item
     ]
 
-    # -----------------------------------------
-    # 平特生肖2肖
-    # -----------------------------------------
+    # -----------------------------------------------------
+    # 平特2肖
+    # -----------------------------------------------------
 
     top2_pingte = [
 
@@ -255,58 +151,31 @@ def test_one_prediction(
             []
         )
 
+        if isinstance(item, dict)
+        and "zodiac" in item
     ]
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 大小
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     size_prediction = (
         prediction
-        .get(
-            "size",
-            {}
-        )
-        .get(
-            "prediction"
-        )
+        .get("size", {})
+        .get("prediction")
     )
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 单双
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     parity_prediction = (
         prediction
-        .get(
-            "parity",
-            {}
-        )
-        .get(
-            "prediction"
-        )
+        .get("parity", {})
+        .get("prediction")
     )
 
-    # -----------------------------------------
-    # 波色
-    # -----------------------------------------
-
-    wave_prediction = (
-        prediction
-        .get(
-            "wave",
-            {}
-        )
-        .get(
-            "prediction"
-        )
-    )
-
-    # -----------------------------------------
-    # 统计
-    # -----------------------------------------
-
-    result = {
+    return {
 
         "number_hit":
             actual["number"]
@@ -327,130 +196,16 @@ def test_one_prediction(
         "parity_hit":
             parity_prediction
             == actual["parity"],
-
-        "wave_hit":
-            wave_prediction
-            == actual["wave"],
     }
 
-    return result
-
 
 # =========================================================
-# 百分比
+# 空统计
 # =========================================================
 
-def rate(
-    hits,
-    total
-):
+def empty_stats():
 
-    if total <= 0:
-        return 0.0
-
-    return round(
-        hits / total,
-        6
-    )
-
-
-# =========================================================
-# 回测指定期数
-# =========================================================
-#
-# 重要：
-#
-# target_row 是未来一期
-#
-# train_rows 只能使用 target_row 之前的数据
-#
-# 因此不会把未来开奖数据泄漏进去。
-#
-# =========================================================
-
-def backtest_window(
-    rows,
-    window
-):
-
-    # -----------------------------------------
-    # 数据按照：
-    #
-    # 最新 → 最旧
-    #
-    # -----------------------------------------
-
-    rows = list(
-        rows
-    )
-
-    # -----------------------------------------
-    # 转成：
-    #
-    # 最旧 → 最新
-    #
-    # -----------------------------------------
-
-    chronological = list(
-        reversed(rows)
-    )
-
-    total_available = len(
-        chronological
-    )
-
-    # -----------------------------------------
-    # 至少需要：
-    #
-    # 训练50期
-    # +
-    # 回测window期
-    #
-    # -----------------------------------------
-
-    min_train = 50
-
-    required = (
-        min_train +
-        window
-    )
-
-    if total_available < required:
-
-        return {
-
-            "window":
-                window,
-
-            "error":
-                "数据不足",
-
-            "required":
-                required,
-
-            "available":
-                total_available,
-        }
-
-    # -----------------------------------------
-    # 只测试最后 window 期
-    # -----------------------------------------
-
-    start_index = (
-        total_available -
-        window
-    )
-
-    # 至少保留50期训练数据
-    if start_index < min_train:
-
-        start_index = min_train
-
-    # -----------------------------------------
-    # 统计
-    # -----------------------------------------
-
-    stats = {
+    return {
 
         "tests":
             0,
@@ -469,338 +224,409 @@ def backtest_window(
 
         "parity_hits":
             0,
-
-        "wave_hits":
-            0,
     }
+
+
+# =========================================================
+# 计算命中率
+# =========================================================
+
+def stats_to_result(stats):
+
+    tests = stats["tests"]
+
+    if tests <= 0:
+
+        return {
+
+            "tests":
+                0,
+
+            "number_top10_hit_rate":
+                0.0,
+
+            "zodiac_top5_hit_rate":
+                0.0,
+
+            "pingte_top2_hit_rate":
+                0.0,
+
+            "size_hit_rate":
+                0.0,
+
+            "parity_hit_rate":
+                0.0,
+        }
+
+    return {
+
+        "tests":
+            tests,
+
+        "number_top10_hit_rate":
+            round(
+                stats["number_hits"]
+                / tests,
+                6
+            ),
+
+        "zodiac_top5_hit_rate":
+            round(
+                stats["zodiac_hits"]
+                / tests,
+                6
+            ),
+
+        "pingte_top2_hit_rate":
+            round(
+                stats["pingte_zodiac_hits"]
+                / tests,
+                6
+            ),
+
+        "size_hit_rate":
+            round(
+                stats["size_hits"]
+                / tests,
+                6
+            ),
+
+        "parity_hit_rate":
+            round(
+                stats["parity_hits"]
+                / tests,
+                6
+            ),
+    }
+
+
+# =========================================================
+# 单个滚动回测
+# =========================================================
+
+def backtest(
+    rows,
+    max_tests=100
+):
+
+    if not rows:
+
+        return {
+            "error":
+                "没有历史数据"
+        }
+
+    # -----------------------------------------------------
+    # 数据库返回：
+    #
+    # 最新 -> 最旧
+    #
+    # 回测需要：
+    #
+    # 最旧 -> 最新
+    # -----------------------------------------------------
+
+    rows = list(rows)
+
+    chronological = list(
+        reversed(rows)
+    )
+
+    total_available = len(
+        chronological
+    )
+
+    # -----------------------------------------------------
+    # 至少需要50期训练数据
+    # -----------------------------------------------------
+
+    min_train = 50
+
+    if total_available <= min_train:
+
+        return {
+
+            "error":
+                f"历史数据不足{min_train + 1}期",
+
+            "available":
+                total_available,
+        }
+
+    # -----------------------------------------------------
+    # 最多测试 max_tests 期
+    # -----------------------------------------------------
+
+    test_count = min(
+        int(max_tests),
+        total_available - min_train
+    )
+
+    start_index = (
+        total_available
+        - test_count
+    )
+
+    stats = empty_stats()
 
     details = []
 
-    # =====================================================
-    # Walk-Forward
-    # =====================================================
+    # -----------------------------------------------------
+    # 滚动回测
+    # -----------------------------------------------------
 
     for i in range(
         start_index,
         total_available
     ):
 
-        # -----------------------------------------
+        # ---------------------------------------------
+        # 至少保留50期训练数据
+        # ---------------------------------------------
+
+        if i < min_train:
+            continue
+
+        # ---------------------------------------------
         # 训练数据
         #
+        # 注意：
+        # chronological[:i]
+        #
         # 不包含当前目标期
-        # -----------------------------------------
+        #
+        # 所以不会偷看未来
+        # ---------------------------------------------
 
-        train_rows = (
-            chronological[:i]
-        )
+        train_rows = chronological[:i]
 
-        # -----------------------------------------
-        # 当前实际开奖
-        # -----------------------------------------
-
-        target_row = (
-            chronological[i]
-        )
+        target_row = chronological[i]
 
         try:
 
-            # -------------------------------------
-            # 生成预测
-            # -------------------------------------
-
-            prediction = (
-                generate_prediction(
-                    train_rows
-                )
+            prediction = generate_prediction(
+                train_rows
             )
 
-            # -------------------------------------
-            # 获取真实结果
-            # -------------------------------------
-
-            actual = (
-                get_actual_result(
-                    target_row
-                )
+            actual = get_actual_result(
+                target_row
             )
 
-            # -------------------------------------
-            # 判断命中
-            # -------------------------------------
-
-            result = (
-                test_one_prediction(
-                    prediction,
-                    actual
-                )
+            result = test_one_prediction(
+                prediction,
+                actual
             )
 
         except Exception as e:
 
+            print()
             print(
-                "回测错误:",
-                target_row.get(
-                    "issue"
-                ),
+                "回测单期错误：",
+                target_row.get("issue"),
                 repr(e)
             )
 
             continue
 
-        # -----------------------------------------
-        # 总测试次数
-        # -----------------------------------------
-
         stats["tests"] += 1
 
-        # -----------------------------------------
-        # 特码10码
-        # -----------------------------------------
-
         if result["number_hit"]:
-
-            stats[
-                "number_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 特码5肖
-        # -----------------------------------------
+            stats["number_hits"] += 1
 
         if result["zodiac_hit"]:
+            stats["zodiac_hits"] += 1
 
-            stats[
-                "zodiac_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 平特2肖
-        # -----------------------------------------
-
-        if result[
-            "pingte_zodiac_hit"
-        ]:
-
-            stats[
-                "pingte_zodiac_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 大小
-        # -----------------------------------------
+        if result["pingte_zodiac_hit"]:
+            stats["pingte_zodiac_hits"] += 1
 
         if result["size_hit"]:
-
-            stats[
-                "size_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 单双
-        # -----------------------------------------
+            stats["size_hits"] += 1
 
         if result["parity_hit"]:
-
-            stats[
-                "parity_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 波色
-        # -----------------------------------------
-
-        if result["wave_hit"]:
-
-            stats[
-                "wave_hits"
-            ] += 1
-
-        # -----------------------------------------
-        # 保存单期结果
-        # -----------------------------------------
+            stats["parity_hits"] += 1
 
         details.append({
 
             "issue":
-                target_row[
-                    "issue"
-                ],
+                target_row["issue"],
 
             "actual_number":
-                actual[
-                    "number"
-                ],
+                actual["number"],
 
             "actual_zodiac":
-                actual[
-                    "zodiac"
-                ],
+                actual["zodiac"],
 
             "actual_size":
-                actual[
-                    "size"
-                ],
+                actual["size"],
 
             "actual_parity":
-                actual[
-                    "parity"
-                ],
+                actual["parity"],
 
-            "actual_wave":
-                actual[
-                    "wave"
-                ],
-
-            **result
+            **result,
         })
 
-    # =====================================================
-    # 统计最终命中率
-    # =====================================================
+    result = stats_to_result(
+        stats
+    )
 
-    total = stats[
-        "tests"
-    ]
+    result["details"] = details
 
-    return {
+    return result
 
-        "window":
-            window,
 
-        "tests":
-            total,
+# =========================================================
+# 最近N期回测
+# =========================================================
 
-        # -------------------------------------
-        # 特码10码
-        # -------------------------------------
+def rolling_window_backtest(
+    rows,
+    window,
+    min_train=50
+):
 
-        "number_top10_hits":
-            stats[
-                "number_hits"
-            ],
+    rows = list(rows)
 
-        "number_top10_hit_rate":
-            rate(
-                stats[
-                    "number_hits"
-                ],
-                total
-            ),
+    if len(rows) <= min_train:
 
-        # -------------------------------------
-        # 特码5肖
-        # -------------------------------------
+        return {
 
-        "zodiac_top5_hits":
-            stats[
-                "zodiac_hits"
-            ],
+            "window":
+                window,
 
-        "zodiac_top5_hit_rate":
-            rate(
-                stats[
-                    "zodiac_hits"
-                ],
-                total
-            ),
+            "error":
+                "历史数据不足",
 
-        # -------------------------------------
-        # 平特2肖
-        # -------------------------------------
+            "available":
+                len(rows),
+        }
 
-        "pingte_top2_hits":
-            stats[
-                "pingte_zodiac_hits"
-            ],
+    # -----------------------------------------------------
+    # 数据：
+    #
+    # 最新 -> 最旧
+    # -----------------------------------------------------
 
-        "pingte_top2_hit_rate":
-            rate(
-                stats[
-                    "pingte_zodiac_hits"
-                ],
-                total
-            ),
+    chronological = list(
+        reversed(rows)
+    )
 
-        # -------------------------------------
-        # 大小
-        # -------------------------------------
+    total = len(
+        chronological
+    )
 
-        "size_hits":
-            stats[
-                "size_hits"
-            ],
+    # -----------------------------------------------------
+    # 实际测试期数
+    # -----------------------------------------------------
 
-        "size_hit_rate":
-            rate(
-                stats[
-                    "size_hits"
-                ],
-                total
-            ),
+    actual_window = min(
+        window,
+        total - min_train
+    )
 
-        # -------------------------------------
-        # 单双
-        # -------------------------------------
+    start_index = (
+        total - actual_window
+    )
 
-        "parity_hits":
-            stats[
-                "parity_hits"
-            ],
+    stats = empty_stats()
 
-        "parity_hit_rate":
-            rate(
-                stats[
-                    "parity_hits"
-                ],
-                total
-            ),
+    details = []
 
-        # -------------------------------------
-        # 波色
-        # -------------------------------------
+    # -----------------------------------------------------
+    # 最近N期逐期回测
+    # -----------------------------------------------------
 
-        "wave_hits":
-            stats[
-                "wave_hits"
-            ],
+    for i in range(
+        start_index,
+        total
+    ):
 
-        "wave_hit_rate":
-            rate(
-                stats[
-                    "wave_hits"
-                ],
-                total
-            ),
+        if i < min_train:
+            continue
 
-        # -------------------------------------
-        # 最近单期明细
-        # -------------------------------------
+        train_rows = chronological[:i]
 
-        "details":
-            details,
-    }
+        target_row = chronological[i]
+
+        try:
+
+            prediction = generate_prediction(
+                train_rows
+            )
+
+            actual = get_actual_result(
+                target_row
+            )
+
+            result = test_one_prediction(
+                prediction,
+                actual
+            )
+
+        except Exception as e:
+
+            print(
+                f"回测 {window} 期错误：",
+                target_row.get("issue"),
+                repr(e)
+            )
+
+            continue
+
+        stats["tests"] += 1
+
+        if result["number_hit"]:
+            stats["number_hits"] += 1
+
+        if result["zodiac_hit"]:
+            stats["zodiac_hits"] += 1
+
+        if result["pingte_zodiac_hit"]:
+            stats["pingte_zodiac_hits"] += 1
+
+        if result["size_hit"]:
+            stats["size_hits"] += 1
+
+        if result["parity_hit"]:
+            stats["parity_hits"] += 1
+
+        details.append({
+
+            "issue":
+                target_row["issue"],
+
+            "actual_number":
+                actual["number"],
+
+            "actual_zodiac":
+                actual["zodiac"],
+
+            "actual_size":
+                actual["size"],
+
+            "actual_parity":
+                actual["parity"],
+
+            **result,
+        })
+
+    result = stats_to_result(
+        stats
+    )
+
+    result["window"] = window
+
+    result["available"] = len(rows)
+
+    result["details"] = details
+
+    return result
 
 
 # =========================================================
 # 多窗口回测
 # =========================================================
-#
-# 你要求：
-#
-# 10期
-# 20期
-# 30期
-# 60期
-# 100期
-#
-# =========================================================
 
-def multi_window_backtest(
-    rows
-):
-
-    results = {}
+def multi_window_backtest(rows):
 
     windows = [
         10,
@@ -810,130 +636,85 @@ def multi_window_backtest(
         100,
     ]
 
-    total = len(
-        rows
-    )
+    results = {}
 
     for window in windows:
 
         print()
         print(
-            "=" * 60
+            f"正在进行最近 {window} 期回测..."
         )
 
-        print(
-            f"正在回测最近 "
-            f"{window} 期"
+        result = rolling_window_backtest(
+            rows,
+            window
         )
 
-        print(
-            "=" * 60
-        )
+        results[str(window)] = result
 
-        # -----------------------------------------
-        # 至少需要：
-        #
-        # 50期训练
-        # + window期测试
-        #
-        # -----------------------------------------
-
-        if total < (
-            50 + window
-        ):
-
-            results[
-                str(window)
-            ] = {
-
-                "window":
-                    window,
-
-                "error":
-                    "数据不足",
-
-                "required":
-                    50 + window,
-
-                "available":
-                    total,
-            }
-
-            print(
-                f"数据不足："
-                f"需要至少 "
-                f"{50 + window} 期，"
-                f"当前 {total} 期"
-            )
-
-            continue
-
-        result = (
-            backtest_window(
-                rows,
-                window
-            )
-        )
-
-        results[
-            str(window)
-        ] = result
-
-        # -----------------------------------------
-        # 控制台打印
-        # -----------------------------------------
+        # -------------------------------------------------
+        # 控制台显示
+        # -------------------------------------------------
 
         if "error" not in result:
 
-            tests = result[
-                "tests"
-            ]
-
             print(
-                f"测试期数："
-                f"{tests}"
+                f"最近{window}期："
             )
 
             print(
-                "特码10码："
-                f"{result['number_top10_hits']}"
-                f"/{tests} "
-                f"{result['number_top10_hit_rate'] * 100:.2f}%"
+                "  特码10码："
+                f"{result['number_top10_hit_rate']:.2%}"
             )
 
             print(
-                "特码5肖："
-                f"{result['zodiac_top5_hits']}"
-                f"/{tests} "
-                f"{result['zodiac_top5_hit_rate'] * 100:.2f}%"
+                "  生肖5肖："
+                f"{result['zodiac_top5_hit_rate']:.2%}"
             )
 
             print(
-                "平特2肖："
-                f"{result['pingte_top2_hits']}"
-                f"/{tests} "
-                f"{result['pingte_top2_hit_rate'] * 100:.2f}%"
+                "  平特2肖："
+                f"{result['pingte_top2_hit_rate']:.2%}"
             )
 
             print(
-                "大小："
-                f"{result['size_hits']}"
-                f"/{tests} "
-                f"{result['size_hit_rate'] * 100:.2f}%"
+                "  大小："
+                f"{result['size_hit_rate']:.2%}"
             )
 
             print(
-                "单双："
-                f"{result['parity_hits']}"
-                f"/{tests} "
-                f"{result['parity_hit_rate'] * 100:.2f}%"
+                "  单双："
+                f"{result['parity_hit_rate']:.2%}"
             )
 
+        else:
+
             print(
-                "波色："
-                f"{result['wave_hits']}"
-                f"/{tests} "
-                f"{result['wave_hit_rate'] * 100:.2f}%"
+                "  ",
+                result["error"]
             )
 
     return results
+
+
+# =========================================================
+# 测试
+# =========================================================
+
+if __name__ == "__main__":
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        "六合彩回测模块"
+    )
+
+    print(
+        "支持：10 / 20 / 30 / 60 / 100期"
+    )
+
+    print(
+        "=" * 70
+    )
