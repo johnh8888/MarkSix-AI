@@ -7,7 +7,7 @@ on:
   schedule:
 
     # 每天 UTC 14:00
-    # 北京/香港时间 22:00
+    # 香港/北京时间 22:00
     - cron: "0 14 * * *"
 
 
@@ -30,6 +30,9 @@ jobs:
       - name: 拉取项目代码
         uses: actions/checkout@v4
 
+        with:
+          fetch-depth: 0
+
 
       # =====================================================
       # 2. 配置 Python
@@ -40,6 +43,7 @@ jobs:
 
         with:
           python-version: "3.11"
+          cache: "pip"
 
 
       # =====================================================
@@ -51,11 +55,67 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then
+
+            pip install -r requirements.txt
+
+          else
+
+            echo "⚠️ requirements.txt 不存在"
+
+          fi
 
 
       # =====================================================
-      # 4. 检查开奖 API
+      # 4. 检查 Python 导入环境
+      # =====================================================
+
+      - name: 检查 Python 模块
+        run: |
+
+          echo "=========================================="
+          echo "检查 Python 模块"
+          echo "=========================================="
+
+          python - <<'PY'
+
+          import sys
+
+          print("Python:")
+          print(sys.version)
+
+          print()
+          print("Python路径:")
+
+          for path in sys.path:
+              print(path)
+
+          print()
+          print("测试 core 模块...")
+
+          import core
+
+          print("✅ core 导入成功")
+
+          PY
+
+
+      # =====================================================
+      # 5. 检查项目结构
+      # =====================================================
+
+      - name: 检查项目结构
+        run: |
+
+          echo "=========================================="
+          echo "项目文件结构"
+          echo "=========================================="
+
+          find . -maxdepth 3 -type f | sort
+
+
+      # =====================================================
+      # 6. 检查开奖 API
       # =====================================================
 
       - name: 检查开奖 API
@@ -83,6 +143,8 @@ jobs:
 
           }
 
+          success = 0
+
           for name, url in urls.items():
 
               print()
@@ -94,10 +156,20 @@ jobs:
               try:
 
                   response = requests.get(
+
                       url,
+
                       timeout=30,
+
                       verify=False,
-                      allow_redirects=True
+
+                      allow_redirects=True,
+
+                      headers={
+                          "User-Agent":
+                              "Mozilla/5.0"
+                      }
+
                   )
 
                   print(
@@ -118,6 +190,21 @@ jobs:
                       type(data).__name__
                   )
 
+                  if isinstance(data, dict):
+
+                      print(
+                          "期号：",
+                          data.get("expect")
+                      )
+
+                      print(
+                          "号码：",
+                          data.get("numbers")
+                          or data.get("openCode")
+                      )
+
+                  success += 1
+
               except Exception as e:
 
                   print(
@@ -125,11 +212,22 @@ jobs:
                       repr(e)
                   )
 
+
+          print()
+          print("=" * 70)
+
+          print(
+              f"API检查完成："
+              f"{success}/{len(urls)}"
+          )
+
+          print("=" * 70)
+
           PY
 
 
       # =====================================================
-      # 5. 检查历史数据 API
+      # 7. 检查历史 API
       # =====================================================
 
       - name: 检查历史数据 API
@@ -157,10 +255,20 @@ jobs:
           try:
 
               response = requests.get(
+
                   url,
-                  timeout=30,
+
+                  timeout=60,
+
                   verify=False,
-                  allow_redirects=True
+
+                  allow_redirects=True,
+
+                  headers={
+                      "User-Agent":
+                          "Mozilla/5.0"
+                  }
+
               )
 
               print(
@@ -181,10 +289,22 @@ jobs:
                   type(data).__name__
               )
 
+              if isinstance(data, dict):
+
+                  lottery_data = data.get(
+                      "lottery_data",
+                      []
+                  )
+
+                  print(
+                      "彩种数量：",
+                      len(lottery_data)
+                  )
+
           except Exception as e:
 
               print(
-                  "❌ 历史 API 检查失败：",
+                  "⚠️ 历史 API 检查失败：",
                   repr(e)
               )
 
@@ -192,45 +312,53 @@ jobs:
 
 
       # =====================================================
-      # 6. 检查项目文件
+      # 8. 数据库初始化检查
       # =====================================================
 
-      - name: 检查项目文件
+      - name: 检查数据库模块
+        run: |
+
+          python - <<'PY'
+
+          from core.database import init_database
+
+          print(
+              "初始化SQLite数据库..."
+          )
+
+          init_database()
+
+          print(
+              "✅ SQLite数据库初始化成功"
+          )
+
+          PY
+
+
+      # =====================================================
+      # 9. 运行 V3.0
+      # =====================================================
+
+      - name: 运行六合彩AI V3.0
+        env:
+
+          PYTHONPATH: ${{ github.workspace }}
+
         run: |
 
           echo "=========================================="
-          echo "项目文件"
+          echo "开始运行六合彩AI智能预测系统 V3.0"
           echo "=========================================="
 
-          find . -maxdepth 3 -type f | sort
-
-          echo ""
-          echo "=========================================="
-          echo "Python版本"
-          echo "=========================================="
-
-          python --version
+          python -u main.py
 
 
       # =====================================================
-      # 7. 运行预测系统
-      # =====================================================
-
-      - name: 运行六合彩AI预测系统
-        run: |
-
-          echo "=========================================="
-          echo "开始运行六合彩AI智能预测系统"
-          echo "=========================================="
-
-          python main.py
-
-
-      # =====================================================
-      # 8. 显示数据库
+      # 10. 显示数据库
       # =====================================================
 
       - name: 显示开奖数据库
+        if: always()
         run: |
 
           echo "=========================================="
@@ -249,10 +377,11 @@ jobs:
 
 
       # =====================================================
-      # 9. 显示预测和回测
+      # 11. 显示预测结果
       # =====================================================
 
-      - name: 显示预测与回测结果
+      - name: 显示预测结果
+        if: always()
         run: |
 
           echo "=========================================="
@@ -270,9 +399,16 @@ jobs:
           fi
 
 
-          echo ""
+      # =====================================================
+      # 12. 显示回测结果
+      # =====================================================
+
+      - name: 显示回测结果
+        if: always()
+        run: |
+
           echo "=========================================="
-          echo "回测结果"
+          echo "V3.0 Walk-Forward 回测"
           echo "=========================================="
 
           if [ -f output/backtest.json ]; then
@@ -287,10 +423,34 @@ jobs:
 
 
       # =====================================================
-      # 10. Git 状态
+      # 13. 显示模块表现
+      # =====================================================
+
+      - name: 显示模块表现
+        if: always()
+        run: |
+
+          echo "=========================================="
+          echo "V3.0 模块历史表现"
+          echo "=========================================="
+
+          if [ -f output/module_performance.json ]; then
+
+            cat output/module_performance.json
+
+          else
+
+            echo "⚠️ module_performance.json 不存在"
+
+          fi
+
+
+      # =====================================================
+      # 14. Git 状态
       # =====================================================
 
       - name: 检查 Git 更新
+        if: always()
         run: |
 
           echo "=========================================="
@@ -301,10 +461,11 @@ jobs:
 
 
       # =====================================================
-      # 11. 自动保存结果
+      # 15. 自动保存结果
       # =====================================================
 
       - name: 自动保存预测与回测结果
+        if: success()
         run: |
 
           git config user.name \
@@ -313,7 +474,9 @@ jobs:
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
+
           git add data/ output/
+
 
           if git diff --cached --quiet; then
 
@@ -322,7 +485,7 @@ jobs:
           else
 
             git commit \
-              -m "自动更新：六合彩预测与回测结果"
+              -m "自动更新：六合彩AI V3.0预测与回测结果"
 
             git push
 
