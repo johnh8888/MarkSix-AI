@@ -1,36 +1,28 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
 
 state_engine.py
 
-动态状态权重引擎
+状态策略引擎
 
+功能:
 
-输入:
-历史开奖
-
-
-输出:
-
-市场状态
-
-+
-模型动态权重
+1. 读取市场状态
+2. 自动调整模型权重
+3. 输出当前策略模式
+4. 给 predictor 调用
 
 
 """
 
 
-from collections import Counter
+from .state import (
 
+    analyze_state,
 
-from .features import (
-
-    get_special,
-
-    get_wave,
+    dynamic_weight
 
 )
 
@@ -39,71 +31,32 @@ from .features import (
 
 
 # =====================================================
-# 状态定义
+# 状态等级
 # =====================================================
 
 
-STATE_HOT = "热态"
-
-STATE_COLD = "冷态"
-
-STATE_BALANCE = "平衡"
-
-STATE_REVERSE = "反转"
-
-STATE_CHAOS = "混沌"
+STATE_LEVEL = {
 
 
+    "数据不足":0,
 
 
-
-# =====================================================
-# 默认权重
-# =====================================================
+    "平衡状态":1,
 
 
-BASE_WEIGHTS = {
+    "趋势变化状态":2,
 
 
-    "frequency":
-        0.20,
+    "集中趋势状态":3,
 
 
-    "trend":
-        0.15,
+    "连续波状态":4,
 
 
-    "momentum":
-        0.10,
+    "波色反转状态":4,
 
 
-    "omission":
-        0.10,
-
-
-    "adjacency":
-        0.08,
-
-
-    "tail":
-        0.07,
-
-
-    "zone":
-        0.05,
-
-
-    "size":
-        0.10,
-
-
-    "parity":
-        0.05,
-
-
-    "wave":
-        0.10,
-
+    "混沌状态":0
 
 }
 
@@ -112,278 +65,116 @@ BASE_WEIGHTS = {
 
 
 # =====================================================
-# 归一化
+# 获取状态等级
 # =====================================================
 
 
-def normalize(weights):
+def get_state_level(
+        state
+):
 
 
-    total=sum(
-        weights.values()
+    return STATE_LEVEL.get(
+
+        state,
+
+        1
+
     )
 
 
-    if total<=0:
-
-        return BASE_WEIGHTS.copy()
 
 
 
-    return {
+# =====================================================
+# 策略名称
+# =====================================================
 
 
-        k:
-
-        round(
-            v/total,
-            4
-        )
+def strategy_name(
+        state
+):
 
 
-        for k,v in weights.items()
+    mapping={
+
+
+        "平衡状态":
+
+        "均衡策略",
+
+
+        "趋势变化状态":
+
+        "趋势跟随策略",
+
+
+        "集中趋势状态":
+
+        "热态追踪策略",
+
+
+        "连续波状态":
+
+        "惯性延续策略",
+
+
+        "波色反转状态":
+
+        "反转防守策略",
+
+
+        "混沌状态":
+
+        "防守降权策略"
 
     }
 
 
 
+    return mapping.get(
 
+        state,
 
-# =====================================================
-# 热冷检测
-# =====================================================
+        "普通策略"
 
-
-def detect_hot_cold(rows):
-
-
-    recent=[]
-
-
-    for row in rows[:20]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            recent.append(n)
-
-
-
-    if not recent:
-
-        return STATE_BALANCE
-
-
-
-    counter=Counter(
-        recent
     )
 
 
 
-    max_count=max(
-        counter.values()
+
+
+# =====================================================
+# 状态引擎
+# =====================================================
+
+
+def build_strategy(
+        rows
+):
+
+
+    state_info = analyze_state(
+
+        rows
+
     )
 
 
+    weights = dynamic_weight(
 
-    # 高频集中
+        state_info
 
-    if max_count>=4:
-
-        return STATE_HOT
-
-
-
-    # 最近号码重复少
-
-    if len(set(recent))>=18:
-
-        return STATE_COLD
-
-
-
-    return STATE_BALANCE
-
-
-
-
-
-# =====================================================
-# 波色状态
-# =====================================================
-
-
-def detect_wave_state(rows):
-
-
-    waves=[]
-
-
-    for row in rows[:20]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            waves.append(
-                get_wave(n)
-            )
-
-
-
-    if len(waves)<5:
-
-        return STATE_BALANCE
-
-
-
-    count=Counter(
-        waves
     )
 
 
-    value=max(
-        count.values()
+    state = state_info.get(
+
+        "state",
+
+        "平衡状态"
+
     )
-
-
-
-    if value>=12:
-
-        return STATE_HOT
-
-
-
-    if value<=5:
-
-        return STATE_COLD
-
-
-
-    return STATE_BALANCE
-
-
-
-
-
-# =====================================================
-# 连续反转检测
-# =====================================================
-
-
-def detect_reverse(rows):
-
-
-    nums=[]
-
-
-    for row in rows[:10]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            nums.append(n)
-
-
-
-    if len(nums)<5:
-
-        return False
-
-
-
-    big_small=[]
-
-
-    for n in nums:
-
-
-        if n>=25:
-
-            big_small.append(1)
-
-        else:
-
-            big_small.append(0)
-
-
-
-    # 大小连续切换
-
-    changes=0
-
-
-    for i in range(
-        len(big_small)-1
-    ):
-
-
-        if big_small[i]!=big_small[i+1]:
-
-            changes+=1
-
-
-
-    return changes>=7
-
-
-
-
-
-# =====================================================
-# 市场状态分析
-# =====================================================
-
-
-def analyze_state(rows):
-
-
-    hot=detect_hot_cold(rows)
-
-
-    wave=detect_wave_state(rows)
-
-
-    reverse=detect_reverse(rows)
-
-
-
-    if reverse:
-
-
-        state=STATE_REVERSE
-
-
-
-    elif hot==STATE_HOT:
-
-
-        state=STATE_HOT
-
-
-
-    elif hot==STATE_COLD:
-
-
-        state=STATE_COLD
-
-
-
-    else:
-
-
-        state=STATE_BALANCE
-
-
 
 
     return {
@@ -394,20 +185,32 @@ def analyze_state(rows):
         state,
 
 
-        "hot_state":
+        "level":
 
-        hot,
+        get_state_level(
+
+            state
+
+        ),
 
 
-        "wave_state":
+        "strategy":
 
-        wave,
+        strategy_name(
+
+            state
+
+        ),
 
 
-        "reverse":
+        "weights":
 
-        reverse,
+        weights,
 
+
+        "details":
+
+        state_info
 
     }
 
@@ -416,109 +219,105 @@ def analyze_state(rows):
 
 
 # =====================================================
-# 状态调整权重
+# 权重强化
 # =====================================================
 
 
-def adjust_weights(rows):
+def apply_state_boost(
+        weights,
+        engine
+):
 
 
-    info=analyze_state(
-        rows
+    result = weights.copy()
+
+
+
+    state=engine.get(
+
+        "state"
+
     )
 
 
-    state=info["state"]
+
+    if state=="连续波状态":
+
+
+        result["wave"] = (
+
+            result.get(
+                "wave",
+                0
+            )
+
+            +
+
+            0.05
+
+        )
 
 
 
-    weights=BASE_WEIGHTS.copy()
+    elif state=="波色反转状态":
+
+
+        result["momentum"]=(
+
+            result.get(
+                "momentum",
+                0
+            )
+
+            +
+
+            0.05
+
+        )
 
 
 
-    # ====================
-    # 热态
-    # ====================
-
-    if state==STATE_HOT:
+    elif state=="混沌状态":
 
 
-        weights["trend"]*=1.5
+        result["omission"]=(
 
-        weights["momentum"]*=1.5
+            result.get(
+                "omission",
+                0
+            )
 
-        weights["frequency"]*=1.2
+            +
 
+            0.08
 
-        weights["omission"]*=0.7
-
-
-
-
-    # ====================
-    # 冷态
-    # ====================
-
-    elif state==STATE_COLD:
-
-
-        weights["omission"]*=1.8
-
-        weights["frequency"]*=0.8
-
-
-        weights["trend"]*=0.8
+        )
 
 
 
+    total=sum(
 
+        result.values()
 
-    # ====================
-    # 反转
-    # ====================
-
-    elif state==STATE_REVERSE:
-
-
-        weights["wave"]*=1.8
-
-        weights["parity"]*=1.4
-
-        weights["size"]*=1.3
-
-
-        weights["momentum"]*=0.6
-
-
-
-
-
-    # ====================
-    # 平衡
-    # ====================
-
-    else:
-
-
-        weights["frequency"]*=1.1
-
-        weights["trend"]*=1.1
-
-
+    )
 
 
 
     return {
 
 
-        "state":
+        k:
 
-        info,
+        round(
+
+            v/total,
+
+            4
+
+        )
 
 
-        "weights":
-
-        normalize(weights)
+        for k,v in result.items()
 
     }
 
@@ -527,16 +326,43 @@ def adjust_weights(rows):
 
 
 # =====================================================
-# 外部调用
+# 输出报告
 # =====================================================
 
 
-def get_weights(rows):
+def state_report(rows):
 
 
-    return adjust_weights(
+    engine=build_strategy(
+
         rows
-    )["weights"]
+
+    )
+
+
+    return {
+
+
+        "当前状态":
+
+        engine["state"],
+
+
+        "策略":
+
+        engine["strategy"],
+
+
+        "等级":
+
+        engine["level"],
+
+
+        "权重":
+
+        engine["weights"]
+
+    }
 
 
 
@@ -552,25 +378,20 @@ if __name__=="__main__":
 
     test=[
 
-
         {
-        "numbers":
-        "38,26,08,06,29,18,23"
-        },
 
-
-        {
         "numbers":
-        "33,27,16,28,04,25,14"
+
+        "39 41 08 09 07 14 49"
+
         }
 
-    ]
+    ]*20
 
 
 
-    result=adjust_weights(
-        test
+    print(
+
+        state_report(test)
+
     )
-
-
-    print(result)
