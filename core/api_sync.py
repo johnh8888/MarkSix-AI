@@ -1,18 +1,20 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.2 FINAL
+六合彩 AI 智能预测系统 V5.3
 
 core/api_sync.py
 
-API数据同步模块
+API同步模块
 
-修复:
-1. 使用 api3.marksix6.net 新接口
-2. 正确解析 numbers
-3. 正确读取 expect期号
-4. 修复号码污染问题
-5. 保留 sync_all 接口
+功能:
+
+1. api3.marksix6.net实时接口
+2. SQLite保存
+3. JSON本地缓存
+4. 自动去重
+5. 支持多彩种
+
 """
 
 
@@ -23,6 +25,8 @@ import json
 import ssl
 import urllib.request
 
+
+from pathlib import Path
 from datetime import datetime
 
 
@@ -33,17 +37,37 @@ from .sqlite_manager import save_draw
 
 
 # =====================================================
+# 路径
+# =====================================================
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+CACHE_DIR = BASE_DIR / "cache"
+
+
+CACHE_DIR.mkdir(
+    exist_ok=True
+)
+
+
+
+
+
+# =====================================================
 # API
 # =====================================================
 
 
-API_REALTIME = (
+API_URL = (
     "https://api3.marksix6.net/lottery_api.php"
 )
 
 
 
 LOTTERIES = {
+
 
     "hk":
     "香港六合彩",
@@ -62,18 +86,15 @@ LOTTERIES = {
 
 
 
+
 # =====================================================
 # SSL
 # =====================================================
 
 
-def ssl_context(verify=True):
+def ssl_context():
 
-    if verify:
-
-        return ssl.create_default_context()
-
-    return ssl._create_unverified_context()
+    return ssl.create_default_context()
 
 
 
@@ -88,26 +109,21 @@ def ssl_context(verify=True):
 def request_json(url):
 
 
-    headers = {
-
-        "User-Agent":
-        "Mozilla/5.0",
-
-        "Accept":
-        "application/json"
-
-    }
-
-
-
     req = urllib.request.Request(
 
         url,
 
-        headers=headers
+        headers={
+
+            "User-Agent":
+            "Mozilla/5.0",
+
+            "Accept":
+            "application/json"
+
+        }
 
     )
-
 
 
     try:
@@ -119,7 +135,7 @@ def request_json(url):
 
             timeout=20,
 
-            context=ssl_context(True)
+            context=ssl_context()
 
         ) as r:
 
@@ -139,42 +155,49 @@ def request_json(url):
 
 
         print(
-
-            "SSL正常请求失败:",
-
+            "API请求失败:",
             e
-
         )
 
 
-
-        print(
-
-            "启用备用SSL模式"
-
-        )
+        raise
 
 
 
-        with urllib.request.urlopen(
-
-            req,
-
-            timeout=20,
-
-            context=ssl_context(False)
-
-        ) as r:
 
 
-            text = r.read().decode(
 
-                "utf-8-sig"
+# =====================================================
+# 保存缓存
+# =====================================================
 
-            )
+
+def save_cache(
+        key,
+        data
+):
 
 
-            return json.loads(text)
+    path = CACHE_DIR / (
+        key + ".json"
+    )
+
+
+    path.write_text(
+
+        json.dumps(
+
+            data,
+
+            ensure_ascii=False,
+
+            indent=2
+
+        ),
+
+        encoding="utf-8"
+
+    )
 
 
 
@@ -183,39 +206,49 @@ def request_json(url):
 
 
 # =====================================================
-# 号码解析
+# 号码处理
 # =====================================================
 
 
-def parse_numbers(numbers):
+def parse_numbers(data):
 
 
-    result=[]
+    nums=[]
 
 
-    for n in numbers:
+    values=data.get(
+
+        "numbers",
+
+        []
+
+    )
+
+
+
+    for n in values:
 
 
         try:
 
 
-            value=int(n)
+            n=int(n)
 
 
-            if 1 <= value <= 49:
+            if 1 <= n <=49:
 
-                result.append(value)
+                nums.append(n)
 
 
 
         except:
 
 
-            continue
+            pass
 
 
 
-    return result
+    return nums
 
 
 
@@ -233,7 +266,7 @@ def sync_one(key):
 
     url = (
 
-        API_REALTIME
+        API_URL
 
         +
 
@@ -250,29 +283,27 @@ def sync_one(key):
     print()
 
     print(
-
         "请求:",
-
         url
-
     )
 
 
 
-    data=request_json(url)
+    data=request_json(
+        url
+    )
+
+
+
+    save_cache(
+        key,
+        data
+    )
 
 
 
     nums=parse_numbers(
-
-        data.get(
-
-            "numbers",
-
-            []
-
-        )
-
+        data
     )
 
 
@@ -281,11 +312,8 @@ def sync_one(key):
 
 
         print(
-
-            "号码数量异常:",
-
+            "号码异常:",
             nums
-
         )
 
 
@@ -296,11 +324,8 @@ def sync_one(key):
     issue=str(
 
         data.get(
-
             "expect",
-
             ""
-
         )
 
     )
@@ -311,31 +336,29 @@ def sync_one(key):
 
 
         issue=datetime.now().strftime(
-
             "%Y%m%d"
-
         )
 
 
 
-    # 前6个正码
+    # 前六正码
 
-    main_numbers=nums[:6]
+    normal=nums[:6]
 
 
-    # 第7个特码
+    # 最后特码
 
     special=nums[6]
 
 
 
-    ok=save_draw(
+    result=save_draw(
 
         key,
 
         issue,
 
-        main_numbers,
+        normal,
 
         special,
 
@@ -345,7 +368,7 @@ def sync_one(key):
 
 
 
-    if ok:
+    if result:
 
 
         print(
@@ -378,7 +401,7 @@ def sync_one(key):
 
 
 
-    return ok
+    return result
 
 
 
@@ -397,9 +420,7 @@ def sync_all():
     print("="*70)
 
     print(
-
         "开始API同步"
-
     )
 
     print("="*70)
@@ -416,7 +437,9 @@ def sync_all():
         try:
 
 
-            result[key]=sync_one(key)
+            result[key]=sync_one(
+                key
+            )
 
 
 
@@ -451,6 +474,7 @@ def sync_all():
         "time":
 
         datetime.now().isoformat()
+
 
     }
 
