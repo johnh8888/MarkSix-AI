@@ -7,20 +7,7 @@ core/predictor.py
 
 V8.0 QUANT STATE SWITCH
 
-
-功能:
-
-1. 热冷分析
-2. Markov趋势
-3. 状态切换
-4. 熵调整
-5. 动态权重
-
-
 """
-
-
-from __future__ import annotations
 
 
 from collections import Counter
@@ -34,31 +21,52 @@ from .state_engine import analyze_state
 
 
 
-
-# =====================================================
-# 属性
-# =====================================================
-
-
 RED={
-
 1,2,7,8,12,13,
 18,19,23,24,
 29,30,34,35,
 40,45,46
-
 }
 
 
 BLUE={
-
 3,4,9,10,
 14,15,20,
 25,26,31,
 36,37,41,
 42,47,48
-
 }
+
+
+
+
+
+def normalize(history):
+
+
+    nums=[]
+
+
+    for x in history:
+
+
+        if isinstance(x,dict):
+
+            nums.append(
+                int(x["special"])
+            )
+
+
+        else:
+
+            nums.append(
+                int(x)
+            )
+
+
+    return nums
+
+
 
 
 
@@ -66,11 +74,16 @@ BLUE={
 
 def get_wave(n):
 
+
     if n in RED:
+
         return "红"
 
+
     if n in BLUE:
+
         return "蓝"
+
 
     return "绿"
 
@@ -78,9 +91,22 @@ def get_wave(n):
 
 
 
+
 def get_size(n):
 
-    return "大" if n>=25 else "小"
+
+    return (
+
+        "大"
+
+        if n>=25
+
+        else
+
+        "小"
+
+    )
+
 
 
 
@@ -88,7 +114,18 @@ def get_size(n):
 
 def get_oe(n):
 
-    return "单" if n%2 else "双"
+
+    return (
+
+        "单"
+
+        if n%2
+
+        else
+
+        "双"
+
+    )
 
 
 
@@ -96,48 +133,25 @@ def get_oe(n):
 
 
 
-# =====================================================
-# 热冷评分
-# =====================================================
+
+def hot_score(numbers):
 
 
-def hot_score(history):
+    c=Counter(numbers)
 
 
-    nums=[
-
-        x["special"]
-
-        for x in history
-
-    ]
-
-
-    counter=Counter(nums)
-
-
-
-    scores={}
-
+    result={}
 
 
     for n in range(1,50):
 
-
-        freq=counter.get(
-
+        result[n]=c.get(
             n,
-
             0
-
         )
 
 
-        scores[n]=freq
-
-
-
-    return scores
+    return result
 
 
 
@@ -145,15 +159,11 @@ def hot_score(history):
 
 
 
-# =====================================================
-# Markov趋势
-# =====================================================
+
+def markov_score(numbers):
 
 
-def markov_score(history):
-
-
-    scores={
+    result={
 
         i:0
 
@@ -163,62 +173,52 @@ def markov_score(history):
 
 
 
-    nums=[
+    if len(numbers)<2:
 
-        x["special"]
-
-        for x in history
-
-    ]
+        return result
 
 
 
-    if len(nums)<2:
 
-        return scores
-
-
-
-    last=nums[0]
+    last=numbers[0]
 
 
 
-    for i,n in enumerate(nums[1:]):
+    for n in numbers[1:]:
 
 
         if n==last:
 
-            scores[n]+=1
+            result[n]+=1
 
 
         last=n
 
 
 
-    return scores
+    return result
 
 
 
 
 
 
-
-# =====================================================
-# V8预测
-# =====================================================
 
 
 def predict_next(history):
 
 
+    numbers=normalize(
+        history
+    )
 
-    if not history:
+
+    if not numbers:
 
 
         return {
 
             "error":
-
             "无数据"
 
         }
@@ -226,41 +226,29 @@ def predict_next(history):
 
 
 
-    # 状态
 
     state=analyze_state(
 
-        history
+        numbers
 
     )
 
 
 
     weights=state[
-
         "动态权重"
-
     ]
 
 
 
-
-
     hot=hot_score(
-
-        history
-
+        numbers
     )
-
 
 
     markov=markov_score(
-
-        history
-
+        numbers
     )
-
-
 
 
 
@@ -268,11 +256,6 @@ def predict_next(history):
 
 
 
-
-
-    # =====================
-    # 综合评分
-    # =====================
 
 
     for n in range(1,50):
@@ -305,23 +288,16 @@ def predict_next(history):
 
             weights["random"]
 
-
         )
 
 
 
 
 
-    # =====================
-    # 熵高降趋势
-    # =====================
-
-
     if state["状态"]=="混沌状态":
 
 
         for n in scores:
-
 
             scores[n]*=0.85
 
@@ -344,7 +320,6 @@ def predict_next(history):
     top10=ranked[:10]
 
 
-
     top3=top10[:3]
 
 
@@ -355,7 +330,7 @@ def predict_next(history):
 
 
 
-    result={
+    return {
 
 
         "版本":
@@ -388,9 +363,7 @@ def predict_next(history):
 
 
 
-        "属性":
-
-        {
+        "属性":{
 
 
             "波色":
@@ -409,7 +382,6 @@ def predict_next(history):
 
             get_oe(first)
 
-
         },
 
 
@@ -417,11 +389,11 @@ def predict_next(history):
         "评分":{
 
 
-            str(k):
+            str(n):
 
-            round(scores[k],3)
+            round(scores[n],3)
 
-            for k in top10
+            for n in top10
 
         },
 
@@ -431,14 +403,7 @@ def predict_next(history):
 
         datetime.now().isoformat()
 
-
     }
-
-
-
-    return result
-
-
 
 
 
@@ -446,6 +411,6 @@ def predict_next(history):
 
 __all__=[
 
-"predict_next"
+    "predict_next"
 
 ]
