@@ -2,72 +2,150 @@ name: 六合AI测试
 
 
 on:
+
   workflow_dispatch:
 
 
 permissions:
+
   contents: write
+
 
 
 jobs:
 
+
   test:
 
+
     runs-on: ubuntu-latest
+
+
+    env:
+
+      LANG: zh_CN.UTF-8
+
+      LC_ALL: zh_CN.UTF-8
+
+      PYTHONUTF8: 1
+
+      PYTHONIOENCODING: utf-8
+
 
 
     steps:
 
 
     - name: 拉取代码
+
       uses: actions/checkout@v4
 
 
+
     - name: Python环境
+
       uses: actions/setup-python@v5
+
       with:
+
         python-version: "3.11"
 
 
-    - name: 查看目录
+
+    - name: 安装依赖
+
       run: |
+
+        python -m pip install --upgrade pip
+
+        
+
+        if [ -f requirements.txt ]; then
+
+          pip install -r requirements.txt
+
+        fi
+
+
+
+    - name: 检查环境
+
+      run: |
+
+        echo "当前目录"
 
         pwd
 
-        ls
 
-        echo "------"
+        echo "文件列表"
 
-        find . -maxdepth 2 -type f
+        ls -la
 
 
-    - name: 测试Python
-      env:
-        PYTHONPATH: ${{ github.workspace }}
+        echo "Python版本"
+
+        python --version
+
+
+
+    - name: 测试中文输出
 
       run: |
 
         python - <<'PY'
 
-        import os
+        print("六合AI智能预测系统")
 
-        print("当前目录:")
-        print(os.getcwd())
-
-
-        import core
-
-        print("core导入成功")
-
+        print("中文环境正常")
 
         PY
+
 
 
     - name: 运行系统
 
       env:
+
         PYTHONPATH: ${{ github.workspace }}
 
       run:
 
         python -u main.py
+
+
+
+    - name: 查看结果
+
+      run: |
+
+        echo "===================="
+
+        echo "预测结果"
+
+        echo "===================="
+
+
+        ls -la output || true
+
+
+        cat output/prediction.json || true
+
+
+
+    - name: 保存结果
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: 六合AI运行结果
+
+        path: |
+
+          output/
+
+          cache/
+
+          *.db
+
+        if-no-files-found: ignore
