@@ -1,21 +1,20 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
 
 database.py
 
-数据库管理模块
+SQLite数据库模块
 
 
 功能:
 
 1. 初始化数据库
-2. 创建开奖表
-3. 插入数据
-4. 自动去重
-5. 查询历史
-6. 获取最新开奖
+2. 创建表
+3. 保存开奖
+4. 查询历史
+5. 查询最新数据
 
 
 """
@@ -25,37 +24,73 @@ import sqlite3
 
 import os
 
+from datetime import datetime
+
 
 
 
 
 # =====================================================
-# 数据库配置
+# 数据目录
 # =====================================================
 
 
-DB_DIR="data"
+DATA_DIR = "data"
+
+
+os.makedirs(
+
+    DATA_DIR,
+
+    exist_ok=True
+
+)
 
 
 
-DB_FILES={
+
+
+# =====================================================
+# 彩种数据库
+# =====================================================
+
+
+DB_FILES = {
 
 
     "hk":
 
-    "hk.db",
+    os.path.join(
+
+        DATA_DIR,
+
+        "hk.db"
+
+    ),
 
 
 
     "newMacau":
 
-    "new_macau.db",
+    os.path.join(
+
+        DATA_DIR,
+
+        "newMacau.db"
+
+    ),
 
 
 
     "oldMacau":
 
-    "old_macau.db"
+    os.path.join(
+
+        DATA_DIR,
+
+        "oldMacau.db"
+
+    )
 
 }
 
@@ -63,60 +98,35 @@ DB_FILES={
 
 
 
-# =====================================================
-# 数据库路径
-# =====================================================
-
-
-def get_db_path(code):
-
-
-    os.makedirs(
-        DB_DIR,
-        exist_ok=True
-    )
-
-
-    filename=DB_FILES.get(
-
-        code,
-
-        f"{code}.db"
-
-    )
-
-
-    return os.path.join(
-
-        DB_DIR,
-
-        filename
-
-    )
-
-
-
-
 
 # =====================================================
-# 连接数据库
+# 获取连接
 # =====================================================
 
 
-def connect_db(code):
+def get_connection(code):
 
 
-    path=get_db_path(
-        code
-    )
+    if code not in DB_FILES:
+
+
+        raise ValueError(
+
+            f"未知彩种:{code}"
+
+        )
+
 
 
     conn=sqlite3.connect(
-        path
+
+        DB_FILES[code]
+
     )
 
 
     conn.row_factory=sqlite3.Row
+
 
 
     return conn
@@ -126,27 +136,30 @@ def connect_db(code):
 
 
 # =====================================================
-# 初始化单个数据库
+# 初始化单数据库
 # =====================================================
 
 
-def init_database(code):
+def init_single_database(code):
 
 
-    conn=connect_db(
+    conn=get_connection(
+
         code
+
     )
 
 
-    cursor=conn.cursor()
+    cur=conn.cursor()
 
 
 
-    cursor.execute(
+    cur.execute(
 
         """
 
-        CREATE TABLE IF NOT EXISTS history
+        CREATE TABLE IF NOT EXISTS draws
+
         (
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,19 +171,13 @@ def init_database(code):
             numbers TEXT,
 
 
-            special INTEGER,
-
-
-            zodiac TEXT,
-
-
-            wave TEXT,
-
-
             open_time TEXT,
 
 
-            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            source TEXT,
+
+
+            create_time TEXT
 
         )
 
@@ -182,11 +189,8 @@ def init_database(code):
 
     conn.commit()
 
+
     conn.close()
-
-
-
-    return True
 
 
 
@@ -197,106 +201,147 @@ def init_database(code):
 # =====================================================
 
 
-def init_all_database():
+def init_database():
 
 
     for code in DB_FILES:
 
 
-        init_database(
+        init_single_database(
+
             code
+
         )
 
 
-    return True
+    print(
+
+        "数据库初始化完成"
+
+    )
 
 
 
 
 
 # =====================================================
-# 插入开奖
+# 保存开奖
 # =====================================================
 
 
-def insert_draw(
+def save_draw(
+
         code,
-        data
+
+        draw
+
 ):
 
 
-    init_database(
+    conn=get_connection(
+
         code
+
     )
 
 
-    conn=connect_db(
-        code
+    cur=conn.cursor()
+
+
+
+    numbers=" ".join(
+
+        str(x)
+
+        for x in draw.get(
+
+            "numbers",
+
+            []
+
+        )
+
     )
-
-
-    cursor=conn.cursor()
 
 
 
     try:
 
 
-        cursor.execute(
+        cur.execute(
 
-        """
+            """
 
-        INSERT OR IGNORE INTO history
+            INSERT INTO draws
 
-        (
+            (
 
-        issue,
+            issue,
 
-        numbers,
+            numbers,
 
-        special,
+            open_time,
 
-        zodiac,
+            source,
 
-        wave,
+            create_time
 
-        open_time
+            )
+
+            VALUES
+
+            (?,?,?,?,?)
+
+            """,
+
+            (
+
+            draw.get(
+
+                "issue"
+
+            ),
+
+
+            numbers,
+
+
+            draw.get(
+
+                "open_time",
+
+                ""
+
+            ),
+
+
+            draw.get(
+
+                "source",
+
+                ""
+
+            ),
+
+
+            datetime.now().isoformat()
+
+            )
 
         )
-
-
-        VALUES
-
-        (?,?,?,?,?,?)
-
-        """,
-
-        (
-
-        data.get("issue"),
-
-        data.get("numbers"),
-
-        data.get("special"),
-
-        data.get("zodiac"),
-
-        data.get("wave"),
-
-        data.get("open_time")
-
-        )
-
-
-        )
-
 
 
         conn.commit()
 
 
+        result=True
 
-        result=cursor.rowcount
+
+
+    except sqlite3.IntegrityError:
+
+
+        result=False
 
 
 
@@ -314,13 +359,16 @@ def insert_draw(
 
 
 # =====================================================
-# 批量插入
+# 批量保存
 # =====================================================
 
 
-def insert_many(
+def save_history(
+
         code,
+
         rows
+
 ):
 
 
@@ -331,13 +379,16 @@ def insert_many(
     for row in rows:
 
 
-        count += insert_draw(
+        if save_draw(
 
             code,
 
             row
 
-        )
+        ):
+
+
+            count+=1
 
 
 
@@ -348,11 +399,12 @@ def insert_many(
 
 
 # =====================================================
-# 查询历史
+# 加载历史
 # =====================================================
 
 
-def get_history(
+def load_history(
+
         code,
 
         limit=None
@@ -360,12 +412,14 @@ def get_history(
 ):
 
 
-    conn=connect_db(
+    conn=get_connection(
+
         code
+
     )
 
 
-    cursor=conn.cursor()
+    cur=conn.cursor()
 
 
 
@@ -373,7 +427,7 @@ def get_history(
 
     SELECT *
 
-    FROM history
+    FROM draws
 
     ORDER BY id DESC
 
@@ -384,23 +438,19 @@ def get_history(
     if limit:
 
 
-        sql += f" LIMIT {int(limit)}"
+        sql += f"""
+
+        LIMIT {int(limit)}
+
+        """
 
 
 
-    cursor.execute(
+    rows=cur.execute(
+
         sql
-    )
 
-
-
-    rows=[
-
-        dict(x)
-
-        for x in cursor.fetchall()
-
-    ]
+    ).fetchall()
 
 
 
@@ -408,21 +458,59 @@ def get_history(
 
 
 
-    return rows
+    result=[]
+
+
+
+    for row in rows:
+
+
+        result.append(
+
+            {
+
+            "issue":
+
+            row["issue"],
+
+
+            "numbers":
+
+            [
+
+            int(x)
+
+            for x in row["numbers"].split()
+
+            ],
+
+
+            "open_time":
+
+            row["open_time"]
+
+            }
+
+        )
+
+
+
+    return result
 
 
 
 
 
 # =====================================================
-# 最新一期
+# 获取最新一期
 # =====================================================
 
 
 def get_latest(code):
 
 
-    rows=get_history(
+    data=load_history(
+
         code,
 
         1
@@ -430,10 +518,10 @@ def get_latest(code):
     )
 
 
-    if rows:
+    if data:
 
 
-        return rows[0]
+        return data[0]
 
 
     return None
@@ -447,61 +535,69 @@ def get_latest(code):
 # =====================================================
 
 
-def count_history(code):
+def count_draws(code):
 
 
-    conn=connect_db(
+    conn=get_connection(
+
         code
-    )
-
-
-    cursor=conn.cursor()
-
-
-
-    cursor.execute(
-
-        "SELECT COUNT(*) FROM history"
 
     )
 
 
+    cur=conn.cursor()
 
-    result=cursor.fetchone()[0]
+
+
+    row=cur.execute(
+
+        """
+
+        SELECT COUNT(*)
+
+        FROM draws
+
+        """
+
+    ).fetchone()
+
 
 
     conn.close()
 
 
 
-    return result
+    return row[0]
 
 
 
 
 
 # =====================================================
-# 清空数据库
+# 删除数据库
 # =====================================================
 
 
 def clear_database(code):
 
 
-    conn=connect_db(
+    conn=get_connection(
+
         code
-    )
-
-
-    cursor=conn.cursor()
-
-
-
-    cursor.execute(
-
-        "DELETE FROM history"
 
     )
+
+
+    cur=conn.cursor()
+
+
+
+    cur.execute(
+
+        "DELETE FROM draws"
+
+    )
+
 
 
     conn.commit()
@@ -520,23 +616,70 @@ def clear_database(code):
 if __name__=="__main__":
 
 
+    init_database()
+
+
+
+    test={
+
+
+        "issue":
+
+        "2026090",
+
+
+        "numbers":
+
+        [
+
+        39,
+
+        41,
+
+        8,
+
+        9,
+
+        7,
+
+        14,
+
+        49
+
+        ],
+
+
+        "source":
+
+        "test"
+
+
+    }
+
+
+
     print(
 
-        "初始化数据库"
+        save_draw(
+
+            "hk",
+
+            test
+
+        )
 
     )
 
 
-    init_all_database()
-
-
 
     print(
 
-        "香港记录:",
+        load_history(
 
-        count_history(
-            "hk"
+            "hk",
+
+            5
+
         )
 
     )
