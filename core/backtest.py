@@ -5,24 +5,28 @@
 
 backtest.py
 
-Walk-Forward回测模块
+Walk Forward历史回测
 
 """
 
 
-from collections import defaultdict
-
-
-from .predictor import predict_all
+from .predictor import generate_prediction
 
 
 from .features import (
 
-    get_special,
-
     get_wave,
 
-    get_zodiac,
+    get_size,
+
+    get_parity
+
+)
+
+
+from .zodiac_model import (
+
+    get_zodiac
 
 )
 
@@ -31,40 +35,228 @@ from .features import (
 
 
 # =====================================================
-# 初始化结果
+# 解析号码
 # =====================================================
 
 
-def init_result():
+def parse_numbers(text):
+
+
+    if isinstance(text,list):
+
+        return [
+
+            int(x)
+
+            for x in text
+
+        ]
+
+
+
+    return [
+
+        int(x)
+
+        for x in str(text)
+
+        .replace(","," ")
+
+        .split()
+
+    ]
+
+
+
+
+
+# =====================================================
+# 获取特码
+# =====================================================
+
+
+def get_special(row):
+
+
+    nums=parse_numbers(
+
+        row.get(
+
+            "numbers",
+
+            ""
+
+        )
+
+    )
+
+
+    if len(nums)==0:
+
+        return None
+
+
+    return nums[-1]
+
+
+
+
+
+# =====================================================
+# 波色判断
+# =====================================================
+
+
+def check_wave(
+
+        prediction,
+
+        actual
+
+):
+
+
+    waves=prediction.get(
+
+        "波色",
+
+        []
+
+    )
+
+
+    real=get_wave(
+
+        actual
+
+    )
+
+
+    return real in waves
+
+
+
+
+
+# =====================================================
+# 大小判断
+# =====================================================
+
+
+def check_size(
+
+        prediction,
+
+        actual
+
+):
+
+
+    size=get_size(
+
+        actual
+
+    )
+
+
+    return (
+
+        size==prediction.get(
+
+            "大小"
+
+        )
+
+    )
+
+
+
+
+
+# =====================================================
+# 单双判断
+# =====================================================
+
+
+def check_parity(
+
+        prediction,
+
+        actual
+
+):
+
+
+    parity=get_parity(
+
+        actual
+
+    )
+
+
+    return (
+
+        parity==prediction.get(
+
+            "单双"
+
+        )
+
+    )
+
+
+
+
+
+# =====================================================
+# 生肖判断
+# =====================================================
+
+
+def check_zodiac(
+
+        prediction,
+
+        actual,
+
+        year=2026
+
+):
+
+
+    z=get_zodiac(
+
+        actual,
+
+        year
+
+    )
 
 
     return {
 
 
-        "count":0,
+        "5肖":
+
+        z in prediction.get(
+
+            "生肖5肖",
+
+            []
+
+        ),
 
 
-        "special10":0,
 
+        "2肖":
 
-        "zodiac5":0,
+        z in prediction.get(
 
+            "平特2肖",
 
-        "flat2":0,
+            []
 
-
-        "size":0,
-
-
-        "parity":0,
-
-
-        "wave_single":0,
-
-
-        "wave_double":0,
-
-
+        )
 
     }
 
@@ -73,149 +265,114 @@ def init_result():
 
 
 # =====================================================
-# 百分比
+# 单期测试
 # =====================================================
 
 
-def percent(a,b):
+def test_one(
 
+        history,
 
-    if b==0:
+        target
 
-        return 0
-
-
-    return round(
-
-        a/b*100,
-
-        2
-
-    )
-
-
-
-
-
-# =====================================================
-# 单次验证
-# =====================================================
-
-
-def check_prediction(
-        prediction,
-        actual
 ):
 
 
-    result={}
+    prediction=generate_prediction(
+
+        history
+
+    )
 
 
-    # -----------------
-    # 特码10码
-    # -----------------
+    actual=get_special(
 
-    special10=prediction["special10"]
-
-
-    result["special10"]= (
-
-        actual in special10
+        target
 
     )
 
 
 
-    # -----------------
-    # 生肖
-    # -----------------
+    if actual is None:
 
-    zodiac=get_zodiac(actual)
+        return None
 
 
-    result["zodiac5"]=(
-
-        zodiac
-
-        in prediction["zodiac5"]
-
-    )
 
 
-    result["flat2"]=(
 
-        zodiac
+    zodiac=check_zodiac(
 
-        in prediction["flat_zodiac2"]
+        prediction,
+
+        actual
 
     )
 
 
 
-    # -----------------
-    # 大小
-    # -----------------
-
-    size="大" if actual>=25 else "小"
+    return {
 
 
-    result["size"]=(
+        "特码":
 
-        size
+        actual in prediction.get(
 
-        ==
-        prediction["size"]["recommend"]
+            "特码10码",
 
-    )
+            []
+
+        ),
 
 
 
-    # -----------------
-    # 单双
-    # -----------------
+        "生肖5肖":
 
-    parity="单" if actual%2 else "双"
-
-
-    result["parity"]=(
-
-        parity
-
-        ==
-        prediction["parity"]["recommend"]
-
-    )
+        zodiac["5肖"],
 
 
 
-    # -----------------
-    # 波色
-    # -----------------
+        "平特2肖":
 
-    wave=get_wave(actual)
+        zodiac["2肖"],
 
 
 
-    result["wave_single"]=(
+        "波色":
 
-        wave
+        check_wave(
 
-        ==
-        prediction["wave"]["single"]
+            prediction,
 
-    )
+            actual
 
-
-    result["wave_double"]=(
-
-        wave
-
-        in prediction["wave"]["double"]
-
-    )
+        ),
 
 
-    return result
+
+        "大小":
+
+        check_size(
+
+            prediction,
+
+            actual
+
+        ),
+
+
+
+        "单双":
+
+        check_parity(
+
+            prediction,
+
+            actual
+
+        )
+
+    }
 
 
 
@@ -227,234 +384,199 @@ def check_prediction(
 
 
 def walk_forward(
+
         rows,
-        test_size=20,
-        name="unknown"
+
+        window=20
+
 ):
 
 
-    if len(rows)<50:
-
-
-        return {
-
-
-            "error":
-
-            "数据不足"
-
-        }
+    result=[]
 
 
 
-    result=init_result()
+    total=len(rows)
 
 
 
-    module_score=defaultdict(
-        lambda:[0,0]
-    )
+    if total<=window:
 
-
-
-    # 保证时间顺序
-
-    rows=list(
-        rows
-    )
-
-
-
-    rows=rows[::-1]
-
-
-
-    start=len(rows)-test_size
+        return result
 
 
 
     for i in range(
-        start,
-        len(rows)
+
+        window,
+
+        total
+
     ):
 
 
-
-        train=rows[:i]
-
-
-        target=rows[i]
+        history=rows[i:]
 
 
 
-        if not train:
-
-            continue
+        target=rows[i-1]
 
 
 
-        prediction=predict_all(
+        r=test_one(
 
-            train,
+            history,
 
-            name
-
-        )
-
-
-
-        actual=get_special(
             target
-        )
-
-
-
-        if not actual:
-
-            continue
-
-
-
-        check=check_prediction(
-
-            prediction,
-
-            actual
 
         )
 
 
 
-        result["count"]+=1
+        if r:
+
+            result.append(r)
 
 
 
-        for k,v in check.items():
-
-
-            if v:
-
-                result[k]+=1
-
-
-
-            module_score[k][1]+=1
-
-
-
-            if v:
-
-                module_score[k][0]+=1
+    return result
 
 
 
 
-    # 百分比
+
+# =====================================================
+# 统计
+# =====================================================
 
 
-    output={
+def calculate_result(
+
+        records
+
+):
 
 
-
-        "name":
-
-        name,
-
-
-
-        "test_count":
-
-        result["count"],
-
-
-
-        "accuracy":{
-
-
-            k:
-
-            percent(v,result["count"])
-
-
-            for k,v in result.items()
-
-            if k!="count"
-
-        },
+    total=len(records)
 
 
 
-        "module_score":{
+    if total==0:
+
+        return {}
 
 
-            k:
 
-            percent(v[0],v[1])
+    keys=[
+
+        "特码",
+
+        "生肖5肖",
+
+        "平特2肖",
+
+        "波色",
+
+        "大小",
+
+        "单双"
+
+    ]
 
 
-            for k,v in module_score.items()
+
+    result={}
+
+
+
+    for k in keys:
+
+
+        hit=sum(
+
+            1
+
+            for x in records
+
+            if x[k]
+
+        )
+
+
+        result[k]={
+
+
+            "命中":
+
+            hit,
+
+
+            "总数":
+
+            total,
+
+
+            "命中率":
+
+            round(
+
+                hit/total*100,
+
+                2
+
+            )
 
         }
 
 
 
-    }
-
-
-
-    return output
+    return result
 
 
 
 
 
 # =====================================================
-# 打印
+# 完整回测
 # =====================================================
 
 
-def print_backtest(data):
+def run_backtest(
+
+        rows
+
+):
 
 
-    print("="*70)
-
-    print(
-
-        data.get(
-            "name",
-            ""
-        ),
-
-        "Walk-Forward回测"
-
-    )
-
-    print("="*70)
+    outputs={}
 
 
 
-    print(
-
-        "有效测试期数:",
-
-        data.get(
-            "test_count"
-        )
-
-    )
+    for window in [10,20]:
 
 
+        records=walk_forward(
 
-    for k,v in data["accuracy"].items():
+            rows,
 
-
-        print(
-
-            f"{k:<15}",
-
-            f"{v}%"
+            window
 
         )
+
+
+        outputs[
+
+            f"最近{window}期"
+
+        ]=calculate_result(
+
+            records
+
+        )
+
+
+
+    return outputs
 
 
 
@@ -468,29 +590,22 @@ def print_backtest(data):
 if __name__=="__main__":
 
 
-    demo=[
-
+    test=[
 
         {
 
         "numbers":
 
-        "38,26,08,06,29,18,23"
+        "39 41 08 09 07 14 49"
 
         }
 
-    ]
+    ]*50
 
 
-    r=walk_forward(
 
-        demo,
+    print(
 
-        10,
-
-        "测试"
+        run_backtest(test)
 
     )
-
-
-    print(r)
