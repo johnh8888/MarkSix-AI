@@ -1,648 +1,205 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-state.py
+core/state.py
 
 市场状态基础模型
-
-
-功能：
-
-1. 状态枚举
-2. 状态评分
-3. 状态检测基础函数
-
 
 """
 
 
-from enum import Enum
+from __future__ import annotations
+
 
 from collections import Counter
+import math
 
 
 
 
 
 # =====================================================
-# 市场状态定义
+# 熵计算
 # =====================================================
 
 
-class MarketState(Enum):
+def entropy(values):
+
+    if not values:
+
+        return 0
 
 
-    平衡状态 = "平衡"
+
+    counter=Counter(values)
 
 
-    热态 = "热态"
+    total=len(values)
 
 
-    冷态 = "冷态"
+    h=0
 
 
-    连续状态 = "连续"
+    for c in counter.values():
+
+        p=c/total
+
+        h-=p*math.log(
+            p,
+            2
+        )
 
 
-    反转状态 = "反转"
-
-
-    混沌状态 = "混沌"
+    return h
 
 
 
 
 
 # =====================================================
-# 状态中文
+# 分布
 # =====================================================
 
 
-def 状态名称(state):
+def distribution(values):
 
 
-    if isinstance(
+    counter=Counter(values)
+
+
+    total=max(
+        1,
+        len(values)
+    )
+
+
+    return {
+
+        k:
+
+        round(
+            v/total,
+            4
+        )
+
+        for k,v
+
+        in counter.items()
+
+    }
+
+
+
+
+
+
+# =====================================================
+# 状态计算
+# =====================================================
+
+
+def analyze_state(history):
+
+
+    recent=history[:12]
+
+
+    medium=history[:36]
+
+
+
+    if len(recent)<5:
+
+        return {
+
+            "state":
+            "数据不足"
+
+        }
+
+
+
+    recent_entropy=entropy(
+        recent
+    )
+
+
+    medium_entropy=entropy(
+        medium
+    )
+
+
+
+    gap=(
+
+        medium_entropy
+
+        -
+
+        recent_entropy
+
+    )
+
+
+
+
+
+    if recent_entropy < 2.5:
+
+
+        state="偏态"
+
+
+
+    elif abs(gap)>0.8:
+
+
+        state="转换"
+
+
+
+    else:
+
+
+        state="平衡"
+
+
+
+
+
+    return {
+
+
+        "state":
 
         state,
 
-        MarketState
 
-    ):
+        "recent_entropy":
 
-
-        return state.value
-
-
-
-    return str(state)
-
-
-
-
-
-# =====================================================
-# 波色连续检测
-# =====================================================
-
-
-def 检测连续波色(
-
-        历史数据,
-
-        周期=5
-
-):
-
-
-    if len(历史数据)<周期:
-
-
-        return False
-
-
-
-    最近=[]
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        波色=item.get(
-
-            "波色",
-
-            []
-
-        )
-
-
-        if 波色:
-
-
-            最近.append(
-
-                波色[-1]
-
-            )
-
-
-
-    if len(最近)<周期:
-
-
-        return False
-
-
-
-    return len(
-
-        set(最近)
-
-    )==1
-
-
-
-
-
-# =====================================================
-# 热号检测
-# =====================================================
-
-
-def 检测热态(
-
-        历史数据,
-
-        周期=20
-
-):
-
-
-    if len(历史数据)<周期:
-
-
-        return False
-
-
-
-    counter=Counter()
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        for num in item.get(
-
-            "号码",
-
-            []
-
-        ):
-
-
-            counter[num]+=1
-
-
-
-    if not counter:
-
-
-        return False
-
-
-
-    最大次数=max(
-
-        counter.values()
-
-    )
-
-
-
-    平均=sum(
-
-        counter.values()
-
-    ) / len(counter)
-
-
-
-    return 最大次数 > 平均 * 2
-
-
-
-
-
-# =====================================================
-# 冷号检测
-# =====================================================
-
-
-def 检测冷态(
-
-        历史数据,
-
-        周期=30
-
-):
-
-
-    if len(历史数据)<周期:
-
-
-        return False
-
-
-
-    出现=set()
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        出现.update(
-
-            item.get(
-
-                "号码",
-
-                []
-
-            )
-
-        )
-
-
-
-    遗漏数量=49-len(
-
-        出现
-
-    )
-
-
-
-    return 遗漏数量>=15
-
-
-
-
-
-# =====================================================
-# 大小趋势检测
-# =====================================================
-
-
-def 大小趋势(
-
-        历史数据,
-
-        周期=10
-
-):
-
-
-    结果=[]
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        numbers=item.get(
-
-            "号码",
-
-            []
-
-        )
-
-
-        if not numbers:
-
-            continue
-
-
-
-        特码=numbers[-1]
-
-
-
-        if 特码>=25:
-
-
-            结果.append(
-
-                "大"
-
-            )
-
-        else:
-
-
-            结果.append(
-
-                "小"
-
-            )
-
-
-
-    return {
-
-        "大":
-
-        结果.count("大"),
-
-
-        "小":
-
-        结果.count("小")
-
-    }
-
-
-
-
-
-# =====================================================
-# 单双趋势检测
-# =====================================================
-
-
-def 单双趋势(
-
-        历史数据,
-
-        周期=10
-
-):
-
-
-    结果=[]
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        numbers=item.get(
-
-            "号码",
-
-            []
-
-        )
-
-
-        if not numbers:
-
-            continue
-
-
-
-        特码=numbers[-1]
-
-
-
-        if 特码 % 2:
-
-
-            结果.append(
-
-                "单"
-
-            )
-
-        else:
-
-
-            结果.append(
-
-                "双"
-
-            )
-
-
-
-    return {
-
-        "单":
-
-        结果.count("单"),
-
-
-        "双":
-
-        结果.count("双")
-
-    }
-
-
-
-
-
-# =====================================================
-# 状态综合评分
-# =====================================================
-
-
-def 状态评分(
-
-        历史数据
-
-):
-
-
-    score={
-
-        "连续":
-
-        0,
-
-        "热":
-
-        0,
-
-        "冷":
-
-        0,
-
-        "反转":
-
-        0
-
-    }
-
-
-
-    if 检测连续波色(
-
-        历史数据
-
-    ):
-
-
-        score["连续"]+=2
-
-
-
-    if 检测热态(
-
-        历史数据
-
-    ):
-
-
-        score["热"]+=2
-
-
-
-    if 检测冷态(
-
-        历史数据
-
-    ):
-
-
-        score["冷"]+=2
-
-
-
-
-
-    return score
-
-
-
-
-
-# =====================================================
-# 主状态判断
-# =====================================================
-
-
-def 分析市场状态(
-
-        历史数据
-
-):
-
-
-    score=状态评分(
-
-        历史数据
-
-    )
-
-
-
-    最大=max(
-
-        score.values()
-
-    )
-
-
-
-    if 最大==0:
-
-
-        return MarketState.平衡状态
-
-
-
-
-
-    状态=max(
-
-        score,
-
-        key=score.get
-
-    )
-
-
-
-    if 状态=="连续":
-
-
-        return MarketState.连续状态
-
-
-
-    if 状态=="热":
-
-
-        return MarketState.热态
-
-
-
-    if 状态=="冷":
-
-
-        return MarketState.冷态
-
-
-
-    if 状态=="反转":
-
-
-        return MarketState.反转状态
-
-
-
-    return MarketState.平衡状态
-
-
-
-
-
-# =====================================================
-# 状态报告
-# =====================================================
-
-
-def 状态报告(
-
-        历史数据
-
-):
-
-
-    state=分析市场状态(
-
-        历史数据
-
-    )
-
-
-
-    return {
-
-
-        "当前状态":
-
-        状态名称(
-
-            state
-
+        round(
+            recent_entropy,
+            4
         ),
 
 
+        "medium_entropy":
 
-        "状态评分":
-
-        状态评分(
-
-            历史数据
-
+        round(
+            medium_entropy,
+            4
         ),
 
 
+        "entropy_gap":
 
-        "大小趋势":
-
-        大小趋势(
-
-            历史数据
-
-        ),
-
-
-
-        "单双趋势":
-
-        单双趋势(
-
-            历史数据
-
+        round(
+            gap,
+            4
         )
+
 
     }
 
@@ -650,11 +207,13 @@ def 状态报告(
 
 
 
-if __name__=="__main__":
 
+__all__=[
 
-    print(
+"analyze_state",
 
-        "V5状态模块启动"
+"entropy",
 
-    )
+"distribution"
+
+]
