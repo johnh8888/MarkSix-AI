@@ -1,125 +1,71 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
 
 features.py
 
-功能:
+基础特征工程模块
 
-号码基础特征工程
+功能：
 
-包含:
+1. 波色
+2. 大小
+3. 单双
+4. 尾数
+5. 分区
+6. 余数
+7. 距离
+8. 连号
+9. 生肖调用
 
-1. 特码解析
-2. 波色
-3. 大小
-4. 单双
-5. 尾数
-6. 分区
-7. 邻号
-8. 冷热
-9. 周期
-10. 生肖动态映射
 
 """
 
 
 from collections import Counter
 
-from .config import (
-    RED_NUMBERS,
-    BLUE_NUMBERS,
-    GREEN_NUMBERS,
-    SHORT_WINDOW,
-    ZODIAC_BASE_YEAR,
-    ZODIAC_LIST,
-)
+
+from .zodiac_model import get_zodiac
 
 
 
 
 
 # =====================================================
-# 基础号码解析
+# 波色定义
 # =====================================================
 
 
-def parse_numbers(row):
+RED = {
 
-    """
-    解析开奖数据
+    1,2,7,8,
+    12,13,18,19,
+    23,24,29,30,
+    34,35,40,45,
+    46
 
-    支持:
-
-    {
-        numbers:"01,02,03..."
-    }
-
-    """
-
-    if not row:
-        return []
+}
 
 
-    numbers = row.get(
-        "numbers",
-        ""
-    )
+BLUE = {
+
+    3,4,9,10,
+    14,15,20,25,
+    26,31,36,37,
+    41,42,47,48
+
+}
 
 
-    if isinstance(
-        numbers,
-        list
-    ):
+GREEN = {
 
-        return [
+    5,6,11,16,
+    17,21,22,27,
+    28,32,33,38,
+    39,43,44,49
 
-            int(x)
-
-            for x in numbers
-
-            if str(x).isdigit()
-
-        ]
-
-
-    result=[]
-
-
-    for x in str(numbers).split(","):
-
-        x=x.strip()
-
-        if x.isdigit():
-
-            result.append(
-                int(x)
-            )
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 获取特码
-# =====================================================
-
-
-def get_special(row):
-
-    nums=parse_numbers(row)
-
-
-    if not nums:
-
-        return None
-
-
-    return nums[0]
+}
 
 
 
@@ -130,20 +76,23 @@ def get_special(row):
 # =====================================================
 
 
-def get_wave(number):
+def get_wave(num):
 
 
-    if number in RED_NUMBERS:
+    num=int(num)
+
+
+    if num in RED:
 
         return "红"
 
 
-    if number in BLUE_NUMBERS:
+    elif num in BLUE:
 
         return "蓝"
 
 
-    if number in GREEN_NUMBERS:
+    elif num in GREEN:
 
         return "绿"
 
@@ -159,14 +108,23 @@ def get_wave(number):
 # =====================================================
 
 
-def get_size(number):
-
-    if number >=25:
-
-        return "大"
+def get_size(num):
 
 
-    return "小"
+    num=int(num)
+
+
+    return (
+
+        "大"
+
+        if num>=25
+
+        else
+
+        "小"
+
+    )
 
 
 
@@ -177,14 +135,23 @@ def get_size(number):
 # =====================================================
 
 
-def get_parity(number):
-
-    if number % 2:
-
-        return "单"
+def get_parity(num):
 
 
-    return "双"
+    num=int(num)
+
+
+    return (
+
+        "单"
+
+        if num%2
+
+        else
+
+        "双"
+
+    )
 
 
 
@@ -195,320 +162,134 @@ def get_parity(number):
 # =====================================================
 
 
-def get_tail(number):
+def get_tail(num):
 
-    return number % 10
+
+    return int(num)%10
 
 
 
 
 
 # =====================================================
-# 七区划分
+# 7余数
 # =====================================================
 
 
-def get_zone(number):
+def get_mod7(num):
 
 
-    if number <=7:
+    return int(num)%7
+
+
+
+
+
+# =====================================================
+# 五区
+# =====================================================
+
+
+def get_zone(num):
+
+
+    num=int(num)
+
+
+
+    if num<=10:
 
         return 1
 
 
-    if number <=14:
+    elif num<=20:
 
         return 2
 
 
-    if number <=21:
+    elif num<=30:
 
         return 3
 
 
-    if number <=28:
+    elif num<=40:
 
         return 4
 
 
-    if number <=35:
+    else:
 
         return 5
 
 
-    if number <=42:
-
-        return 6
-
-
-    return 7
-
-
 
 
 
 # =====================================================
-# 邻号
+# 数字距离
 # =====================================================
 
 
-def neighbor_distance(a,b):
+def cross_distance(
+        a,
+        b
+):
+
 
     return abs(
-        a-b
+
+        int(a)-int(b)
+
     )
 
 
 
 
 
-def is_neighbor(a,b):
-
-
-    return abs(a-b)<=2
-
-
-
-
-
 # =====================================================
-# 2026生肖动态计算
+# 连号检测
 # =====================================================
 
 
-def get_zodiac(number,year=2026):
+def consecutive_numbers(nums):
 
-    """
-    根据年份计算号码生肖
 
-    2026 = 马年
+    nums=sorted(
 
-    """
+        [
 
-    offset=(
+            int(x)
 
-        year
+            for x in nums
 
-        -
+        ]
 
-        ZODIAC_BASE_YEAR
+    )
 
-    ) % 12
 
+    result=[]
 
-    index=(
 
-        number
 
-        +
+    for i in range(
+        len(nums)-1
+    ):
 
-        offset
 
-    ) % 12
+        if nums[i+1]-nums[i]==1:
 
 
-    return ZODIAC_LIST[index]
+            result.append(
 
+                (
 
+                    nums[i],
 
+                    nums[i+1]
 
+                )
 
-# =====================================================
-# 开奖生肖统计
-# =====================================================
-
-
-def zodiac_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if not n:
-
-            continue
-
-
-        z=get_zodiac(n)
-
-
-        counter[z]+=1
-
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 波色统计
-# =====================================================
-
-
-def wave_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if not n:
-
-            continue
-
-
-        w=get_wave(n)
-
-
-        if w:
-
-            counter[w]+=1
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 大小统计
-# =====================================================
-
-
-def size_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if not n:
-
-            continue
-
-
-        counter[
-            get_size(n)
-        ] +=1
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 单双统计
-# =====================================================
-
-
-def parity_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if not n:
-
-            continue
-
-
-        counter[
-            get_parity(n)
-        ]+=1
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 号码频率
-# =====================================================
-
-
-def number_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            counter[n]+=1
-
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 遗漏计算
-# =====================================================
-
-
-def omission_count(rows):
-
-
-    result={}
-
-
-    for n in range(1,50):
-
-
-        count=0
-
-
-        for row in rows:
-
-
-            if get_special(row)==n:
-
-                break
-
-
-            count+=1
-
-
-
-        result[n]=count
+            )
 
 
     return result
@@ -518,121 +299,318 @@ def omission_count(rows):
 
 
 # =====================================================
-# 尾数统计
+# 单号码完整特征
 # =====================================================
 
 
-def tail_frequency(rows):
+def number_feature(
+        num,
+        year=2026
+):
+
+
+    num=int(num)
+
+
+
+    return {
+
+
+        "number":
+
+        num,
+
+
+        "zodiac":
+
+        get_zodiac(
+
+            num,
+
+            year
+
+        ),
+
+
+        "wave":
+
+        get_wave(num),
+
+
+        "size":
+
+        get_size(num),
+
+
+        "parity":
+
+        get_parity(num),
+
+
+        "tail":
+
+        get_tail(num),
+
+
+        "mod7":
+
+        get_mod7(num),
+
+
+        "zone":
+
+        get_zone(num)
+
+    }
+
+
+
+
+
+# =====================================================
+# 开奖特征
+# =====================================================
+
+
+def draw_feature(
+        numbers,
+        year=2026
+):
+
+
+    nums=[
+
+        int(x)
+
+        for x in numbers
+
+    ]
+
+
+
+    return {
+
+
+        "numbers":
+
+        nums,
+
+
+        "zodiac":
+
+        [
+
+            get_zodiac(
+                x,
+                year
+            )
+
+            for x in nums
+
+        ],
+
+
+
+        "wave":
+
+        [
+
+            get_wave(x)
+
+            for x in nums
+
+        ],
+
+
+
+        "size":
+
+        [
+
+            get_size(x)
+
+            for x in nums
+
+        ],
+
+
+
+        "parity":
+
+        [
+
+            get_parity(x)
+
+            for x in nums
+
+        ],
+
+
+
+        "tail":
+
+        [
+
+            get_tail(x)
+
+            for x in nums
+
+        ],
+
+
+
+        "zone":
+
+        [
+
+            get_zone(x)
+
+            for x in nums
+
+        ],
+
+
+
+        "continue":
+
+        consecutive_numbers(nums)
+
+    }
+
+
+
+
+
+# =====================================================
+# 历史统计
+# =====================================================
+
+
+def feature_frequency(
+        rows,
+        key,
+        limit=100
+):
 
 
     counter=Counter()
 
 
-    for row in rows:
+
+    for row in rows[:limit]:
 
 
-        n=get_special(row)
-
-
-        if n:
-
-            counter[
-                get_tail(n)
-            ]+=1
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 分区统计
-# =====================================================
-
-
-def zone_frequency(rows):
-
-
-    counter=Counter()
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            counter[
-                get_zone(n)
-            ]+=1
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 周期检测
-# =====================================================
-
-
-def cycle_gap(rows,number):
-
-
-    gap=0
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if n==number:
-
-            return gap
-
-
-        gap+=1
-
-
-
-    return gap
-
-
-
-
-
-# =====================================================
-# 冷热状态
-# =====================================================
-
-
-def hot_cold(rows):
-
-
-    freq=number_frequency(
-        rows[:SHORT_WINDOW]
-    )
-
-
-    result={}
-
-
-
-    for n in range(1,50):
-
-
-        result[n]=freq.get(
-            n,
-            0
+        values=row.get(
+            key,
+            []
         )
 
 
-    return result
+        for v in values:
+
+
+            counter[v]+=1
+
+
+
+    total=sum(
+
+        counter.values()
+
+    )
+
+
+
+    if total==0:
+
+        return {}
+
+
+
+    return {
+
+
+        k:
+
+        round(
+
+            v/total,
+
+            4
+
+        )
+
+
+        for k,v in counter.items()
+
+    }
+
+
+
+
+
+# =====================================================
+# 号码列表解析
+# =====================================================
+
+
+def parse_numbers(text):
+
+
+    if isinstance(
+        text,
+        list
+    ):
+
+        return [
+
+            int(x)
+
+            for x in text
+
+        ]
+
+
+
+    return [
+
+        int(x)
+
+        for x in str(text)
+
+        .replace(","," ")
+
+        .split()
+
+    ]
+
+
+
+
+
+# =====================================================
+# 测试
+# =====================================================
+
+
+if __name__=="__main__":
+
+
+    nums=[
+
+        39,
+        41,
+        8,
+        9,
+        7,
+        14,
+        49
+
+    ]
+
+
+    print(
+
+        draw_feature(nums)
+
+    )
