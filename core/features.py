@@ -1,71 +1,17 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 features.py
 
-基础特征工程模块
-
-功能：
-
-1. 波色
-2. 大小
-3. 单双
-4. 尾数
-5. 分区
-6. 余数
-7. 距离
-8. 连号
-9. 生肖调用
+号码特征工程模块
 
 
 """
 
 
 from collections import Counter
-
-
-from .zodiac_model import get_zodiac
-
-
-
-
-
-# =====================================================
-# 波色定义
-# =====================================================
-
-
-RED = {
-
-    1,2,7,8,
-    12,13,18,19,
-    23,24,29,30,
-    34,35,40,45,
-    46
-
-}
-
-
-BLUE = {
-
-    3,4,9,10,
-    14,15,20,25,
-    26,31,36,37,
-    41,42,47,48
-
-}
-
-
-GREEN = {
-
-    5,6,11,16,
-    17,21,22,27,
-    28,32,33,38,
-    39,43,44,49
-
-}
 
 
 
@@ -76,28 +22,60 @@ GREEN = {
 # =====================================================
 
 
-def get_wave(num):
+红波 = {
+
+    1,2,7,8,12,13,18,19,
+    23,24,29,30,34,35,
+    40,45,46
+
+}
+
+
+
+蓝波 = {
+
+    3,4,9,10,14,15,
+    20,25,26,31,36,
+    37,41,42,47,48
+
+}
+
+
+
+绿波 = {
+
+    5,6,11,16,17,21,
+    22,27,28,32,33,
+    38,39,43,44,49
+
+}
+
+
+
+
+
+def 获取波色(num):
 
 
     num=int(num)
 
 
-    if num in RED:
+    if num in 红波:
 
         return "红"
 
 
-    elif num in BLUE:
+    if num in 蓝波:
 
         return "蓝"
 
 
-    elif num in GREEN:
+    if num in 绿波:
 
         return "绿"
 
 
-    return None
+    return "未知"
 
 
 
@@ -108,23 +86,18 @@ def get_wave(num):
 # =====================================================
 
 
-def get_size(num):
+def 获取大小(num):
 
 
     num=int(num)
 
 
-    return (
+    if num >= 25:
 
-        "大"
+        return "大"
 
-        if num>=25
 
-        else
-
-        "小"
-
-    )
+    return "小"
 
 
 
@@ -135,23 +108,18 @@ def get_size(num):
 # =====================================================
 
 
-def get_parity(num):
+def 获取单双(num):
 
 
     num=int(num)
 
 
-    return (
+    if num % 2 == 0:
 
-        "单"
+        return "双"
 
-        if num%2
 
-        else
-
-        "双"
-
-    )
+    return "单"
 
 
 
@@ -162,137 +130,83 @@ def get_parity(num):
 # =====================================================
 
 
-def get_tail(num):
+def 获取尾数(num):
 
 
-    return int(num)%10
-
-
-
-
-
-# =====================================================
-# 7余数
-# =====================================================
-
-
-def get_mod7(num):
-
-
-    return int(num)%7
+    return int(num) % 10
 
 
 
 
 
 # =====================================================
-# 五区
+# 号码区域
 # =====================================================
 
 
-def get_zone(num):
+def 获取区域(num):
 
 
     num=int(num)
 
 
+    if num <= 10:
 
-    if num<=10:
-
-        return 1
-
-
-    elif num<=20:
-
-        return 2
+        return "一区"
 
 
-    elif num<=30:
+    elif num <=20:
 
-        return 3
+        return "二区"
 
 
-    elif num<=40:
+    elif num <=30:
 
-        return 4
+        return "三区"
+
+
+    elif num <=40:
+
+        return "四区"
 
 
     else:
 
-        return 5
+        return "五区"
 
 
 
 
 
 # =====================================================
-# 数字距离
+# 质数
 # =====================================================
 
 
-def cross_distance(
-        a,
-        b
-):
+质数 = {
 
+    2,3,5,7,11,13,
+    17,19,23,29,
+    31,37,41,43,47
 
-    return abs(
-
-        int(a)-int(b)
-
-    )
+}
 
 
 
 
 
-# =====================================================
-# 连号检测
-# =====================================================
+def 获取质合(num):
 
 
-def consecutive_numbers(nums):
+    num=int(num)
 
 
-    nums=sorted(
+    if num in 质数:
 
-        [
-
-            int(x)
-
-            for x in nums
-
-        ]
-
-    )
+        return "质数"
 
 
-    result=[]
-
-
-
-    for i in range(
-        len(nums)-1
-    ):
-
-
-        if nums[i+1]-nums[i]==1:
-
-
-            result.append(
-
-                (
-
-                    nums[i],
-
-                    nums[i+1]
-
-                )
-
-            )
-
-
-    return result
+    return "合数"
 
 
 
@@ -303,63 +217,45 @@ def consecutive_numbers(nums):
 # =====================================================
 
 
-def number_feature(
-        num,
-        year=2026
-):
-
-
-    num=int(num)
-
+def 分析号码(num):
 
 
     return {
 
 
-        "number":
+        "号码":
 
         num,
 
 
-        "zodiac":
+        "波色":
 
-        get_zodiac(
-
-            num,
-
-            year
-
-        ),
+        获取波色(num),
 
 
-        "wave":
+        "大小":
 
-        get_wave(num),
-
-
-        "size":
-
-        get_size(num),
+        获取大小(num),
 
 
-        "parity":
+        "单双":
 
-        get_parity(num),
-
-
-        "tail":
-
-        get_tail(num),
+        获取单双(num),
 
 
-        "mod7":
+        "尾数":
 
-        get_mod7(num),
+        获取尾数(num),
 
 
-        "zone":
+        "区域":
 
-        get_zone(num)
+        获取区域(num),
+
+
+        "质合":
+
+        获取质合(num)
 
     }
 
@@ -368,128 +264,159 @@ def number_feature(
 
 
 # =====================================================
-# 开奖特征
+# 开奖期特征
 # =====================================================
 
 
-def draw_feature(
-        numbers,
-        year=2026
+def 分析开奖(numbers):
+
+
+    特征=[]
+
+
+    for num in numbers:
+
+
+        特征.append(
+
+            分析号码(num)
+
+        )
+
+
+    return 特征
+
+
+
+
+
+# =====================================================
+# 统计特征
+# =====================================================
+
+
+def 统计属性(numbers):
+
+
+    结果={}
+
+
+
+    for key in [
+
+        "波色",
+
+        "大小",
+
+        "单双",
+
+        "区域",
+
+        "质合"
+
+    ]:
+
+
+        counter=Counter()
+
+
+
+        for num in numbers:
+
+
+            counter[
+
+                分析号码(num)[key]
+
+            ] +=1
+
+
+
+        结果[key]=dict(
+
+            counter
+
+        )
+
+
+
+    return 结果
+
+
+
+
+
+# =====================================================
+# 最近遗漏计算
+# =====================================================
+
+
+def 计算遗漏(
+
+        历史数据
+
 ):
 
 
-    nums=[
+    遗漏={
 
-        int(x)
+        i:0
 
-        for x in numbers
-
-    ]
-
-
-
-    return {
-
-
-        "numbers":
-
-        nums,
-
-
-        "zodiac":
-
-        [
-
-            get_zodiac(
-                x,
-                year
-            )
-
-            for x in nums
-
-        ],
-
-
-
-        "wave":
-
-        [
-
-            get_wave(x)
-
-            for x in nums
-
-        ],
-
-
-
-        "size":
-
-        [
-
-            get_size(x)
-
-            for x in nums
-
-        ],
-
-
-
-        "parity":
-
-        [
-
-            get_parity(x)
-
-            for x in nums
-
-        ],
-
-
-
-        "tail":
-
-        [
-
-            get_tail(x)
-
-            for x in nums
-
-        ],
-
-
-
-        "zone":
-
-        [
-
-            get_zone(x)
-
-            for x in nums
-
-        ],
-
-
-
-        "continue":
-
-        consecutive_numbers(nums)
+        for i in range(1,50)
 
     }
 
 
 
+    for item in reversed(
+
+        历史数据
+
+    ):
+
+
+        numbers=item.get(
+
+            "号码",
+
+            []
+
+        )
+
+
+
+        for num in range(1,50):
+
+
+            if num not in numbers:
+
+
+                遗漏[num]+=1
+
+
+
+            else:
+
+
+                遗漏[num]=0
+
+
+
+    return 遗漏
+
+
+
 
 
 # =====================================================
-# 历史统计
+# 热冷号码
 # =====================================================
 
 
-def feature_frequency(
-        rows,
-        key,
-        limit=100
+def 热冷分析(
+
+        历史数据
+
 ):
 
 
@@ -497,51 +424,61 @@ def feature_frequency(
 
 
 
-    for row in rows[:limit]:
+    for item in 历史数据:
 
 
-        values=row.get(
-            key,
+        for num in item.get(
+
+            "号码",
+
             []
-        )
+
+        ):
 
 
-        for v in values:
-
-
-            counter[v]+=1
-
-
-
-    total=sum(
-
-        counter.values()
-
-    )
+            counter[num]+=1
 
 
 
-    if total==0:
 
-        return {}
+
+    热门=[
+
+        x[0]
+
+        for x in counter.most_common(10)
+
+    ]
+
+
+
+    冷门=[
+
+        x[0]
+
+        for x in sorted(
+
+            counter.items(),
+
+            key=lambda x:x[1]
+
+        )[:10]
+
+    ]
 
 
 
     return {
 
 
-        k:
+        "热门号码":
 
-        round(
-
-            v/total,
-
-            4
-
-        )
+        热门,
 
 
-        for k,v in counter.items()
+        "冷门号码":
+
+        冷门
 
     }
 
@@ -550,67 +487,71 @@ def feature_frequency(
 
 
 # =====================================================
-# 号码列表解析
+# V5统一特征入口
 # =====================================================
 
 
-def parse_numbers(text):
+def 生成全部特征(
+
+        历史数据
+
+):
 
 
-    if isinstance(
-        text,
-        list
-    ):
-
-        return [
-
-            int(x)
-
-            for x in text
-
-        ]
+    return {
 
 
+        "属性统计":
 
-    return [
+        [
 
-        int(x)
+            统计属性(
 
-        for x in str(text)
+                x.get(
 
-        .replace(","," ")
+                    "号码",
 
-        .split()
+                    []
 
-    ]
+                )
 
+            )
 
+            for x in 历史数据
+
+        ],
 
 
 
-# =====================================================
-# 测试
-# =====================================================
+        "遗漏":
+
+        计算遗漏(
+
+            历史数据
+
+        ),
+
+
+
+        "冷热":
+
+        热冷分析(
+
+            历史数据
+
+        )
+
+    }
+
+
+
 
 
 if __name__=="__main__":
 
 
-    nums=[
-
-        39,
-        41,
-        8,
-        9,
-        7,
-        14,
-        49
-
-    ]
-
-
     print(
 
-        draw_feature(nums)
+        分析号码(1)
 
     )
