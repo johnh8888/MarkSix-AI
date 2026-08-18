@@ -1,4 +1,4 @@
-name: 六合AI测试
+name: 六合AI智能预测系统 FINAL
 
 
 on:
@@ -15,32 +15,28 @@ permissions:
 jobs:
 
 
-  test:
+  predict:
 
 
     runs-on: ubuntu-latest
 
 
-    env:
-
-      LANG: zh_CN.UTF-8
-
-      LC_ALL: zh_CN.UTF-8
-
-      PYTHONUTF8: 1
-
-      PYTHONIOENCODING: utf-8
-
-
-
     steps:
 
+
+    # =========================
+    # 拉取代码
+    # =========================
 
     - name: 拉取代码
 
       uses: actions/checkout@v4
 
 
+
+    # =========================
+    # Python环境
+    # =========================
 
     - name: Python环境
 
@@ -50,15 +46,45 @@ jobs:
 
         python-version: "3.11"
 
+        cache: pip
 
+
+
+    # =========================
+    # 中文环境
+    # =========================
+
+    - name: 设置中文环境
+
+      run: |
+
+
+        sudo apt-get update
+
+
+        sudo apt-get install -y language-pack-zh-hans
+
+
+        echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
+
+        echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
+
+        echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
+
+
+
+
+    # =========================
+    # 安装依赖
+    # =========================
 
     - name: 安装依赖
 
       run: |
 
+
         python -m pip install --upgrade pip
 
-        
 
         if [ -f requirements.txt ]; then
 
@@ -68,84 +94,287 @@ jobs:
 
 
 
-    - name: 检查环境
+
+    # =========================
+    # 查看项目
+    # =========================
+
+    - name: 检查项目结构
 
       run: |
 
-        echo "当前目录"
+
+        echo "======================"
+
+        echo "项目目录"
+
+        echo "======================"
+
 
         pwd
 
 
-        echo "文件列表"
-
-        ls -la
-
-
-        echo "Python版本"
-
-        python --version
+        find . -maxdepth 3 -type f | sort
 
 
 
-    - name: 测试中文输出
 
-      run: |
+    # =========================
+    # Python导入测试
+    # =========================
 
-        python - <<'PY'
+    - name: Python模块测试
 
-        print("六合AI智能预测系统")
-
-        print("中文环境正常")
-
-        PY
-
-
-
-    - name: 运行系统
 
       env:
 
         PYTHONPATH: ${{ github.workspace }}
 
-      run:
+
+      run: |
+
+
+        python - <<'PY'
+
+
+        import sys
+
+        import os
+
+
+        print("======================")
+
+        print("Python版本")
+
+        print(sys.version)
+
+
+        print("======================")
+
+
+        print(
+            "工作目录:",
+            os.getcwd()
+        )
+
+
+        try:
+
+            import core
+
+            print(
+                "✅ core模块正常"
+            )
+
+        except Exception as e:
+
+            print(
+                "❌ core错误:",
+                e
+            )
+
+            raise
+
+
+        PY
+
+
+
+
+
+    # =========================
+    # 运行系统
+    # =========================
+
+    - name: 运行六合AI系统
+
+
+      env:
+
+        PYTHONPATH: ${{ github.workspace }}
+
+        LANG: zh_CN.UTF-8
+
+        LC_ALL: zh_CN.UTF-8
+
+        PYTHONIOENCODING: utf-8
+
+
+
+      run: |
+
 
         python -u main.py
 
 
 
-    - name: 查看结果
+
+    # =========================
+    # 中文最终预测显示
+    # =========================
+
+    - name: 显示最终预测结果
+
+
+      env:
+
+        PYTHONIOENCODING: utf-8
+
 
       run: |
 
-        echo "===================="
 
-        echo "预测结果"
+        echo "======================"
 
-        echo "===================="
+        echo "       六合AI最终预测"
 
-
-        ls -la output || true
+        echo "======================"
 
 
-        cat output/prediction.json || true
+        python - <<'PY'
+
+
+        import json
+
+
+        path="output/prediction.json"
+
+
+        try:
+
+
+            with open(
+
+                path,
+
+                encoding="utf-8"
+
+            ) as f:
+
+
+                data=json.load(f)
 
 
 
-    - name: 保存结果
+            for key,item in data["lotteries"].items():
+
+
+                print()
+
+                print("======================")
+
+                print(
+                    item.get(
+                        "彩种",
+                        key
+                    )
+                )
+
+                print("======================")
+
+
+                if "error" in item:
+
+
+                    print(
+                        "错误:",
+                        item["error"]
+                    )
+
+                    continue
+
+
+
+                p=item["预测"]
+
+
+
+                state=p.get(
+                    "市场状态",
+                    {}
+                )
+
+
+                print(
+                    "市场状态:",
+                    state.get(
+                        "状态",
+                        ""
+                    )
+                )
+
+
+                print(
+                    "特码10码:",
+                    p.get(
+                        "特码10码"
+                    )
+                )
+
+
+                print(
+                    "重点3码:",
+                    p.get(
+                        "重点3码"
+                    )
+                )
+
+
+                print(
+                    "第一推荐:",
+                    p.get(
+                        "第一推荐"
+                    )
+                )
+
+
+                print(
+                    "评分:",
+                    p.get(
+                        "评分",
+                        {}
+                    )
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "读取预测失败:",
+                e
+            )
+
+            raise
+
+
+
+        PY
+
+
+
+
+    # =========================
+    # 保存结果
+    # =========================
+
+    - name: 上传预测结果
+
 
       uses: actions/upload-artifact@v4
 
+
       with:
 
-        name: 六合AI运行结果
 
-        path: |
+        name: 六合AI预测结果
 
-          output/
 
-          cache/
+        path:
 
-          *.db
 
-        if-no-files-found: ignore
+          output/prediction.json
+
+
+        retention-days: 30
