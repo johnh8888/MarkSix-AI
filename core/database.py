@@ -1,20 +1,20 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 database.py
 
-SQLite数据库模块
+数据库管理模块
 
 
-功能:
+功能：
 
-1. 初始化数据库
-2. 创建表
-3. 保存开奖
-4. 查询历史
-5. 查询最新数据
+1. SQLite初始化
+2. 保存开奖数据
+3. 查询历史数据
+4. 保存模型权重
+5. 保存预测记录
 
 
 """
@@ -22,28 +22,16 @@ SQLite数据库模块
 
 import sqlite3
 
+import json
+
 import os
 
 from datetime import datetime
 
 
-
-
-
-# =====================================================
-# 数据目录
-# =====================================================
-
-
-DATA_DIR = "data"
-
-
-os.makedirs(
-
-    DATA_DIR,
-
-    exist_ok=True
-
+from .config import (
+    数据目录,
+    模型文件
 )
 
 
@@ -51,49 +39,17 @@ os.makedirs(
 
 
 # =====================================================
-# 彩种数据库
+# 数据库路径
 # =====================================================
 
 
-DB_FILES = {
+数据库文件 = os.path.join(
 
+    数据目录,
 
-    "hk":
+    "marksix_v5.db"
 
-    os.path.join(
-
-        DATA_DIR,
-
-        "hk.db"
-
-    ),
-
-
-
-    "newMacau":
-
-    os.path.join(
-
-        DATA_DIR,
-
-        "newMacau.db"
-
-    ),
-
-
-
-    "oldMacau":
-
-    os.path.join(
-
-        DATA_DIR,
-
-        "oldMacau.db"
-
-    )
-
-}
-
+)
 
 
 
@@ -104,119 +60,136 @@ DB_FILES = {
 # =====================================================
 
 
-def get_connection(code):
+def 获取连接():
 
+    return sqlite3.connect(
 
-    if code not in DB_FILES:
-
-
-        raise ValueError(
-
-            f"未知彩种:{code}"
-
-        )
-
-
-
-    conn=sqlite3.connect(
-
-        DB_FILES[code]
+        数据库文件
 
     )
-
-
-    conn.row_factory=sqlite3.Row
-
-
-
-    return conn
 
 
 
 
 
 # =====================================================
-# 初始化单数据库
-# =====================================================
-
-
-def init_single_database(code):
-
-
-    conn=get_connection(
-
-        code
-
-    )
-
-
-    cur=conn.cursor()
-
-
-
-    cur.execute(
-
-        """
-
-        CREATE TABLE IF NOT EXISTS draws
-
-        (
-
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-
-            issue TEXT UNIQUE,
-
-
-            numbers TEXT,
-
-
-            open_time TEXT,
-
-
-            source TEXT,
-
-
-            create_time TEXT
-
-        )
-
-        """
-
-    )
-
-
-
-    conn.commit()
-
-
-    conn.close()
-
-
-
-
-
-# =====================================================
-# 初始化全部数据库
+# 初始化数据库
 # =====================================================
 
 
 def init_database():
 
 
-    for code in DB_FILES:
+    conn = 获取连接()
+
+    cursor = conn.cursor()
 
 
-        init_single_database(
 
-            code
+    # 开奖历史表
+
+
+    cursor.execute(
+
+        """
+
+        CREATE TABLE IF NOT EXISTS 开奖历史 (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            彩种 TEXT,
+
+            期号 TEXT,
+
+            开奖号码 TEXT,
+
+            生肖 TEXT,
+
+            波色 TEXT,
+
+            开奖时间 TEXT,
+
+            创建时间 TEXT
 
         )
+
+        """
+
+    )
+
+
+
+
+
+    # 模型权重表
+
+
+    cursor.execute(
+
+        """
+
+        CREATE TABLE IF NOT EXISTS 模型权重 (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            模型 TEXT UNIQUE,
+
+            权重 REAL,
+
+            命中率 REAL,
+
+            更新时间 TEXT
+
+        )
+
+        """
+
+    )
+
+
+
+
+
+    # 预测记录表
+
+
+    cursor.execute(
+
+        """
+
+        CREATE TABLE IF NOT EXISTS 预测记录 (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            彩种 TEXT,
+
+            推荐号码 TEXT,
+
+            推荐生肖 TEXT,
+
+            推荐波色 TEXT,
+
+            预测时间 TEXT
+
+        )
+
+        """
+
+    )
+
+
+
+
+
+    conn.commit()
+
+    conn.close()
+
 
 
     print(
 
-        "数据库初始化完成"
+        "✅ 数据库初始化完成"
 
     )
 
@@ -225,232 +198,273 @@ def init_database():
 
 
 # =====================================================
-# 保存开奖
-# =====================================================
-
-
-def save_draw(
-
-        code,
-
-        draw
-
-):
-
-
-    conn=get_connection(
-
-        code
-
-    )
-
-
-    cur=conn.cursor()
-
-
-
-    numbers=" ".join(
-
-        str(x)
-
-        for x in draw.get(
-
-            "numbers",
-
-            []
-
-        )
-
-    )
-
-
-
-    try:
-
-
-        cur.execute(
-
-            """
-
-            INSERT INTO draws
-
-            (
-
-            issue,
-
-            numbers,
-
-            open_time,
-
-            source,
-
-            create_time
-
-            )
-
-            VALUES
-
-            (?,?,?,?,?)
-
-            """,
-
-            (
-
-            draw.get(
-
-                "issue"
-
-            ),
-
-
-            numbers,
-
-
-            draw.get(
-
-                "open_time",
-
-                ""
-
-            ),
-
-
-            draw.get(
-
-                "source",
-
-                ""
-
-            ),
-
-
-            datetime.now().isoformat()
-
-            )
-
-        )
-
-
-        conn.commit()
-
-
-        result=True
-
-
-
-    except sqlite3.IntegrityError:
-
-
-        result=False
-
-
-
-    finally:
-
-
-        conn.close()
-
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 批量保存
+# 保存历史开奖
 # =====================================================
 
 
 def save_history(
 
-        code,
+        彩种,
 
-        rows
+        数据列表
 
 ):
 
 
-    count=0
+    conn = 获取连接()
+
+    cursor = conn.cursor()
 
 
 
-    for row in rows:
-
-
-        if save_draw(
-
-            code,
-
-            row
-
-        ):
-
-
-            count+=1
+    新增 = 0
 
 
 
-    return count
+    for 数据 in 数据列表:
+
+
+        期号 = str(
+
+            数据.get(
+
+                "期号",
+
+                数据.get(
+
+                    "expect",
+
+                    ""
+
+                )
+
+            )
+
+        )
+
+
+
+        cursor.execute(
+
+            """
+
+            SELECT id
+
+            FROM 开奖历史
+
+            WHERE 彩种=? AND 期号=?
+
+            """,
+
+            (
+
+                彩种,
+
+                期号
+
+            )
+
+        )
+
+
+        已存在 = cursor.fetchone()
+
+
+
+        if 已存在:
+
+
+            continue
+
+
+
+
+
+        号码 = 数据.get(
+
+            "号码",
+
+            数据.get(
+
+                "numbers",
+
+                []
+
+            )
+
+        )
+
+
+
+        生肖 = 数据.get(
+
+            "生肖",
+
+            []
+
+        )
+
+
+
+        波色 = 数据.get(
+
+            "波色",
+
+            []
+
+        )
+
+
+
+        时间 = 数据.get(
+
+            "开奖时间",
+
+            ""
+
+        )
+
+
+
+        cursor.execute(
+
+            """
+
+            INSERT INTO 开奖历史
+
+            (
+
+            彩种,
+
+            期号,
+
+            开奖号码,
+
+            生肖,
+
+            波色,
+
+            开奖时间,
+
+            创建时间
+
+            )
+
+            VALUES (?,?,?,?,?,?,?)
+
+            """,
+
+            (
+
+                彩种,
+
+                期号,
+
+                json.dumps(
+
+                    号码,
+
+                    ensure_ascii=False
+
+                ),
+
+                json.dumps(
+
+                    生肖,
+
+                    ensure_ascii=False
+
+                ),
+
+                json.dumps(
+
+                    波色,
+
+                    ensure_ascii=False
+
+                ),
+
+                时间,
+
+                datetime.now().isoformat()
+
+            )
+
+        )
+
+
+
+        新增 += 1
+
+
+
+
+
+    conn.commit()
+
+    conn.close()
+
+
+
+    return 新增
 
 
 
 
 
 # =====================================================
-# 加载历史
+# 读取历史数据
 # =====================================================
 
 
 def load_history(
 
-        code,
-
-        limit=None
+        彩种
 
 ):
 
 
-    conn=get_connection(
+    conn = 获取连接()
 
-        code
+    cursor = conn.cursor()
+
+
+
+    cursor.execute(
+
+        """
+
+        SELECT
+
+        期号,
+
+        开奖号码,
+
+        生肖,
+
+        波色,
+
+        开奖时间
+
+        FROM 开奖历史
+
+        WHERE 彩种=?
+
+        ORDER BY id ASC
+
+        """,
+
+        (
+
+            彩种,
+
+        )
 
     )
 
 
-    cur=conn.cursor()
 
-
-
-    sql="""
-
-    SELECT *
-
-    FROM draws
-
-    ORDER BY id DESC
-
-    """
-
-
-
-    if limit:
-
-
-        sql += f"""
-
-        LIMIT {int(limit)}
-
-        """
-
-
-
-    rows=cur.execute(
-
-        sql
-
-    ).fetchall()
+    rows = cursor.fetchall()
 
 
 
@@ -469,25 +483,41 @@ def load_history(
 
             {
 
-            "issue":
+                "期号":
 
-            row["issue"],
-
-
-            "numbers":
-
-            [
-
-            int(x)
-
-            for x in row["numbers"].split()
-
-            ],
+                row[0],
 
 
-            "open_time":
+                "号码":
 
-            row["open_time"]
+                json.loads(
+
+                    row[1]
+
+                ),
+
+
+                "生肖":
+
+                json.loads(
+
+                    row[2]
+
+                ),
+
+
+                "波色":
+
+                json.loads(
+
+                    row[3]
+
+                ),
+
+
+                "开奖时间":
+
+                row[4]
 
             }
 
@@ -502,99 +532,237 @@ def load_history(
 
 
 # =====================================================
-# 获取最新一期
+# 保存模型权重
 # =====================================================
 
 
-def get_latest(code):
+def save_model_weight(
+
+        模型,
+
+        权重,
+
+        命中率
+
+):
 
 
-    data=load_history(
+    conn = 获取连接()
 
-        code,
+    cursor = conn.cursor()
 
-        1
+
+
+    cursor.execute(
+
+        """
+
+        INSERT INTO 模型权重
+
+        (
+
+        模型,
+
+        权重,
+
+        命中率,
+
+        更新时间
+
+        )
+
+        VALUES (?,?,?,?)
+
+        ON CONFLICT(模型)
+
+        DO UPDATE SET
+
+        权重=excluded.权重,
+
+        命中率=excluded.命中率,
+
+        更新时间=excluded.更新时间
+
+        """,
+
+        (
+
+            模型,
+
+            权重,
+
+            命中率,
+
+            datetime.now().isoformat()
+
+        )
 
     )
 
 
-    if data:
 
+    conn.commit()
 
-        return data[0]
-
-
-    return None
+    conn.close()
 
 
 
 
 
 # =====================================================
-# 数据数量
+# 获取模型权重
 # =====================================================
 
 
-def count_draws(code):
+def get_model_weights():
 
 
-    conn=get_connection(
+    conn = 获取连接()
 
-        code
+    cursor = conn.cursor()
+
+
+
+    cursor.execute(
+
+        """
+
+        SELECT
+
+        模型,
+
+        权重
+
+        FROM 模型权重
+
+        """
 
     )
 
 
-    cur=conn.cursor()
-
-
-
-    row=cur.execute(
-
-        """
-
-        SELECT COUNT(*)
-
-        FROM draws
-
-        """
-
-    ).fetchone()
-
+    rows = cursor.fetchall()
 
 
     conn.close()
 
 
 
-    return row[0]
+    return {
+
+
+        r[0]:
+
+        r[1]
+
+        for r in rows
+
+    }
 
 
 
 
 
 # =====================================================
-# 删除数据库
+# 保存预测
 # =====================================================
 
 
-def clear_database(code):
+def save_prediction(
+
+        数据
+
+):
 
 
-    conn=get_connection(
+    conn = 获取连接()
 
-        code
-
-    )
-
-
-    cur=conn.cursor()
+    cursor = conn.cursor()
 
 
 
-    cur.execute(
+    cursor.execute(
 
-        "DELETE FROM draws"
+        """
+
+        INSERT INTO 预测记录
+
+        (
+
+        彩种,
+
+        推荐号码,
+
+        推荐生肖,
+
+        推荐波色,
+
+        预测时间
+
+        )
+
+        VALUES (?,?,?,?,?)
+
+        """,
+
+        (
+
+            数据.get(
+
+                "彩种",
+
+                ""
+
+            ),
+
+
+            json.dumps(
+
+                数据.get(
+
+                    "号码",
+
+                    []
+
+                ),
+
+                ensure_ascii=False
+
+            ),
+
+
+            json.dumps(
+
+                数据.get(
+
+                    "生肖",
+
+                    []
+
+                ),
+
+                ensure_ascii=False
+
+            ),
+
+
+            json.dumps(
+
+                数据.get(
+
+                    "波色",
+
+                    []
+
+                ),
+
+                ensure_ascii=False
+
+            ),
+
+
+            datetime.now().isoformat()
+
+        )
 
     )
 
@@ -613,73 +781,15 @@ def clear_database(code):
 # =====================================================
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
 
     init_database()
 
-
-
-    test={
-
-
-        "issue":
-
-        "2026090",
-
-
-        "numbers":
-
-        [
-
-        39,
-
-        41,
-
-        8,
-
-        9,
-
-        7,
-
-        14,
-
-        49
-
-        ],
-
-
-        "source":
-
-        "test"
-
-
-    }
-
-
-
     print(
 
-        save_draw(
+        "数据库位置:",
 
-            "hk",
-
-            test
-
-        )
-
-    )
-
-
-
-    print(
-
-        load_history(
-
-            "hk",
-
-            5
-
-        )
+        数据库文件
 
     )
