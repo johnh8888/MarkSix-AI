@@ -1,20 +1,19 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 wave_model.py
 
 波色智能模型
 
 
-功能:
+功能：
 
-1. 波色统计
-2. 波色概率
-3. 连波检测
-4. 反转检测
-5. 动态推荐
+1. 红蓝绿概率计算
+2. 波色趋势分析
+3. 连续波色检测
+4. 波色评分
 
 
 """
@@ -23,18 +22,43 @@ wave_model.py
 from collections import Counter
 
 
-from .features import get_wave
-
-
-
-
 
 # =====================================================
-# 波色列表
+# 波色号码表
 # =====================================================
 
 
-WAVES = [
+红波 = {
+
+    1,2,7,8,12,13,18,19,
+    23,24,29,30,34,35,
+    40,45,46
+
+}
+
+
+
+蓝波 = {
+
+    3,4,9,10,14,15,
+    20,25,26,31,36,
+    37,41,42,47,48
+
+}
+
+
+
+绿波 = {
+
+    5,6,11,16,17,21,
+    22,27,28,32,33,
+    38,39,43,44,49
+
+}
+
+
+
+波色列表 = [
 
     "红",
 
@@ -49,59 +73,52 @@ WAVES = [
 
 
 # =====================================================
-# 号码解析
+# 获取波色
 # =====================================================
 
 
-def parse_numbers(rows):
+def 获取波色(num):
 
 
-    result=[]
+    num=int(num)
 
 
-    for row in rows:
+    if num in 红波:
+
+        return "红"
 
 
-        nums=row.get(
+    if num in 蓝波:
 
-            "numbers",
-
-            ""
-
-        )
+        return "蓝"
 
 
-        if isinstance(nums,str):
+    if num in 绿波:
+
+        return "绿"
 
 
-            nums=nums.replace(
-
-                ",",
-
-                " "
-
-            ).split()
+    return "未知"
 
 
 
-        for n in nums:
 
 
-            try:
-
-                result.append(
-
-                    int(n)
-
-                )
-
-            except:
-
-                pass
+# =====================================================
+# 单期开奖波色
+# =====================================================
 
 
+def 开奖波色(numbers):
 
-    return result
+
+    return [
+
+        获取波色(x)
+
+        for x in numbers
+
+    ]
 
 
 
@@ -112,39 +129,88 @@ def parse_numbers(rows):
 # =====================================================
 
 
-def wave_frequency(numbers):
+def 波色统计(
+
+        历史数据
+
+):
 
 
-    counter=Counter()
-
-
-
-    for n in numbers:
-
-
-        counter[
-
-            get_wave(n)
-
-        ]+=1
+    统计=Counter()
 
 
 
-    total=sum(
+    for item in 历史数据:
 
-        counter.values()
+
+        numbers=item.get(
+
+            "号码",
+
+            []
+
+        )
+
+
+        for num in numbers:
+
+
+            统计[
+
+                获取波色(num)
+
+            ] +=1
+
+
+
+    return dict(
+
+        统计
 
     )
 
 
 
-    if total==0:
+
+
+# =====================================================
+# 波色概率
+# =====================================================
+
+
+def 波色概率(
+
+        历史数据
+
+):
+
+
+    统计=波色统计(
+
+        历史数据
+
+    )
+
+
+    总数=sum(
+
+        统计.values()
+
+    )
+
+
+
+    if 总数==0:
+
 
         return {
 
-            x:0
 
-            for x in WAVES
+            "红":0.33,
+
+            "蓝":0.33,
+
+            "绿":0.34
 
         }
 
@@ -153,17 +219,28 @@ def wave_frequency(numbers):
     return {
 
 
-        x:
+        色:
 
         round(
 
-            counter[x]/total,
+            统计.get(
+
+                色,
+
+                0
+
+            )
+
+            /
+
+            总数,
 
             4
 
         )
 
-        for x in WAVES
+
+        for 色 in 波色列表
 
     }
 
@@ -172,260 +249,98 @@ def wave_frequency(numbers):
 
 
 # =====================================================
-# 最近趋势
+# 最近波色趋势
 # =====================================================
 
 
-def recent_wave(numbers,window=20):
+def 最近波色趋势(
 
+        历史数据,
 
-    counter=Counter()
+        周期=20
 
+):
 
 
-    for n in numbers[:window]:
+    最近=历史数据[-周期:]
 
 
-        counter[
 
-            get_wave(n)
+    统计=Counter()
 
-        ]+=1
 
 
+    for item in 最近:
 
-    return counter.most_common()
 
+        numbers=item.get(
 
+            "号码",
 
-
-
-# =====================================================
-# 连续波检测
-# =====================================================
-
-
-def detect_same_wave(numbers):
-
-
-    if len(numbers)<3:
-
-        return False
-
-
-
-    waves=[
-
-        get_wave(n)
-
-        for n in numbers[:3]
-
-    ]
-
-
-
-    return len(set(waves))==1
-
-
-
-
-
-# =====================================================
-# 波色反转
-# =====================================================
-
-
-def detect_wave_reverse(numbers):
-
-
-    if len(numbers)<6:
-
-        return False
-
-
-
-    first=[
-
-        get_wave(n)
-
-        for n in numbers[:3]
-
-    ]
-
-
-
-    second=[
-
-        get_wave(n)
-
-        for n in numbers[3:6]
-
-    ]
-
-
-
-    return (
-
-        len(set(first))==1
-
-        and
-
-        len(set(second))==1
-
-        and
-
-        first[0]!=second[0]
-
-    )
-
-
-
-
-
-# =====================================================
-# 波色冷热
-# =====================================================
-
-
-def wave_hot_cold(numbers):
-
-
-    freq=wave_frequency(
-
-        numbers
-
-    )
-
-
-    hot=max(
-
-        freq,
-
-        key=freq.get
-
-    )
-
-
-    cold=min(
-
-        freq,
-
-        key=freq.get
-
-    )
-
-
-    return {
-
-
-        "hot":
-
-        hot,
-
-
-        "cold":
-
-        cold,
-
-
-        "probability":
-
-        freq
-
-    }
-
-
-
-
-
-# =====================================================
-# 动态波色评分
-# =====================================================
-
-
-def wave_score(numbers):
-
-
-    freq=wave_frequency(
-
-        numbers
-
-    )
-
-
-    score={}
-
-
-
-    for w in WAVES:
-
-
-        score[w]=freq[w]
-
-
-
-    # 连续增强
-
-    if detect_same_wave(numbers):
-
-
-        last=get_wave(
-
-            numbers[0]
+            []
 
         )
 
 
-        score[last]+=0.15
+
+        # 特码最后一个号码
+
+        if numbers:
+
+
+            特码=numbers[-1]
+
+
+            统计[
+
+                获取波色(
+
+                    特码
+
+                )
+
+            ]+=1
 
 
 
-    # 反转增强
+    总数=sum(
 
-    if detect_wave_reverse(numbers):
-
-
-        last=get_wave(
-
-            numbers[0]
-
-        )
-
-
-        score[last]-=0.05
-
-
-
-    total=sum(
-
-        max(v,0)
-
-        for v in score.values()
+        统计.values()
 
     )
 
 
 
-    if total==0:
+    if 总数==0:
 
-        return score
+        return {}
 
 
 
     return {
 
 
-        k:
+        色:
 
         round(
 
-            max(v,0)/total,
+            统计.get(
+
+                色,
+
+                0
+
+            )
+
+            /
+
+            总数,
 
             4
 
         )
 
-        for k,v in score.items()
+        for 色 in 波色列表
 
     }
 
@@ -434,23 +349,230 @@ def wave_score(numbers):
 
 
 # =====================================================
-# 推荐
+# 连续波色检测
 # =====================================================
 
 
-def predict_wave(numbers):
+def 检测连续波色(
+
+        历史数据
+
+):
 
 
-    score=wave_score(
+    if len(历史数据)<2:
 
-        numbers
+        return {
+
+
+            "状态":
+
+            "数据不足"
+
+        }
+
+
+
+    连续=0
+
+
+
+    上一次=None
+
+
+
+    for item in reversed(
+
+        历史数据
+
+    ):
+
+
+        numbers=item.get(
+
+            "号码",
+
+            []
+
+        )
+
+
+        if not numbers:
+
+            continue
+
+
+
+        当前=获取波色(
+
+            numbers[-1]
+
+        )
+
+
+
+        if 上一次 is None:
+
+
+            上一次=当前
+
+            连续=1
+
+
+        elif 当前==上一次:
+
+
+            连续+=1
+
+
+        else:
+
+
+            break
+
+
+
+    return {
+
+
+        "连续波色":
+
+        上一次,
+
+
+        "连续次数":
+
+        连续
+
+    }
+
+
+
+
+
+# =====================================================
+# 波色状态
+# =====================================================
+
+
+def 分析波色状态(
+
+        历史数据
+
+):
+
+
+    概率=波色概率(
+
+        历史数据
 
     )
 
 
-    ranking=sorted(
+    趋势=最近波色趋势(
 
-        score.items(),
+        历史数据
+
+    )
+
+
+    连续=检测连续波色(
+
+        历史数据
+
+    )
+
+
+
+    if 连续.get(
+
+        "连续次数",
+
+        0
+
+    )>=3:
+
+
+        状态="连续状态"
+
+
+
+    else:
+
+
+        状态="正常状态"
+
+
+
+
+
+    return {
+
+
+        "总体概率":
+
+        概率,
+
+
+        "近期趋势":
+
+        趋势,
+
+
+        "连续检测":
+
+        连续,
+
+
+        "市场状态":
+
+        状态
+
+    }
+
+
+
+
+
+# =====================================================
+# 波色评分
+# =====================================================
+
+
+def 波色评分(
+
+        历史数据
+
+):
+
+
+    概率=波色概率(
+
+        历史数据
+
+    )
+
+
+    评分={}
+
+
+
+    for 色,value in 概率.items():
+
+
+        评分[色]=round(
+
+            value,
+
+            4
+
+        )
+
+
+
+    return sorted(
+
+        评分.items(),
 
         key=lambda x:x[1],
 
@@ -459,46 +581,61 @@ def predict_wave(numbers):
     )
 
 
+
+
+
+# =====================================================
+# 推荐波色
+# =====================================================
+
+
+def 推荐波色(
+
+        历史数据
+
+):
+
+
+    排序=波色评分(
+
+        历史数据
+
+    )
+
+
+    单推=排序[0][0]
+
+
+    双推=[
+
+        x[0]
+
+        for x in 排序[:2]
+
+    ]
+
+
+
+    排除=排序[-1][0]
+
+
+
     return {
 
 
-        "单推":
+        "波色单推":
 
-        ranking[0][0],
-
-
-        "双推":
-
-        [
-
-            x[0]
-
-            for x in ranking[:2]
-
-        ],
+        单推,
 
 
-        "概率":
+        "波色双推":
 
-        score,
-
-
-        "连续":
-
-        detect_same_wave(
-
-            numbers
-
-        ),
+        双推,
 
 
-        "反转":
+        "波色排除":
 
-        detect_wave_reverse(
-
-            numbers
-
-        )
+        排除
 
     }
 
@@ -506,37 +643,11 @@ def predict_wave(numbers):
 
 
 
-# =====================================================
-# 测试
-# =====================================================
-
-
 if __name__=="__main__":
-
-
-    data=[
-
-        {
-
-        "numbers":
-
-        "39 41 08 09 07 14 49"
-
-        }
-
-    ]*20
-
-
-
-    nums=parse_numbers(
-
-        data
-
-    )
 
 
     print(
 
-        predict_wave(nums)
+        "V5波色模型启动"
 
     )
