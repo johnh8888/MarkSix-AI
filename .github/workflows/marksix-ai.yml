@@ -1,331 +1,73 @@
-# ==========================================================
-# 六合 AI 智能预测系统 V5.2 FINAL
-#
-# 自动流程：
-#
-# 定时启动
-#    ↓
-# 拉取代码
-#    ↓
-# 安装 Python
-#    ↓
-# 检查模块
-#    ↓
-# 初始化数据库
-#    ↓
-# API同步开奖数据
-#    ↓
-# AI预测
-#    ↓
-# Walk Forward回测
-#    ↓
-# 保存 prediction.json
-#    ↓
-# 自动提交结果
-#
-# ==========================================================
+name: 六合AI测试
 
-
-name: 六合AI智能预测系统 V5.2 FINAL
-
-
-# ==========================================================
-# 触发方式
-# ==========================================================
 
 on:
-
-  # 手动运行
   workflow_dispatch:
 
 
-  # 每小时运行一次
-  schedule:
-
-    - cron: "5 * * * *"
-
-
-
-# ==========================================================
-# 权限
-# ==========================================================
-
 permissions:
-
   contents: write
 
 
-
-# ==========================================================
-# 工作任务
-# ==========================================================
-
 jobs:
 
-
-  运行六合AI:
-
+  test:
 
     runs-on: ubuntu-latest
-
-
-    timeout-minutes: 15
-
 
 
     steps:
 
 
+    - name: 拉取代码
+      uses: actions/checkout@v4
 
-      # --------------------------------------------------
-      # 1. 获取代码
-      # --------------------------------------------------
 
-      - name: 获取项目代码
+    - name: Python环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-        uses: actions/checkout@v4
 
+    - name: 查看目录
+      run: |
 
+        pwd
 
+        ls
 
+        echo "------"
 
-      # --------------------------------------------------
-      # 2. Python环境
-      # --------------------------------------------------
+        find . -maxdepth 2 -type f
 
-      - name: 安装 Python 3.11
 
-        uses: actions/setup-python@v5
+    - name: 测试Python
+      env:
+        PYTHONPATH: ${{ github.workspace }}
 
-        with:
+      run: |
 
-          python-version: "3.11"
+        python - <<'PY'
 
+        import os
 
+        print("当前目录:")
+        print(os.getcwd())
 
 
+        import core
 
-      # --------------------------------------------------
-      # 3. Python语法检查
-      # --------------------------------------------------
+        print("core导入成功")
 
-      - name: Python语法检查
 
-        run: |
+        PY
 
-          python -m compileall -q .
 
+    - name: 运行系统
 
+      env:
+        PYTHONPATH: ${{ github.workspace }}
 
+      run:
 
-
-      # --------------------------------------------------
-      # 4. 核心模块检查
-      # --------------------------------------------------
-
-      - name: AI核心模块检查
-
-        env:
-
-          PYTHONPATH: ${{ github.workspace }}
-
-
-        run: |
-
-
-          python - <<'PY'
-
-
-          import importlib
-
-
-
-          模块列表 = [
-
-
-              "core.config",
-
-
-              "core.sqlite_manager",
-
-
-              "core.api_sync",
-
-
-              "core.data_quality",
-
-
-              "core.features",
-
-
-              "core.strategies",
-
-
-              "core.state",
-
-
-              "core.state_engine",
-
-
-              "core.wave_model",
-
-
-              "core.zodiac_model",
-
-
-              "core.predictor",
-
-
-              "core.backtest",
-
-
-              "core.engine"
-
-
-          ]
-
-
-
-          print("="*60)
-
-          print("开始检查AI模块")
-
-          print("="*60)
-
-
-
-          for 模块 in 模块列表:
-
-
-              importlib.import_module(模块)
-
-
-              print("✅",模块)
-
-
-
-          print()
-
-          print("检查数据库接口")
-
-
-
-          from core.sqlite_manager import init_database
-
-
-
-          init_database()
-
-
-
-          print("✅ SQLite数据库正常")
-
-
-
-          print("="*60)
-
-          print("全部模块检查通过")
-
-          print("="*60)
-
-
-
-          PY
-
-
-
-
-
-      # --------------------------------------------------
-      # 5. 运行AI系统
-      # --------------------------------------------------
-
-      - name: 启动六合AI预测系统
-
-
-        env:
-
-          PYTHONPATH: ${{ github.workspace }}
-
-
-        run:
-
-
-          python -u main.py
-
-
-
-
-
-
-      # --------------------------------------------------
-      # 6. 查看输出
-      # --------------------------------------------------
-
-      - name: 查看预测结果
-
-
-        if: always()
-
-
-        run: |
-
-
-          echo "========== 输出文件 =========="
-
-
-          find output -maxdepth 2 -type f -print || true
-
-
-          echo "============================="
-
-
-
-
-
-
-      # --------------------------------------------------
-      # 7. 保存结果
-      # --------------------------------------------------
-
-      - name: 提交预测结果
-
-
-        if: success()
-
-
-        run: |
-
-
-
-          git config user.name "github-actions[bot]"
-
-
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-
-
-          git add output/*.json *.db core/*.db 2>/dev/null || true
-
-
-
-          if git diff --cached --quiet;
-
-
-          then
-
-
-              echo "没有新的预测结果"
-
-
-          else
-
-
-              git commit -m "更新六合AI预测结果"
-
-
-              git push
-
-
-
-          fi
+        python -u main.py
