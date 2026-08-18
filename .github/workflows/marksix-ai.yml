@@ -1,9 +1,10 @@
-name: 六合AI智能预测系统 FINAL
+name: 六合AI智能预测 FINAL
 
 
 on:
 
   workflow_dispatch:
+
 
 
 permissions:
@@ -21,12 +22,10 @@ jobs:
     runs-on: ubuntu-latest
 
 
+
     steps:
 
 
-    # =========================
-    # 拉取代码
-    # =========================
 
     - name: 拉取代码
 
@@ -34,9 +33,6 @@ jobs:
 
 
 
-    # =========================
-    # Python环境
-    # =========================
 
     - name: Python环境
 
@@ -46,23 +42,12 @@ jobs:
 
         python-version: "3.11"
 
-        cache: pip
 
 
 
-    # =========================
-    # 中文环境
-    # =========================
-
-    - name: 设置中文环境
+    - name: 中文环境
 
       run: |
-
-
-        sudo apt-get update
-
-
-        sudo apt-get install -y language-pack-zh-hans
 
 
         echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
@@ -74,9 +59,6 @@ jobs:
 
 
 
-    # =========================
-    # 安装依赖
-    # =========================
 
     - name: 安装依赖
 
@@ -86,7 +68,9 @@ jobs:
         python -m pip install --upgrade pip
 
 
-        if [ -f requirements.txt ]; then
+        if [ -f requirements.txt ];
+
+        then
 
           pip install -r requirements.txt
 
@@ -95,113 +79,18 @@ jobs:
 
 
 
-    # =========================
-    # 查看项目
-    # =========================
 
-    - name: 检查项目结构
-
-      run: |
-
-
-        echo "======================"
-
-        echo "项目目录"
-
-        echo "======================"
-
-
-        pwd
-
-
-        find . -maxdepth 3 -type f | sort
-
-
-
-
-    # =========================
-    # Python导入测试
-    # =========================
-
-    - name: Python模块测试
+    - name: 运行系统
 
 
       env:
 
         PYTHONPATH: ${{ github.workspace }}
-
-
-      run: |
-
-
-        python - <<'PY'
-
-
-        import sys
-
-        import os
-
-
-        print("======================")
-
-        print("Python版本")
-
-        print(sys.version)
-
-
-        print("======================")
-
-
-        print(
-            "工作目录:",
-            os.getcwd()
-        )
-
-
-        try:
-
-            import core
-
-            print(
-                "✅ core模块正常"
-            )
-
-        except Exception as e:
-
-            print(
-                "❌ core错误:",
-                e
-            )
-
-            raise
-
-
-        PY
-
-
-
-
-
-    # =========================
-    # 运行系统
-    # =========================
-
-    - name: 运行六合AI系统
-
-
-      env:
-
-        PYTHONPATH: ${{ github.workspace }}
-
-        LANG: zh_CN.UTF-8
-
-        LC_ALL: zh_CN.UTF-8
 
         PYTHONIOENCODING: utf-8
 
 
-
-      run: |
+      run:
 
 
         python -u main.py
@@ -209,16 +98,8 @@ jobs:
 
 
 
-    # =========================
-    # 中文最终预测显示
-    # =========================
 
-    - name: 显示最终预测结果
-
-
-      env:
-
-        PYTHONIOENCODING: utf-8
+    - name: 中文最终预测
 
 
       run: |
@@ -237,116 +118,98 @@ jobs:
         import json
 
 
-        path="output/prediction.json"
+
+        with open(
+
+            "output/prediction.json",
+
+            encoding="utf-8"
+
+        ) as f:
 
 
-        try:
-
-
-            with open(
-
-                path,
-
-                encoding="utf-8"
-
-            ) as f:
-
-
-                data=json.load(f)
+            data=json.load(f)
 
 
 
-            for key,item in data["lotteries"].items():
+
+        for k,v in data["lotteries"].items():
 
 
-                print()
+            print()
 
-                print("======================")
+            print("======================")
 
-                print(
-                    item.get(
-                        "彩种",
-                        key
-                    )
+            print(
+
+                v.get(
+
+                    "彩种",
+
+                    k
+
                 )
 
-                print("======================")
+            )
+
+            print("======================")
 
 
-                if "error" in item:
+            if "error" in v:
 
+                print(v["error"])
 
-                    print(
-                        "错误:",
-                        item["error"]
-                    )
+                continue
 
-                    continue
-
-
-
-                p=item["预测"]
-
-
-
-                state=p.get(
-                    "市场状态",
-                    {}
-                )
-
-
-                print(
-                    "市场状态:",
-                    state.get(
-                        "状态",
-                        ""
-                    )
-                )
-
-
-                print(
-                    "特码10码:",
-                    p.get(
-                        "特码10码"
-                    )
-                )
-
-
-                print(
-                    "重点3码:",
-                    p.get(
-                        "重点3码"
-                    )
-                )
-
-
-                print(
-                    "第一推荐:",
-                    p.get(
-                        "第一推荐"
-                    )
-                )
-
-
-                print(
-                    "评分:",
-                    p.get(
-                        "评分",
-                        {}
-                    )
-                )
-
-
-
-        except Exception as e:
 
 
             print(
-                "读取预测失败:",
-                e
+
+                "状态:",
+
+                v["状态"]["名称"]
+
             )
 
-            raise
+
+
+            print(
+
+                "特码10码:",
+
+                v["预测"]["特码10码"]
+
+            )
+
+
+
+            print(
+
+                "重点3码:",
+
+                v["预测"]["重点3码"]
+
+            )
+
+
+
+            print(
+
+                "第一推荐:",
+
+                v["预测"]["第一推荐"]
+
+            )
+
+
+
+            print(
+
+                "属性:",
+
+                v["属性"]
+
+            )
 
 
 
@@ -355,11 +218,7 @@ jobs:
 
 
 
-    # =========================
-    # 保存结果
-    # =========================
-
-    - name: 上传预测结果
+    - name: 保存预测文件
 
 
       uses: actions/upload-artifact@v4
@@ -373,8 +232,4 @@ jobs:
 
         path:
 
-
           output/prediction.json
-
-
-        retention-days: 30
