@@ -1,46 +1,51 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-hmm_model.py
-
-隐马尔可夫模型状态识别
+core/hmm_model.py
 
 
-功能:
+隐藏状态模型
 
-1. 隐藏市场状态识别
-2. 状态概率计算
-3. 下一状态预测
-4. 与state_engine联动
 
+功能：
+
+1. 热态识别
+2. 冷态识别
+3. 平衡状态
+4. 混沌检测
+5. 输出状态概率
+
+
+无第三方依赖
 
 """
 
 
-import math
+from __future__ import annotations
+
 
 from collections import Counter
 
+import math
+
+
+from typing import Dict, List
 
 
 
 
-# =====================================================
-# 状态定义
-# =====================================================
 
+STATES = [
 
-HMM_STATES=[
+    "hot",
 
-    "热态",
+    "cold",
 
-    "冷态",
+    "balance",
 
-    "平衡",
-
-    "混沌"
+    "chaos"
 
 ]
 
@@ -48,240 +53,163 @@ HMM_STATES=[
 
 
 
-# =====================================================
-# 初始化
-# =====================================================
-
-
-def 初始化HMM():
-
-
-    return {
-
-
-        "状态概率":{
-
-
-            state:0.25
-
-            for state in HMM_STATES
-
-        },
-
-
-        "转移":{
-
-
-            state:{
-
-                s:0.25
-
-                for s in HMM_STATES
-
-            }
-
-            for state in HMM_STATES
-
-        }
-
-    }
-
-
-
 
 
 # =====================================================
-# 熵计算
+# 熵
 # =====================================================
 
 
-def 计算熵(
-
-        序列
-
-):
+def entropy(values):
 
 
-    if not 序列:
-
+    if not values:
 
         return 0
 
 
 
-    counter=Counter(
-
-        序列
-
-    )
+    counter=Counter(values)
 
 
+    total=len(values)
 
-    total=len(
 
-        序列
-
-    )
+    result=0.0
 
 
 
-    entropy=0
+    for c in counter.values():
 
 
-
-    for count in counter.values():
-
-
-        p=count/total
+        p=c/total
 
 
-        entropy-=p*math.log(
+        result-=p*math.log(
 
-            p+1e-9
+            p,
+
+            2
 
         )
 
 
 
-    return round(
+    return result
 
-        entropy,
 
-        4
-
-    )
 
 
 
 
 
 # =====================================================
-# 特征判断状态
+# 状态模型
 # =====================================================
 
 
-def 判断状态(
+class StableHMM:
 
-        历史状态
 
-):
 
+    def __init__(self):
 
-    if len(历史状态)<5:
 
+        self.states=STATES
 
-        return "平衡"
 
 
+        self.state_probability={
 
+            s:
 
+            0.25
 
-    最近=历史状态[-5:]
+            for s in STATES
 
+        }
 
 
-    counter=Counter(
 
-        最近
 
-    )
 
 
 
-    最大次数=max(
 
-        counter.values()
+    # ------------------------------------
+    # 状态判断
+    # ------------------------------------
 
-    )
 
+    def analyze(
 
+            self,
 
-    entropy=计算熵(
-
-        最近
-
-    )
-
-
-
-
-
-    # 连续集中
-
-
-    if 最大次数>=4:
-
-
-        return "热态"
-
-
-
-
-
-    # 熵高
-
-
-    if entropy>1.5:
-
-
-        return "混沌"
-
-
-
-
-
-    # 长期少出现
-
-
-    if 最大次数<=1:
-
-
-        return "冷态"
-
-
-
-
-
-    return "平衡"
-
-
-
-
-
-# =====================================================
-# 训练HMM
-# =====================================================
-
-
-def 训练HMM(
-
-        历史状态
-
-):
-
-
-    hmm=初始化HMM()
-
-
-
-    状态序列=[]
-
-
-
-    for i in range(
-
-        len(历史状态)
+            history:List[int]
 
     ):
 
 
-        状态序列.append(
 
-            判断状态(
+        if len(history)<10:
 
-                历史状态[:i+1]
 
-            )
+            return {
+
+
+                "state":
+
+                "balance",
+
+
+                "probability":
+
+                self.state_probability
+
+            }
+
+
+
+
+
+
+        recent=history[:12]
+
+
+        medium=history[:36]
+
+
+
+
+
+        recent_count=Counter(
+            recent
+        )
+
+
+        medium_count=Counter(
+            medium
+        )
+
+
+
+
+
+        recent_max=max(
+
+            recent_count.values()
+
+        )
+
+
+
+        concentration=(
+
+            recent_max
+
+            /
+
+            len(recent)
 
         )
 
@@ -289,53 +217,102 @@ def 训练HMM(
 
 
 
-    # 统计状态转移
 
 
-    for i in range(
-
-        len(状态序列)-1
-
-    ):
+        h_recent=entropy(
+            recent
+        )
 
 
-        当前=状态序列[i]
-
-
-        下一个=状态序列[i+1]
-
-
-
-        hmm["转移"][当前][下一个]+=1
-
-
-
-
-
-    # 归一化
-
-
-    for state,data in hmm["转移"].items():
-
-
-
-        total=sum(
-
-            data.values()
-
+        h_medium=entropy(
+            medium
         )
 
 
 
-        if total:
+        gap=h_medium-h_recent
 
 
-            for k in data:
 
 
-                data[k]=round(
 
-                    data[k]/total,
+
+
+        # 热态
+
+        if concentration>=0.25:
+
+
+
+            state="hot"
+
+
+
+        # 冷态
+
+        elif gap>0.6:
+
+
+
+            state="cold"
+
+
+
+
+        # 混沌
+
+        elif h_recent>3.3:
+
+
+
+            state="chaos"
+
+
+
+        else:
+
+
+            state="balance"
+
+
+
+
+
+
+
+        probability={
+
+            s:0.05
+
+            for s in STATES
+
+        }
+
+
+
+        probability[state]=0.85
+
+
+
+        remain=(
+
+            1 -
+
+            probability[state]
+
+        )/3
+
+
+
+        for s in STATES:
+
+
+            if s!=state:
+
+
+                probability[s]=round(
+
+                    remain,
 
                     4
 
@@ -343,50 +320,42 @@ def 训练HMM(
 
 
 
-    return hmm
-
-
-
-
-
-# =====================================================
-# 当前状态预测
-# =====================================================
-
-
-def 预测状态(
-
-        hmm,
-
-        当前状态
-
-):
-
-
-    转移=hmm["转移"].get(
-
-        当前状态,
-
-        {}
-
-    )
-
-
-
-    if not 转移:
 
 
         return {
 
 
-            "状态":
+            "state":
 
-            "平衡",
+            state,
 
 
-            "概率":
+            "probability":
 
-            0.25
+            probability,
+
+
+            "entropy_recent":
+
+            round(
+
+                h_recent,
+
+                4
+
+            ),
+
+
+            "entropy_medium":
+
+            round(
+
+                h_medium,
+
+                4
+
+            )
+
 
         }
 
@@ -394,129 +363,239 @@ def 预测状态(
 
 
 
-    状态=max(
-
-        转移,
-
-        key=转移.get
-
-    )
 
 
-
-    return {
-
-
-        "状态":
-
-        状态,
+    # ------------------------------------
+    # 训练接口
+    # ------------------------------------
 
 
-        "概率":
+    def fit(
 
-        转移[状态]
+            self,
 
-    }
+            history
 
-
-
-
-
-# =====================================================
-# HMM综合分析
-# =====================================================
+    ):
 
 
-def hmm分析(
+        result=self.analyze(
 
-        历史数据
-
-):
-
-
-    状态序列=[]
-
-
-
-    for item in 历史数据:
-
-
-        nums=item.get(
-
-            "号码",
-
-            []
+            history
 
         )
 
 
-        if nums:
+        self.state_probability=result[
+
+            "probability"
+
+        ]
 
 
-            状态序列.append(
-
-                nums[0]
-
-            )
+        return result
 
 
 
 
 
-    hmm=训练HMM(
+    # ------------------------------------
+    # 预测状态
+    # ------------------------------------
 
-        状态序列
+
+    def predict_next_state(
+
+            self,
+
+            history
+
+    ):
+
+
+        result=self.analyze(
+
+            history
+
+        )
+
+
+        return max(
+
+            result["probability"].items(),
+
+            key=lambda x:x[1]
+
+        )[0]
+
+
+
+
+
+
+
+
+# =====================================================
+# 外部接口
+# =====================================================
+
+
+def hmm_state(
+
+        history
+
+):
+
+
+    model=StableHMM()
+
+
+    return model.analyze(
+
+        history
 
     )
 
 
 
-    当前=判断状态(
-
-        状态序列
-
-    )
 
 
 
-    下一=预测状态(
 
-        hmm,
+def hmm_score(
 
-        当前
+        history
 
-    )
-
+)->Dict[int,float]:
 
 
-    return {
+    """
+    HMM输出号码状态评分
+
+    热态:
+    最近出现号码增加权重
+
+    冷态:
+    增加遗漏号码
+
+    混沌:
+    降低影响
 
 
-        "当前状态":
-
-        当前,
+    """
 
 
-        "预测状态":
 
-        下一,
+    scores={
 
+        n:0.5
 
-        "模型":
-
-        hmm
+        for n in range(1,50)
 
     }
 
 
 
 
+    if not history:
 
-if __name__=="__main__":
+
+        return scores
 
 
-    print(
 
-        "V5.1 HMM模块启动"
+
+
+    result=hmm_state(
+
+        history
 
     )
+
+
+    state=result["state"]
+
+
+
+
+
+
+    recent=history[:12]
+
+
+
+
+
+    if state=="hot":
+
+
+        for n in recent:
+
+
+            scores[n]+=0.3
+
+
+
+
+
+    elif state=="cold":
+
+
+
+        for n in scores:
+
+
+            if n not in recent:
+
+
+                scores[n]+=0.15
+
+
+
+
+
+
+    elif state=="chaos":
+
+
+
+        for n in scores:
+
+
+            scores[n]=0.5
+
+
+
+
+
+
+    else:
+
+
+
+        for n in recent:
+
+
+            scores[n]+=0.1
+
+
+
+
+
+    return scores
+
+
+
+
+
+
+
+__all__=[
+
+"StableHMM",
+
+"hmm_state",
+
+"hmm_score"
+
+]
