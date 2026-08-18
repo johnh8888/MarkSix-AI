@@ -1,40 +1,40 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-bayesian_engine.py
-
-贝叶斯动态融合引擎
+core/bayesian_engine.py
 
 
-功能:
+贝叶斯模型融合
 
-1. 模型可信度更新
-2. 贝叶斯权重
-3. 新旧数据衰减
-4. 多模型融合
-5. 输出号码概率
+
+功能：
+
+1. 多模型权重管理
+2. 在线更新模型可信度
+3. 防止单模型过拟合
+4. 输出融合权重
 
 
 """
 
 
-import math
+from __future__ import annotations
 
 
-from collections import defaultdict
+from typing import Dict
 
 
 
 
 
 # =====================================================
-# 贝叶斯参数
+# 默认先验
 # =====================================================
 
 
-默认先验={
+DEFAULT_MODELS = {
 
 
     "frequency":
@@ -47,12 +47,12 @@ from collections import defaultdict
     1.0,
 
 
-    "momentum":
+    "markov":
 
     1.0,
 
 
-    "omission":
+    "hmm":
 
     1.0,
 
@@ -64,16 +64,6 @@ from collections import defaultdict
 
     "zodiac":
 
-    1.0,
-
-
-    "size":
-
-    1.0,
-
-
-    "parity":
-
     1.0
 
 }
@@ -82,501 +72,301 @@ from collections import defaultdict
 
 
 
-# =====================================================
-# 初始化模型参数
-# =====================================================
-
-
-def 初始化贝叶斯():
-
-    return {
-
-
-        模型:{
-
-            "成功":
-
-            1,
-
-
-            "失败":
-
-            1,
-
-
-            "概率":
-
-            0.5
-
-        }
-
-
-        for 模型 in 默认先验
-
-    }
-
-
-
 
 
 # =====================================================
-# 更新模型结果
+# 贝叶斯权重模型
 # =====================================================
 
 
-def 更新模型(
-
-        参数,
-
-        模型,
-
-        成功
-
-):
+class BayesianEngine:
 
 
-    if 模型 not in 参数:
+
+    def __init__(
+
+            self,
+
+            models=None
+
+    ):
 
 
-        参数[模型]={
+        if models is None:
 
-            "成功":1,
+            models=DEFAULT_MODELS
 
-            "失败":1,
 
-            "概率":0.5
+
+        self.alpha={
+
+            k:2.0
+
+            for k in models
 
         }
 
 
 
-    if 成功:
+        self.beta={
 
+            k:2.0
 
-        参数[模型]["成功"]+=1
+            for k in models
 
-
-    else:
-
-
-        参数[模型]["失败"]+=1
+        }
 
 
 
 
 
-    成功次数=参数[模型]["成功"]
+
+    # --------------------------------
+    # 更新模型表现
+    # --------------------------------
 
 
-    失败次数=参数[模型]["失败"]
+    def update(
+
+            self,
+
+            model_name:str,
+
+            hit:bool
+
+    ):
 
 
 
-    参数[模型]["概率"]=round(
-
-        成功次数 /
-
-        (
-
-            成功次数
-
-            +
-
-            失败次数
-
-        ),
-
-        4
-
-    )
+        if model_name not in self.alpha:
 
 
-    return 参数
+            self.alpha[model_name]=2.0
+
+            self.beta[model_name]=2.0
 
 
 
 
-
-# =====================================================
-# 模型可信度
-# =====================================================
+        if hit:
 
 
-def 模型可信度(
-
-        参数
-
-):
+            self.alpha[model_name]+=1
 
 
-    结果={}
+        else:
+
+
+            self.beta[model_name]+=1
 
 
 
-    for 模型,data in 参数.items():
 
 
-        结果[模型]=data.get(
 
-            "概率",
+    # --------------------------------
+    # 获取模型概率
+    # --------------------------------
 
-            0.5
+
+    def get_probability(
+
+            self,
+
+            model_name:str
+
+    ):
+
+
+        a=self.alpha.get(
+
+            model_name,
+
+            2.0
 
         )
 
 
+        b=self.beta.get(
 
-    return 结果
+            model_name,
 
-
-
-
-
-# =====================================================
-# 贝叶斯融合权重
-# =====================================================
-
-
-def 计算融合权重(
-
-        参数
-
-):
-
-
-    可信度=模型可信度(
-
-        参数
-
-    )
-
-
-    权重={}
-
-
-
-    for 模型,概率 in 可信度.items():
-
-
-        # 防止极端化
-
-        权重[模型]=round(
-
-            0.2
-
-            +
-
-            概率*0.8,
-
-            4
+            2.0
 
         )
 
 
-
-    总=sum(
-
-        权重.values()
-
-    )
+        return a/(a+b)
 
 
 
-    return {
 
 
-        k:
 
-        round(
+    # --------------------------------
+    # 所有权重
+    # --------------------------------
 
-            v/总,
 
-            4
+    def weights(self):
 
+
+        result={}
+
+
+
+        for name in self.alpha:
+
+
+            result[name]=self.get_probability(
+                name
+            )
+
+
+
+        total=sum(
+            result.values()
         )
 
 
-        for k,v in 权重.items()
-
-    }
+        if total<=0:
 
 
+            return {
+
+                k:
+
+                1/len(result)
+
+                for k in result
+
+            }
 
 
 
-# =====================================================
-# 时间衰减
-# =====================================================
+        return {
+
+            k:
+
+            round(
+                v/total,
+                4
+            )
+
+            for k,v
+
+            in result.items()
+
+        }
 
 
-def 时间衰减(
-
-        天数,
-
-        衰减率=0.03
-
-):
-
-
-    return round(
-
-        math.exp(
-
-            -衰减率*天数
-
-        ),
-
-        4
-
-    )
 
 
 
 
 
 # =====================================================
-# 号码融合评分
+# 融合评分
 # =====================================================
 
 
-def 融合号码评分(
+def bayesian_fusion(
 
-        模型结果,
-
-        权重
+        predictions:Dict[str,Dict[int,float]]
 
 ):
 
 
     """
-    
-    模型结果格式:
+    输入：
 
     {
-      frequency:
-      {
-        1:0.3,
-        2:0.2
+      "frequency":{
+          1:0.5
       },
 
-      wave:
-      {
-        1:0.5
+      "trend":{
+          1:0.8
       }
-
     }
 
+
+    输出:
+
+    {
+       1:综合评分
+    }
 
     """
 
 
-    总评分=defaultdict(float)
+
+    if not predictions:
+
+
+        return {}
 
 
 
-    for 模型,号码数据 in 模型结果.items():
 
 
-        w=权重.get(
+    engine=BayesianEngine(
 
-            模型,
+        predictions.keys()
+
+    )
+
+
+
+    weights=engine.weights()
+
+
+
+    result={}
+
+
+
+    for model,scores in predictions.items():
+
+
+        w=weights.get(
+
+            model,
 
             0
 
         )
 
 
+        for num,value in scores.items():
 
-        for num,score in 号码数据.items():
 
+            result[num]=(
 
-            总评分[num]+=score*w
+                result.get(
+                    num,
+                    0
+                )
 
+                +
 
+                value*w
 
+            )
 
 
-    return dict(
 
-        sorted(
+    return result
 
-            总评分.items(),
 
-            key=lambda x:x[1],
 
-            reverse=True
 
-        )
 
-    )
 
+__all__=[
 
+"BayesianEngine",
 
+"bayesian_fusion"
 
-
-# =====================================================
-# 状态调整
-# =====================================================
-
-
-def 状态修正(
-
-        权重,
-
-        当前状态
-
-):
-
-
-    权重=权重.copy()
-
-
-
-    if 当前状态=="混沌":
-
-
-        for key in 权重:
-
-
-            if key in [
-
-                "frequency",
-
-                "trend"
-
-            ]:
-
-
-                权重[key]*=0.7
-
-
-
-
-
-    elif 当前状态=="连续":
-
-
-        if "wave" in 权重:
-
-
-            权重["wave"]*=1.2
-
-
-
-    elif 当前状态=="冷态":
-
-
-        if "omission" in 权重:
-
-
-            权重["omission"]*=1.2
-
-
-
-
-
-    总=sum(
-
-        权重.values()
-
-    )
-
-
-
-    return {
-
-
-        k:
-
-        round(
-
-            v/总,
-
-            4
-
-        )
-
-
-        for k,v in 权重.items()
-
-    }
-
-
-
-
-
-# =====================================================
-# V5最终入口
-# =====================================================
-
-
-def 贝叶斯预测融合(
-
-        模型结果,
-
-        参数,
-
-        当前状态="平衡"
-
-):
-
-
-    权重=计算融合权重(
-
-        参数
-
-    )
-
-
-
-    权重=状态修正(
-
-        权重,
-
-        当前状态
-
-    )
-
-
-
-    最终=融合号码评分(
-
-        模型结果,
-
-        权重
-
-    )
-
-
-
-    return {
-
-
-        "号码评分":
-
-        最终,
-
-
-        "模型权重":
-
-        权重,
-
-
-        "状态":
-
-        当前状态
-
-    }
-
-
-
-
-
-if __name__=="__main__":
-
-
-    print(
-
-        "V5贝叶斯引擎启动"
-
-    )
+]
