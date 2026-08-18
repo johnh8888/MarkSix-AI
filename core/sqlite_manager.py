@@ -5,67 +5,80 @@
 
 core/sqlite_manager.py
 
-SQLite统一管理
+SQLite数据库管理
 
-接口:
+功能：
 
-init_database()
-load_history()
-get_connection()
+1. 初始化数据库
+2. 保存开奖数据
+3. 读取历史数据
+4. 支持三彩种
 
 """
 
+
 from __future__ import annotations
+
 
 import sqlite3
 import json
+
 from pathlib import Path
-from typing import List, Dict, Any
+from datetime import datetime
+
+
+
 
 
 # =====================================================
 # 路径
 # =====================================================
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 
 DB_FILES = {
 
+
     "hk":
+
     BASE_DIR / "hk_macau.db",
 
 
+
     "newMacau":
+
     BASE_DIR / "new_macau.db",
 
 
+
     "oldMacau":
+
     BASE_DIR / "old_macau.db"
 
 }
 
 
 
+
+
 # =====================================================
-# 连接
+# 连接数据库
 # =====================================================
 
 
-def get_connection(key:str):
-
-    if key not in DB_FILES:
-
-        raise ValueError(
-            f"未知彩种:{key}"
-        )
+def connect_db(path):
 
 
-    conn=sqlite3.connect(
-        str(DB_FILES[key])
+    conn = sqlite3.connect(
+        str(path)
     )
 
-    conn.row_factory=sqlite3.Row
+
+    conn.row_factory = sqlite3.Row
+
 
     return conn
 
@@ -80,38 +93,47 @@ def get_connection(key:str):
 
 def init_database():
 
-    for key in DB_FILES:
+
+    for key,path in DB_FILES.items():
 
 
-        conn=get_connection(key)
+        conn=connect_db(path)
 
 
-        conn.execute("""
+        conn.execute(
+            """
 
-        CREATE TABLE IF NOT EXISTS draws(
+            CREATE TABLE IF NOT EXISTS draws(
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            issue_no TEXT UNIQUE,
 
-            draw_date TEXT,
+                issue TEXT UNIQUE,
 
-            numbers_json TEXT,
 
-            special INTEGER,
+                numbers TEXT,
 
-            source TEXT,
 
-            created_at TEXT
+                special INTEGER,
 
+
+                source TEXT,
+
+
+                created_at TEXT
+
+
+            )
+
+            """
         )
-
-        """)
 
 
         conn.commit()
 
+
         conn.close()
+
 
 
     return True
@@ -126,57 +148,121 @@ def init_database():
 
 
 def save_draw(
-    key:str,
-    issue_no:str,
-    date:str,
-    numbers:list,
-    special:int,
-    source="api"
+
+        lottery,
+
+        issue,
+
+        numbers,
+
+        special,
+
+        source="api"
+
 ):
 
 
-    conn=get_connection(key)
+    if lottery not in DB_FILES:
 
 
-    conn.execute(
-    """
+        print(
+            "未知彩种:",
+            lottery
+        )
 
-    INSERT OR REPLACE INTO draws
-
-    (
-    issue_no,
-    draw_date,
-    numbers_json,
-    special,
-    source,
-    created_at
-    )
-
-    VALUES(?,?,?,?,?,datetime('now'))
-
-    """,
-
-    (
-
-    str(issue_no),
-
-    date,
-
-    json.dumps(numbers),
-
-    int(special),
-
-    source
-
-    )
+        return False
 
 
-    )
 
 
-    conn.commit()
+    path=DB_FILES[lottery]
 
-    conn.close()
+
+    conn=connect_db(path)
+
+
+
+    try:
+
+
+        conn.execute(
+
+            """
+
+            INSERT OR REPLACE INTO draws
+
+            (
+
+            issue,
+
+            numbers,
+
+            special,
+
+            source,
+
+            created_at
+
+            )
+
+            VALUES(?,?,?,?,?)
+
+            """,
+
+            (
+
+                str(issue),
+
+
+                json.dumps(
+
+                    numbers,
+
+                    ensure_ascii=False
+
+                ),
+
+
+                int(special),
+
+
+                source,
+
+
+                datetime.now().isoformat()
+
+            )
+
+        )
+
+
+        conn.commit()
+
+
+
+        return True
+
+
+
+    except Exception as e:
+
+
+        print(
+            "保存失败:",
+            e
+        )
+
+
+        return False
+
+
+
+    finally:
+
+
+        conn.close()
+
+
 
 
 
@@ -188,32 +274,40 @@ def save_draw(
 # =====================================================
 
 
-def load_history(
-        key:str
-)->List[Dict[str,Any]]:
+def load_history(lottery):
 
 
-    conn=get_connection(key)
+    if lottery not in DB_FILES:
+
+
+        return []
+
+
+
+    conn=connect_db(
+        DB_FILES[lottery]
+    )
 
 
     rows=conn.execute(
-    """
 
-    SELECT *
+        """
 
-    FROM draws
+        SELECT *
 
-    ORDER BY id DESC
+        FROM draws
 
-    """
+        ORDER BY id DESC
+
+
+        """
+
     ).fetchall()
-
-
-    conn.close()
 
 
 
     result=[]
+
 
 
     for r in rows:
@@ -223,39 +317,53 @@ def load_history(
 
 
             numbers=json.loads(
-                r["numbers_json"]
+                r["numbers"]
             )
 
 
             result.append(
 
-            {
-
-            "issue":
-            r["issue_no"],
+                {
 
 
-            "date":
-            r["draw_date"],
+                "issue":
+
+                r["issue"],
 
 
-            "numbers":
-            numbers,
+
+                "numbers":
+
+                numbers,
 
 
-            "special":
-            int(r["special"])
+
+                "special":
+
+                int(
+                    r["special"]
+                ),
 
 
-            }
+
+                "source":
+
+                r["source"]
+
+
+                }
 
             )
 
 
-        except Exception:
+        except:
 
 
             continue
+
+
+
+    conn.close()
 
 
 
@@ -266,22 +374,81 @@ def load_history(
 
 
 # =====================================================
-# 兼容旧名称
+# 获取特码历史
 # =====================================================
 
 
-load_data=load_history
+def load_specials(lottery):
+
+
+    rows=load_history(
+        lottery
+    )
+
+
+    return [
+
+        x["special"]
+
+        for x in rows
+
+        if "special" in x
+
+    ]
+
+
+
+
+
+# =====================================================
+# 数据统计
+# =====================================================
+
+
+def database_info():
+
+
+    result={}
+
+
+
+    for key,path in DB_FILES.items():
+
+
+        conn=connect_db(path)
+
+
+        count=conn.execute(
+
+            "SELECT COUNT(*) FROM draws"
+
+        ).fetchone()[0]
+
+
+        conn.close()
+
+
+
+        result[key]=count
+
+
+
+    return result
+
+
 
 
 
 __all__=[
 
-"init_database",
+    "init_database",
 
-"load_history",
+    "save_draw",
 
-"save_draw",
+    "load_history",
 
-"get_connection"
+    "load_specials",
+
+    "database_info"
 
 ]
