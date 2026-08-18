@@ -1,207 +1,260 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合AI V10.0 FINAL
 
-main.py
-
-系统启动入口
-
+启动入口
 """
 
-
+import os
 import sys
-
-import traceback
-
-from datetime import datetime
+import json
 
 
+# UTF-8输出
 
-sys.path.append(".")
+os.environ["PYTHONIOENCODING"]="utf-8"
 
 
 
+from core.engine import run
 
 
-# =====================================================
-# 导入核心引擎
-# =====================================================
 
 
-try:
-
-    from core.engine import run
+def show_result():
 
 
-except Exception as e:
+    path="output/prediction.json"
+
+
+
+    if not os.path.exists(path):
+
+        print(
+            "没有找到预测文件"
+        )
+
+        return
+
+
+
+    with open(
+
+        path,
+
+        "r",
+
+        encoding="utf-8"
+
+    ) as f:
+
+        data=json.load(f)
+
 
 
     print()
 
+    print("="*50)
+
     print(
-        "核心模块加载失败"
+        "       六合AI最终预测 V10.0 FINAL"
     )
 
-
-    print(e)
-
-
-    traceback.print_exc()
-
-
-    sys.exit(1)
-
-
-
-
-
-
-# =====================================================
-# 欢迎界面
-# =====================================================
-
-
-def 显示标题():
-
-
-    print()
-
-
-    print("="*70)
+    print("="*50)
 
 
     print(
-        "          六合 AI 智能预测系统 V5.1"
+        "时间:",
+        data.get("time")
     )
 
 
-    print()
+
+    for key,item in data.get(
+        "lotteries",
+        {}
+    ).items():
 
 
-    print(
-        "  API真实数据 + SQLite数据库"
-    )
+        print()
+
+        print(
+            "="*50
+        )
 
 
-    print()
+        print(
+            item.get(
+                "彩种",
+                key
+            )
+        )
 
 
-    print(
-        "  HMM状态识别 + 马尔可夫链"
-    )
-
-
-    print()
-
-
-    print(
-        "  贝叶斯融合 + 在线学习"
-    )
-
-
-    print()
-
-
-    print(
-        "  防过拟合 Walk-Forward 回测"
-    )
-
-
-    print()
-
-
-    print(
-        datetime.now()
-    )
-
-
-    print("="*70)
+        print(
+            "="*50
+        )
 
 
 
+        if "error" in item:
+
+
+            print(
+                "错误:",
+                item["error"]
+            )
+
+            continue
 
 
 
-# =====================================================
-# 主程序
-# =====================================================
+        p=item.get(
+            "预测",
+            {}
+        )
 
 
-def main():
+        state=p.get(
+            "市场状态",
+            {}
+        )
+
+
+
+        print(
+
+            "市场状态:",
+
+            state.get(
+                "状态",
+                "未知"
+            )
+
+        )
+
+
+
+        print(
+
+            "特码10码:",
+
+            p.get(
+                "特码10码",
+                []
+            )
+
+        )
+
+
+
+        print(
+
+            "重点3码:",
+
+            p.get(
+                "重点3码",
+                []
+            )
+
+        )
+
+
+
+        print(
+
+            "第一推荐:",
+
+            p.get(
+                "第一推荐"
+            )
+
+        )
+
+
+
+        print(
+
+            "生肖5肖:",
+
+            p.get(
+                "生肖5肖",
+                []
+            )
+
+        )
+
+
+
+        attr=p.get(
+            "属性",
+            {}
+        )
+
+
+        print(
+            "波色:",
+            attr.get(
+                "波色",
+                ""
+            )
+        )
+
+
+        print(
+            "大小:",
+            attr.get(
+                "大小",
+                ""
+            )
+        )
+
+
+        print(
+            "单双:",
+            attr.get(
+                "单双",
+                ""
+            )
+        )
+
+
+
+        print(
+
+            "评分:",
+
+            p.get(
+                "评分",
+                {}
+            )
+
+        )
+
+
+
+
+if __name__=="__main__":
 
 
     try:
 
 
-        显示标题()
+        run()
 
 
-
-        print()
-
-
-        print(
-            "启动V5.1智能分析系统..."
-        )
-
-
-
-        结果=run()
-
-
-
-        print()
-
-
-        print("="*70)
-
-
-        print(
-            "系统运行完成"
-        )
-
-
-        print("="*70)
-
-
-
-        return 结果
-
-
+        show_result()
 
 
 
     except Exception as e:
 
 
-        print()
-
-
         print(
-            "系统运行异常"
+            "系统错误:",
+            e
         )
 
 
-        print(e)
-
-
-        traceback.print_exc()
-
-
-        return None
-
-
-
-
-
-
-# =====================================================
-# 程序入口
-# =====================================================
-
-
-if __name__=="__main__":
-
-
-    main()
+        sys.exit(1)
