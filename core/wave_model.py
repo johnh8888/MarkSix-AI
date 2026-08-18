@@ -10,12 +10,11 @@ wave_model.py
 
 功能:
 
-1. 波色概率
-2. 波色趋势
-3. 波色冷热
-4. 双推
-5. 排除色
-6. 波色状态
+1. 波色统计
+2. 波色概率
+3. 连波检测
+4. 反转检测
+5. 动态推荐
 
 
 """
@@ -24,24 +23,18 @@ wave_model.py
 from collections import Counter
 
 
-from .features import (
-
-    get_special,
-
-    get_wave,
-
-)
+from .features import get_wave
 
 
 
 
 
 # =====================================================
-# 基础颜色
+# 波色列表
 # =====================================================
 
 
-WAVES=[
+WAVES = [
 
     "红",
 
@@ -56,28 +49,55 @@ WAVES=[
 
 
 # =====================================================
-# 获取历史波色
+# 号码解析
 # =====================================================
 
 
-def get_history_wave(rows,limit=100):
+def parse_numbers(rows):
 
 
     result=[]
 
 
-    for row in rows[:limit]:
+    for row in rows:
 
 
-        n=get_special(row)
+        nums=row.get(
+
+            "numbers",
+
+            ""
+
+        )
 
 
-        if n:
+        if isinstance(nums,str):
 
 
-            result.append(
-                get_wave(n)
-            )
+            nums=nums.replace(
+
+                ",",
+
+                " "
+
+            ).split()
+
+
+
+        for n in nums:
+
+
+            try:
+
+                result.append(
+
+                    int(n)
+
+                )
+
+            except:
+
+                pass
 
 
 
@@ -88,37 +108,41 @@ def get_history_wave(rows,limit=100):
 
 
 # =====================================================
-# 基础概率
+# 波色统计
 # =====================================================
 
 
-def wave_frequency(rows,limit=100):
+def wave_frequency(numbers):
 
 
-    waves=get_history_wave(
-        rows,
-        limit
-    )
+    counter=Counter()
 
 
-    counter=Counter(
-        waves
-    )
+
+    for n in numbers:
+
+
+        counter[
+
+            get_wave(n)
+
+        ]+=1
+
 
 
     total=sum(
+
         counter.values()
+
     )
 
 
 
     if total==0:
 
-
         return {
 
-
-            x:1/3
+            x:0
 
             for x in WAVES
 
@@ -139,7 +163,6 @@ def wave_frequency(rows,limit=100):
 
         )
 
-
         for x in WAVES
 
     }
@@ -153,97 +176,143 @@ def wave_frequency(rows,limit=100):
 # =====================================================
 
 
-def wave_trend(rows):
+def recent_wave(numbers,window=20):
 
 
-    recent=wave_frequency(
-        rows,
-        20
-    )
-
-
-    long=wave_frequency(
-        rows,
-        100
-    )
+    counter=Counter()
 
 
 
-    score={}
+    for n in numbers[:window]:
+
+
+        counter[
+
+            get_wave(n)
+
+        ]+=1
 
 
 
-    for w in WAVES:
-
-
-        score[w]=(
-
-            recent[w]*0.7
-
-            +
-
-            long[w]*0.3
-
-        )
-
-
-
-    total=sum(
-        score.values()
-    )
-
-
-    return {
-
-
-        k:
-
-        round(
-            v/total,
-            4
-        )
-
-
-        for k,v in score.items()
-
-    }
+    return counter.most_common()
 
 
 
 
 
 # =====================================================
-# 冷热检测
+# 连续波检测
 # =====================================================
 
 
-def wave_hot_cold(rows):
+def detect_same_wave(numbers):
 
 
-    prob=wave_frequency(
-        rows,
-        30
+    if len(numbers)<3:
+
+        return False
+
+
+
+    waves=[
+
+        get_wave(n)
+
+        for n in numbers[:3]
+
+    ]
+
+
+
+    return len(set(waves))==1
+
+
+
+
+
+# =====================================================
+# 波色反转
+# =====================================================
+
+
+def detect_wave_reverse(numbers):
+
+
+    if len(numbers)<6:
+
+        return False
+
+
+
+    first=[
+
+        get_wave(n)
+
+        for n in numbers[:3]
+
+    ]
+
+
+
+    second=[
+
+        get_wave(n)
+
+        for n in numbers[3:6]
+
+    ]
+
+
+
+    return (
+
+        len(set(first))==1
+
+        and
+
+        len(set(second))==1
+
+        and
+
+        first[0]!=second[0]
+
     )
 
+
+
+
+
+# =====================================================
+# 波色冷热
+# =====================================================
+
+
+def wave_hot_cold(numbers):
+
+
+    freq=wave_frequency(
+
+        numbers
+
+    )
 
 
     hot=max(
 
-        prob,
+        freq,
 
-        key=prob.get
+        key=freq.get
 
     )
 
 
     cold=min(
 
-        prob,
+        freq,
 
-        key=prob.get
+        key=freq.get
 
     )
-
 
 
     return {
@@ -259,9 +328,9 @@ def wave_hot_cold(rows):
         cold,
 
 
-        "prob":
+        "probability":
 
-        prob
+        freq
 
     }
 
@@ -270,174 +339,91 @@ def wave_hot_cold(rows):
 
 
 # =====================================================
-# 连续检测
+# 动态波色评分
 # =====================================================
 
 
-def detect_wave_streak(rows):
+def wave_score(numbers):
 
 
-    waves=get_history_wave(
-        rows,
-        20
+    freq=wave_frequency(
+
+        numbers
+
     )
 
 
-    if not waves:
-
-        return None
+    score={}
 
 
 
-    last=waves[0]
+    for w in WAVES:
 
 
-    count=0
+        score[w]=freq[w]
 
 
 
-    for w in waves:
+    # 连续增强
+
+    if detect_same_wave(numbers):
 
 
-        if w==last:
+        last=get_wave(
 
-            count+=1
+            numbers[0]
 
-        else:
+        )
 
-            break
+
+        score[last]+=0.15
+
+
+
+    # 反转增强
+
+    if detect_wave_reverse(numbers):
+
+
+        last=get_wave(
+
+            numbers[0]
+
+        )
+
+
+        score[last]-=0.05
+
+
+
+    total=sum(
+
+        max(v,0)
+
+        for v in score.values()
+
+    )
+
+
+
+    if total==0:
+
+        return score
 
 
 
     return {
 
 
-        "wave":
-
-        last,
-
-
-        "length":
-
-        count
-
-    }
-
-
-
-
-
-# =====================================================
-# 反转检测
-# =====================================================
-
-
-def detect_wave_reverse(rows):
-
-
-    waves=get_history_wave(
-        rows,
-        10
-    )
-
-
-    if len(waves)<6:
-
-        return False
-
-
-
-    first=waves[:3]
-
-
-    second=waves[3:6]
-
-
-
-    return (
-
-        len(set(first))==1
-
-        and
-
-        len(set(second))==3
-
-    )
-
-
-
-
-
-# =====================================================
-# 最终波色预测
-# =====================================================
-
-
-def predict_wave(rows):
-
-
-    trend=wave_trend(
-        rows
-    )
-
-
-    hotcold=wave_hot_cold(
-        rows
-    )
-
-
-    streak=detect_wave_streak(
-        rows
-    )
-
-
-
-    score=trend.copy()
-
-
-
-    # 连续出现降低惯性
-
-    if streak:
-
-
-        if streak["length"]>=4:
-
-
-            score[streak["wave"]] *=0.7
-
-
-
-
-    # 反转提高其他颜色
-
-
-    if detect_wave_reverse(rows):
-
-
-        for w in score:
-
-
-            score[w]*=1.2
-
-
-
-    total=sum(
-        score.values()
-    )
-
-
-
-    score={
-
-
         k:
 
         round(
-            v/total,
-            4
-        )
 
+            max(v,0)/total,
+
+            4
+
+        )
 
         for k,v in score.items()
 
@@ -445,7 +431,24 @@ def predict_wave(rows):
 
 
 
-    order=sorted(
+
+
+# =====================================================
+# 推荐
+# =====================================================
+
+
+def predict_wave(numbers):
+
+
+    score=wave_score(
+
+        numbers
+
+    )
+
+
+    ranking=sorted(
 
         score.items(),
 
@@ -456,55 +459,46 @@ def predict_wave(rows):
     )
 
 
-
     return {
 
 
-        "single":
+        "单推":
 
-        order[0][0],
+        ranking[0][0],
 
 
-
-        "double":
+        "双推":
 
         [
 
-            order[0][0],
+            x[0]
 
-            order[1][0]
+            for x in ranking[:2]
 
         ],
 
 
-
-        "exclude":
-
-        order[2][0],
-
-
-
-        "probability":
+        "概率":
 
         score,
 
 
+        "连续":
 
-        "hot":
+        detect_same_wave(
 
-        hotcold["hot"],
+            numbers
 
-
-
-        "cold":
-
-        hotcold["cold"],
+        ),
 
 
+        "反转":
 
-        "streak":
+        detect_wave_reverse(
 
-        streak
+            numbers
+
+        )
 
     }
 
@@ -520,33 +514,29 @@ def predict_wave(rows):
 if __name__=="__main__":
 
 
-    rows=[
-
-
-        {
-
-        "numbers":
-
-        "38,26,08,06,29,18,23"
-
-        },
-
+    data=[
 
         {
 
         "numbers":
 
-        "33,27,16,28,04,25,14"
+        "39 41 08 09 07 14 49"
 
         }
 
+    ]*20
 
-    ]
 
+
+    nums=parse_numbers(
+
+        data
+
+    )
 
 
     print(
 
-        predict_wave(rows)
+        predict_wave(nums)
 
     )
