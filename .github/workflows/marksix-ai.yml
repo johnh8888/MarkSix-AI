@@ -1,4 +1,4 @@
-name: 六合AI最终测试
+name: 六合AI V10 FINAL
 
 
 on:
@@ -18,33 +18,32 @@ jobs:
   run:
 
 
-    runs-on: ubuntu-latest
+    runs-on:
 
-
-    env:
-
-      PYTHONPATH: ${{ github.workspace }}
-
-      PYTHONIOENCODING: utf-8
-
-      LANG: C.UTF-8
-
-      LC_ALL: C.UTF-8
+      ubuntu-latest
 
 
 
     steps:
 
 
-    - name: 拉取代码
+    - name:
 
-      uses: actions/checkout@v4
+        拉取代码
+
+      uses:
+
+        actions/checkout@v4
 
 
 
-    - name: Python环境
+    - name:
 
-      uses: actions/setup-python@v5
+        Python
+
+      uses:
+
+        actions/setup-python@v5
 
       with:
 
@@ -52,264 +51,120 @@ jobs:
 
 
 
-    - name: 安装依赖
+    - name:
+
+        设置中文环境
 
       run:
 
-        pip install -r requirements.txt || true
+        |
+
+        echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
+
+        echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
+
+        echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
 
 
 
-    - name: 查看环境
+    - name:
 
-      run: |
-
-        python --version
-
-        pwd
-
-        ls
-
-
-
-    - name: 测试核心模块
-
-      run: |
-
-        python - <<'PY'
-
-        import core
-
-        print("核心模块加载成功")
-
-        PY
-
-
-
-    - name: 运行六合AI
+        安装依赖
 
       run:
+
+        |
+
+        pip install requests pandas numpy
+
+
+
+    - name:
+
+        运行AI
+
+      env:
+
+        PYTHONPATH:
+
+          ${{github.workspace}}
+
+      run:
+
+        |
 
         python -u main.py
 
 
 
-    - name: 输出最终预测
+    - name:
 
-      run: |
+        最终预测
 
+      run:
 
-        echo "=============================="
-
-        echo "        六合AI最终预测"
-
-        echo "=============================="
-
+        |
 
         python - <<'PY'
-
 
         import json
 
 
-        path="output/prediction.json"
+        d=json.load(
+          open(
+          "output/prediction.json",
+          encoding="utf-8"
+          )
+        )
 
 
+        print("="*40)
 
-        with open(
+        print("       六合AI V10最终预测")
 
-            path,
-
-            encoding="utf-8"
-
-        ) as f:
-
-            data=json.load(f)
+        print("="*40)
 
 
-
-        print()
-
-        print("版本:",data.get("version"))
-
-        print("时间:",data.get("time"))
-
-
-
-        for key,item in data.get("lotteries",{}).items():
-
+        for k,v in d["lotteries"].items():
 
             print()
 
-            print("==============================")
+            print(v.get("彩种",k))
 
-            print(
-
-                item.get(
-
-                    "彩种",
-
-                    key
-
-                )
-
-            )
-
-            print("==============================")
+            print("-"*30)
 
 
-            if "error" in item:
-
-                print(
-
-                    "错误:",
-
-                    item["error"]
-
-                )
-
-                continue
-
-
-
-            p=item.get(
-
-                "预测",
-
-                {}
-
-            )
-
-
-
-            # 兼容 V7/V8/V9
-
-            state=p.get(
-
-                "市场状态",
-
-                {}
-
-            )
-
-
-
-            状态=(
-
-                state.get("状态")
-
-                or
-
-                state.get("state")
-
-                or
-
-                "未知"
-
-            )
-
+            p=v.get("预测",{})
 
 
             print(
-
-                "市场状态:",
-
-                状态
-
-            )
-
-
-
-            if "entropy" in state:
-
-                print(
-
-                    "熵值:",
-
-                    state["entropy"]
-
-                )
-
-
-
-            print(
-
-                "特码10码:",
-
-                p.get(
-
-                    "特码10码",
-
-                    []
-
-                )
-
+            "特码10码:",
+            p.get("特码10码")
             )
 
 
             print(
-
-                "重点3码:",
-
-                p.get(
-
-                    "重点3码",
-
-                    []
-
-                )
-
+            "重点3码:",
+            p.get("重点3码")
             )
 
 
             print(
-
-                "第一推荐:",
-
-                p.get(
-
-                    "第一推荐"
-
-                )
-
+            "第一推荐:",
+            p.get("第一推荐")
             )
 
 
             print(
-
-                "评分:",
-
-                p.get(
-
-                    "评分",
-
-                    {}
-
-                )
-
+            "生肖5肖:",
+            p.get("生肖5肖")
             )
 
 
-
-            属性=p.get(
-
-                "属性",
-
-                {}
-
+            print(
+            "属性:",
+            p.get("属性")
             )
-
-
-            if 属性:
-
-                print(
-
-                    "属性:",
-
-                    属性
-
-                )
-
 
 
         PY
