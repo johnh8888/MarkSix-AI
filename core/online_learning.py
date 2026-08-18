@@ -1,538 +1,323 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-online_learning.py
+core/online_learning.py
+
 
 在线学习模块
 
 
-功能:
+功能：
 
-1. 预测反馈
-2. 模型奖励
-3. 模型惩罚
-4. 动态权重
-5. 时间衰减
+1. 记录模型表现
+2. 更新模型可信度
+3. 输出动态权重
+4. 支持 Bayesian Engine
 
 
 """
 
 
-import math
-
-from datetime import datetime
+from __future__ import annotations
 
 
-
-
-
-# =====================================================
-# 初始化在线学习
-# =====================================================
-
-
-def 初始化学习器():
-
-    return {
-
-
-        "models":{},
-
-
-        "history":[]
-
-
-    }
+from typing import Dict, Any
 
 
 
 
 
 # =====================================================
-# 注册模型
+# 在线学习器
 # =====================================================
 
 
-def 注册模型(
+class OnlineLearner:
 
-        learner,
 
-        模型
+    def __init__(self):
 
-):
 
+        self.models = {}
 
-    if 模型 not in learner["models"]:
 
 
-        learner["models"][模型]={
 
+    # ---------------------------------
+    # 注册模型
+    # ---------------------------------
 
-            "success":0,
 
+    def register(
 
-            "fail":0,
+            self,
 
+            name:str
 
-            "total":0,
+    ):
 
 
-            "weight":1.0,
+        if name not in self.models:
 
 
-            "last_update":
+            self.models[name]={
 
-            str(datetime.now())
 
-        }
+                "hit":0,
 
 
-    return learner
+                "miss":0,
 
 
+                "total":0
 
 
+            }
 
-# =====================================================
-# 记录结果
-# =====================================================
 
 
-def 更新模型(
 
-        learner,
 
-        模型,
 
-        命中
 
-):
+    # ---------------------------------
+    # 更新结果
+    # ---------------------------------
 
 
-    注册模型(
+    def update(
 
-        learner,
+            self,
 
-        模型
+            model:str,
 
-    )
+            success:bool
 
+    ):
 
 
-    data=learner["models"][模型]
+        self.register(model)
 
 
+        item=self.models[model]
 
-    data["total"]+=1
 
+        item["total"]+=1
 
 
-    if 命中:
 
+        if success:
 
-        data["success"]+=1
 
+            item["hit"]+=1
 
 
-    else:
+        else:
 
 
-        data["fail"]+=1
+            item["miss"]+=1
 
 
 
 
 
-    # 基础成功率
 
+    # ---------------------------------
+    # 模型准确率
+    # ---------------------------------
 
-    rate=(
 
-        data["success"]
+    def accuracy(
 
-        /
+            self,
 
-        data["total"]
+            model:str
 
-    )
+    ):
 
 
+        if model not in self.models:
 
 
+            return 0.5
 
-    # 动态权重
 
 
-    data["weight"]=round(
+        item=self.models[model]
 
-        0.5
 
-        +
+        if item["total"]==0:
 
-        rate,
 
-        4
+            return 0.5
 
-    )
 
 
+        return round(
 
-    data["last_update"]=str(
+            item["hit"]
 
-        datetime.now()
+            /
 
-    )
-
-
-
-    return learner
-
-
-
-
-
-# =====================================================
-# 批量更新
-# =====================================================
-
-
-def 批量反馈(
-
-        learner,
-
-        结果
-
-):
-
-
-    """
-
-
-    结果格式:
-
-    {
-
-      "frequency":True,
-
-      "trend":False
-
-    }
-
-
-    """
-
-
-
-    for 模型,命中 in 结果.items():
-
-
-        更新模型(
-
-            learner,
-
-            模型,
-
-            命中
-
-        )
-
-
-
-    return learner
-
-
-
-
-
-# =====================================================
-# 时间衰减
-# =====================================================
-
-
-def 时间衰减权重(
-
-        原权重,
-
-        天数
-
-):
-
-
-    decay=math.exp(
-
-        -0.03*天数
-
-    )
-
-
-    return round(
-
-        原权重*decay,
-
-        4
-
-    )
-
-
-
-
-
-# =====================================================
-# 获取模型权重
-# =====================================================
-
-
-def 获取权重(
-
-        learner
-
-):
-
-
-    result={}
-
-
-
-    for 模型,data in learner["models"].items():
-
-
-        result[模型]=data.get(
-
-            "weight",
-
-            1
-
-        )
-
-
-
-    total=sum(
-
-        result.values()
-
-    )
-
-
-
-    if total==0:
-
-
-        return result
-
-
-
-
-
-    return {
-
-
-        k:
-
-        round(
-
-            v/total,
+            item["total"],
 
             4
 
         )
 
 
-        for k,v in result.items()
-
-    }
 
 
 
 
-
-# =====================================================
-# 自动淘汰低效模型
-# =====================================================
-
-
-def 模型筛选(
-
-        learner,
-
-        最低次数=30,
-
-        最低成功率=0.25
-
-):
+    # ---------------------------------
+    # 动态权重
+    # ---------------------------------
 
 
-    保留=[]
+    def weights(self):
+
+
+        result={}
 
 
 
-    for 模型,data in learner["models"].items():
+        for name in self.models:
 
 
-        if data["total"]<最低次数:
+            acc=self.accuracy(
 
-
-            保留.append(
-
-                模型
+                name
 
             )
 
 
-            continue
+            # 平滑
+
+            result[name]=(
+
+                0.5
+
+                +
+
+                acc
+
+            )
 
 
 
 
 
-        rate=(
+        total=sum(
 
-            data["success"]
-
-            /
-
-            data["total"]
+            result.values()
 
         )
 
 
 
-        if rate>=最低成功率:
+        if total==0:
 
 
-            保留.append(
-
-                模型
-
-            )
-
-
-
-    return 保留
+            return {}
 
 
 
 
-
-# =====================================================
-# 学习报告
-# =====================================================
+        return {
 
 
-def 学习报告(
+            k:
 
-        learner
+            round(
 
-):
-
-
-    report={}
-
-
-
-    for 模型,data in learner["models"].items():
-
-
-        total=data["total"]
-
-
-
-        rate=0
-
-
-
-        if total:
-
-
-            rate=round(
-
-                data["success"]
-
-                /
-
-                total,
+                v/total,
 
                 4
 
             )
 
 
+            for k,v
 
-        report[模型]={
-
-
-            "次数":
-
-            total,
-
-
-            "成功率":
-
-            rate,
-
-
-            "权重":
-
-            data["weight"]
+            in result.items()
 
         }
 
 
 
-    return report
+
 
 
 
 
 
 # =====================================================
-# V5在线更新入口
+# 全局学习器
 # =====================================================
 
 
-def 在线学习更新(
+ONLINE_ENGINE=OnlineLearner()
 
-        learner,
 
-        模型结果
+
+
+
+
+# =====================================================
+# 快捷接口
+# =====================================================
+
+
+def update_model(
+
+        model_name:str,
+
+        hit:bool
 
 ):
 
 
-    learner=批量反馈(
+    ONLINE_ENGINE.update(
 
-        learner,
+        model_name,
 
-        模型结果
+        hit
 
     )
+
+
+
+
+
+
+def get_online_weights()->Dict[str,float]:
+
+
+    return ONLINE_ENGINE.weights()
+
+
+
+
+
+
+def get_learning_state()->Dict[str,Any]:
 
 
     return {
 
 
-        "学习器":
+        "models":
 
-        learner,
-
-
-        "权重":
-
-        获取权重(
-
-            learner
-
-        ),
+        ONLINE_ENGINE.models,
 
 
-        "报告":
+        "weights":
 
-        学习报告(
+        ONLINE_ENGINE.weights()
 
-            learner
-
-        )
 
     }
 
@@ -540,11 +325,16 @@ def 在线学习更新(
 
 
 
-if __name__=="__main__":
 
 
-    print(
+__all__=[
 
-        "V5.1 在线学习模块启动"
+"OnlineLearner",
 
-    )
+"update_model",
+
+"get_online_weights",
+
+"get_learning_state"
+
+]
