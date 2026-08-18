@@ -1,208 +1,129 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统
+V9.0 状态识别引擎
 
-core/state_engine.py
-
-V8.0 QUANT STATE SWITCH
-
-状态检测模块
-
+识别:
+HOT 热态
+COLD 冷态
+NORMAL 正常
+REVERSAL 反转
+CHAOS 混沌
 """
 
 
-from collections import Counter
 import math
+from collections import Counter
 
 
 
+def entropy(values):
 
-RED={
-1,2,7,8,12,13,
-18,19,23,24,
-29,30,34,35,
-40,45,46
-}
-
-
-BLUE={
-3,4,9,10,
-14,15,20,
-25,26,31,
-36,37,41,
-42,47,48
-}
-
-
-
-
-def normalize_history(history):
-
-    """
-    兼容:
-
-    [
-      49,
-      16,
-      22
-    ]
-
-
-    和:
-
-    [
-      {"special":49}
-    ]
-
-    """
-
-    numbers=[]
-
-
-    for x in history:
-
-
-        if isinstance(x,dict):
-
-            if "special" in x:
-
-                numbers.append(
-                    int(x["special"])
-                )
-
-
-        else:
-
-            numbers.append(
-                int(x)
-            )
-
-
-    return numbers
-
-
-
-
-
-
-def get_wave(n):
-
-
-    if n in RED:
-
-        return "红"
-
-
-    if n in BLUE:
-
-        return "蓝"
-
-
-    return "绿"
-
-
-
-
-
-
-
-def entropy(numbers):
-
-
-    if not numbers:
-
+    if not values:
         return 0
 
 
+    count=Counter(values)
 
-    counter=Counter(numbers)
+    total=len(values)
 
-
-    total=len(numbers)
-
-
-    value=0
+    e=0
 
 
+    for v in count.values():
 
-    for c in counter.values():
+        p=v/total
 
-
-        p=c/total
-
-
-        value-=p*math.log2(p)
+        e-=p*math.log2(p)
 
 
-
-    return round(value,4)
+    return round(e,4)
 
 
 
 
+def recent_trend(history, window=20):
+
+    data=history[-window:]
+
+    if len(data)<10:
+
+        return {
+            "state":"NORMAL",
+            "entropy":0
+        }
+
+
+
+    e=entropy(data)
+
+
+    counter=Counter(data)
+
+
+    most=counter.most_common(1)[0][1]
+
+
+    repeat_rate=most/len(data)
+
+
+
+    if e>4.5:
+
+        state="CHAOS"
+
+
+    elif repeat_rate>0.18:
+
+        state="HOT"
+
+
+    elif repeat_rate<0.06:
+
+        state="COLD"
+
+
+    else:
+
+        state="NORMAL"
+
+
+
+    return {
+
+        "state":state,
+
+        "entropy":e,
+
+        "repeat_rate":round(
+            repeat_rate,
+            3
+        )
+
+    }
 
 
 
 
-def repeat_wave(numbers):
+def detect_reverse(history):
 
 
-    if len(numbers)<5:
+    if len(history)<10:
 
         return False
 
 
+    a=history[-5:]
 
-    waves=[
-
-        get_wave(x)
-
-        for x in numbers[:5]
-
-    ]
+    b=history[-10:-5]
 
 
-    return len(set(waves))==1
+    if sum(a)/5 > sum(b)/5:
+
+        return True
 
 
-
-
-
-
-
-def flip_wave(numbers):
-
-
-    if len(numbers)<6:
-
-        return False
-
-
-
-    waves=[
-
-        get_wave(x)
-
-        for x in numbers[:6]
-
-    ]
-
-
-
-    return (
-
-        waves[0]!=waves[1]
-
-        and
-
-        waves[1]!=waves[2]
-
-    )
-
-
-
-
+    return False
 
 
 
@@ -210,122 +131,14 @@ def flip_wave(numbers):
 def analyze_state(history):
 
 
-    numbers=normalize_history(
-        history
-    )
+    result=recent_trend(history)
 
 
-    e=entropy(
-        numbers[:100]
-    )
 
+    if detect_reverse(history):
 
+        result["state"]="REVERSAL"
 
-    state="正常状态"
 
 
-
-    hot=0.6
-
-    markov=0.35
-
-    random=0.05
-
-
-
-
-
-    if e>3.4:
-
-
-        state="混沌状态"
-
-
-        hot=0.4
-
-        markov=0.35
-
-        random=0.25
-
-
-
-
-
-
-    if repeat_wave(numbers):
-
-
-        state="连续波状态"
-
-
-        hot=0.45
-
-        markov=0.25
-
-        random=0.30
-
-
-
-
-
-
-    if flip_wave(numbers):
-
-
-        state="反转状态"
-
-
-        hot=0.5
-
-        markov=0.4
-
-        random=0.1
-
-
-
-
-
-    return {
-
-
-        "状态":
-
-        state,
-
-
-        "entropy":
-
-        e,
-
-
-        "动态权重":{
-
-
-            "hot":
-
-            hot,
-
-
-            "markov":
-
-            markov,
-
-
-            "random":
-
-            random
-
-        }
-
-
-    }
-
-
-
-
-
-__all__=[
-
-    "analyze_state"
-
-]
+    return result
