@@ -5,91 +5,411 @@
 
 strategies.py
 
-预测策略融合引擎
-
+10模型融合策略
 
 """
 
 
+from collections import Counter
 
-import math
 
+from .features import (
 
-from core.config import (
+    get_special,
 
-    NUMBER_MIN,
-
-    NUMBER_MAX,
-
-    MODEL_WEIGHTS,
-
-    SOFTMAX_TEMPERATURE,
+    get_wave,
 
 )
 
 
-from core.features import (
-
-    build_features,
-
-)
-
-
-from core.state_engine import (
-
-    detect_market_state,
-
-    dynamic_weights,
-
-)
+from .state_engine import get_weights
 
 
 
 
 
-from core.wave_model import (
-
-    wave_score,
-
-)
+# =====================================================
+# 通用归一化
+# =====================================================
 
 
+def normalize(scores):
 
 
+    if not scores:
 
-# =========================================================
-# Min-Max
-# =========================================================
-
-
-def normalize(values):
-
-
-    if not values:
-
-        return {}
+        return {
+            i:0.5
+            for i in range(1,50)
+        }
 
 
-
-    low=min(
-        values.values()
+    values=list(
+        scores.values()
     )
 
 
-    high=max(
-        values.values()
-    )
+    low=min(values)
+
+    high=max(values)
 
 
 
     if high==low:
 
         return {
-
             k:0.5
+            for k in scores
+        }
 
-            for k in values
 
+    return {
+
+
+        k:
+
+        (v-low)/(high-low)
+
+
+        for k,v in scores.items()
+
+    }
+
+
+
+
+
+# =====================================================
+# 1 频率模型
+# =====================================================
+
+
+def model_frequency(rows):
+
+
+    counter=Counter()
+
+
+
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            counter[n]+=1
+
+
+
+    return normalize(
+
+        {
+
+        n:
+
+        counter.get(n,0)
+
+        for n in range(1,50)
+
+        }
+
+    )
+
+
+
+
+
+# =====================================================
+# 2 趋势模型
+# =====================================================
+
+
+def model_trend(rows):
+
+
+    score={}
+
+
+
+    for n in range(1,50):
+
+        s=0
+
+
+        for i,row in enumerate(rows[:50]):
+
+
+            if get_special(row)==n:
+
+
+                s+=50-i
+
+
+
+        score[n]=s
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 3 动量模型
+# =====================================================
+
+
+def model_momentum(rows):
+
+
+    score={}
+
+
+
+    recent=[]
+
+
+    for row in rows[:20]:
+
+        n=get_special(row)
+
+        if n:
+
+            recent.append(n)
+
+
+
+    for n in range(1,50):
+
+
+        score[n]=recent.count(n)*2
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 4 遗漏模型
+# =====================================================
+
+
+def model_omission(rows):
+
+
+    score={}
+
+
+
+    for n in range(1,50):
+
+
+        miss=0
+
+
+        for row in rows:
+
+
+            if get_special(row)==n:
+
+                break
+
+
+            miss+=1
+
+
+
+        score[n]=miss
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 5 邻号模型
+# =====================================================
+
+
+def model_adjacency(rows):
+
+
+    score={
+
+        n:0
+
+        for n in range(1,50)
+
+    }
+
+
+
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if not n:
+
+            continue
+
+
+
+        for x in (
+
+            n-1,
+
+            n+1
+
+        ):
+
+
+            if 1<=x<=49:
+
+                score[x]+=1
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 6 尾数模型
+# =====================================================
+
+
+def model_tail(rows):
+
+
+    tails=Counter()
+
+
+
+    for row in rows[:100]:
+
+        n=get_special(row)
+
+        if n:
+
+            tails[n%10]+=1
+
+
+
+    score={}
+
+
+
+    for n in range(1,50):
+
+
+        score[n]=tails[n%10]
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 7 分区模型
+# =====================================================
+
+
+def model_zone(rows):
+
+
+    zones=Counter()
+
+
+
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+
+            zones[
+                (n-1)//10
+            ]+=1
+
+
+
+    score={}
+
+
+
+    for n in range(1,50):
+
+
+        score[n]=zones[
+            (n-1)//10
+        ]
+
+
+
+    return normalize(score)
+
+
+
+
+
+# =====================================================
+# 8 大小
+# =====================================================
+
+
+def model_size(rows):
+
+
+    big=0
+
+    small=0
+
+
+
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if n>=25:
+
+            big+=1
+
+        elif n:
+
+            small+=1
+
+
+
+    total=big+small
+
+
+    if total==0:
+
+        return {
+            n:0.5
+            for n in range(1,50)
         }
 
 
@@ -97,25 +417,17 @@ def normalize(values):
     return {
 
 
-        k:
+        n:
 
         (
-
-            v-low
-
-        )
-
-        /
-
-        (
-
-            high-low
-
+            big/total
+            if n>=25
+            else
+            small/total
         )
 
 
-
-        for k,v in values.items()
+        for n in range(1,50)
 
     }
 
@@ -123,78 +435,64 @@ def normalize(values):
 
 
 
-# =========================================================
-# Softmax
-# =========================================================
+# =====================================================
+# 9 单双
+# =====================================================
 
 
-def softmax(scores):
+def model_parity(rows):
 
 
-    if not scores:
+    odd=0
 
-        return {}
-
-
-
-    temp=SOFTMAX_TEMPERATURE
+    even=0
 
 
 
-    exp={}
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+
+            if n%2:
+
+                odd+=1
+
+            else:
+
+                even+=1
 
 
 
-    max_value=max(
-        scores.values()
-    )
+    total=odd+even
 
 
+    if total==0:
 
-    total=0
-
-
-
-    for k,v in scores.items():
-
-
-        e=math.exp(
-
-            (
-
-                v-max_value
-
-            )
-
-            /
-
-            temp
-
-        )
-
-
-        exp[k]=e
-
-
-        total+=e
+        return {
+            n:0.5
+            for n in range(1,50)
+        }
 
 
 
     return {
 
 
-        k:
+        n:
 
-        round(
-
-            v/total,
-
-            6
-
+        (
+            odd/total
+            if n%2
+            else even/total
         )
 
 
-        for k,v in exp.items()
+        for n in range(1,50)
 
     }
 
@@ -202,342 +500,160 @@ def softmax(scores):
 
 
 
-# =========================================================
-# 单模型评分
-# =========================================================
+# =====================================================
+# 10 波色
+# =====================================================
 
 
-def model_scores(rows):
+def model_wave(rows):
 
 
-    features=build_features(
-        rows
+    counter=Counter()
+
+
+
+    for row in rows[:100]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            counter[
+                get_wave(n)
+            ]+=1
+
+
+
+    total=sum(
+        counter.values()
     )
 
 
-
-    result={}
-
-
-
-    for model,data in features.items():
-
-
-        if isinstance(data,dict):
-
-
-            # 数字模型
-
-            if all(
-
-                isinstance(k,int)
-
-                for k in data.keys()
-
-            ):
-
-
-                result[model]=normalize(
-
-                    data
-
-                )
+    score={}
 
 
 
-    return result
+    for n in range(1,50):
+
+
+        if total:
+
+
+            score[n]=counter[
+                get_wave(n)
+            ]/total
+
+
+        else:
+
+            score[n]=0.5
+
+
+
+    return score
 
 
 
 
 
-# =========================================================
-# 波色影响
-# =========================================================
-
-
-def apply_wave_bonus(
-        scores,
-        rows
-):
-
-
-    waves=wave_score(
-        rows
-    )
-
-
-    for n in scores:
-
-
-        w=__import__(
-
-            "core.features",
-
-            fromlist=[
-
-                "get_wave"
-
-            ]
-
-        ).get_wave(n)
-
-
-
-        if w:
-
-
-            scores[n]+=(
-
-                waves.get(
-                    w,
-                    0
-                )
-
-                *
-
-                0.08
-
-            )
-
-
-
-    return scores
-
-
-
-
-
-# =========================================================
+# =====================================================
 # 主融合
-# =========================================================
+# =====================================================
 
 
-def combine_prediction(rows):
+def combine_models(rows):
 
 
-    """
-
-    返回:
-
-    最终49码评分
+    models={
 
 
-    """
+        "frequency":
+
+            model_frequency(rows),
+
+
+        "trend":
+
+            model_trend(rows),
+
+
+        "momentum":
+
+            model_momentum(rows),
+
+
+        "omission":
+
+            model_omission(rows),
+
+
+        "adjacency":
+
+            model_adjacency(rows),
+
+
+        "tail":
+
+            model_tail(rows),
+
+
+        "zone":
+
+            model_zone(rows),
+
+
+        "size":
+
+            model_size(rows),
+
+
+        "parity":
+
+            model_parity(rows),
+
+
+        "wave":
+
+            model_wave(rows),
+
+    }
 
 
 
-    models=model_scores(
-        rows
-    )
-
-
-
-    state=detect_market_state(
-        rows
-    )
-
-
-
-    weights=dynamic_weights(
-
-        MODEL_WEIGHTS,
-
-        state
-
-    )
+    weights=get_weights(rows)
 
 
 
     final={
 
-
         n:0
 
-        for n in range(
-
-            NUMBER_MIN,
-
-            NUMBER_MAX+1
-
-        )
+        for n in range(1,50)
 
     }
 
 
 
-
-    contribution={}
-
+    for name,data in models.items():
 
 
-
-    for model,scores in models.items():
-
-
-        weight=weights.get(
-
-            model,
-
+        w=weights.get(
+            name,
             0
-
         )
 
 
-        contribution[model]=weight
+        for n in range(1,50):
 
 
+            final[n]+=data[n]*w
 
-        for n,v in scores.items():
 
 
-            final[n]+=(
+    final=normalize(final)
 
-                v
 
-                *
 
-                weight
-
-            )
-
-
-
-    # 波色增强
-
-
-    final=apply_wave_bonus(
-
-        final,
-
-        rows
-
-    )
-
-
-
-    # softmax概率
-
-
-    probability=softmax(
-
-        final
-
-    )
-
-
-
-    ranking=sorted(
-
-        probability.items(),
-
-        key=lambda x:x[1],
-
-        reverse=True
-
-    )
-
-
-
-    return {
-
-
-        "ranking":
-
-        ranking,
-
-
-        "probability":
-
-        probability,
-
-
-        "state":
-
-        state,
-
-
-        "weights":
-
-        contribution
-
-
-    }
-
-
-
-
-
-# =========================================================
-# 输出Top10
-# =========================================================
-
-
-def top_numbers(
-        rows,
-        count=10
-):
-
-
-    result=combine_prediction(
-        rows
-    )
-
-
-
-    return result["ranking"][:count]
-
-
-
-
-
-# =========================================================
-# 测试
-# =========================================================
-
-
-if __name__=="__main__":
-
-
-    rows=[
-
-        {
-
-        "numbers":
-
-        "38,26,08,06,29,18,23"
-
-        }
-
-    ]
-
-
-
-    result=combine_prediction(
-        rows
-    )
-
-
-    print(
-        "状态:",
-        result["state"]
-    )
-
-
-
-    print(
-        "Top10:"
-    )
-
-
-
-    for n,p in result["ranking"][:10]:
-
-
-        print(
-
-            n,
-
-            p
-
-        )
+    return final,models,weights
