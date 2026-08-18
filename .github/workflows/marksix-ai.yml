@@ -1,10 +1,9 @@
-name: 六合AI智能预测 FINAL
+name: 六合AI最终测试
 
 
 on:
 
   workflow_dispatch:
-
 
 
 permissions:
@@ -16,21 +15,30 @@ permissions:
 jobs:
 
 
-  predict:
+  run:
 
 
     runs-on: ubuntu-latest
+
+
+    env:
+
+      PYTHONPATH: ${{ github.workspace }}
+
+      PYTHONIOENCODING: utf-8
+
+      LANG: C.UTF-8
+
+      LC_ALL: C.UTF-8
 
 
 
     steps:
 
 
-
     - name: 拉取代码
 
       uses: actions/checkout@v4
-
 
 
 
@@ -44,72 +52,58 @@ jobs:
 
 
 
-
-    - name: 中文环境
-
-      run: |
-
-
-        echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
-
-        echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
-
-        echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
-
-
-
-
-
     - name: 安装依赖
-
-      run: |
-
-
-        python -m pip install --upgrade pip
-
-
-        if [ -f requirements.txt ];
-
-        then
-
-          pip install -r requirements.txt
-
-        fi
-
-
-
-
-
-    - name: 运行系统
-
-
-      env:
-
-        PYTHONPATH: ${{ github.workspace }}
-
-        PYTHONIOENCODING: utf-8
-
 
       run:
 
+        pip install -r requirements.txt || true
+
+
+
+    - name: 查看环境
+
+      run: |
+
+        python --version
+
+        pwd
+
+        ls
+
+
+
+    - name: 测试核心模块
+
+      run: |
+
+        python - <<'PY'
+
+        import core
+
+        print("核心模块加载成功")
+
+        PY
+
+
+
+    - name: 运行六合AI
+
+      run:
 
         python -u main.py
 
 
 
-
-
-    - name: 中文最终预测
-
+    - name: 输出最终预测
 
       run: |
 
 
-        echo "======================"
+        echo "=============================="
 
-        echo "       六合AI最终预测"
+        echo "        六合AI最终预测"
 
-        echo "======================"
+        echo "=============================="
 
 
         python - <<'PY'
@@ -118,58 +112,123 @@ jobs:
         import json
 
 
+        path="output/prediction.json"
+
+
 
         with open(
 
-            "output/prediction.json",
+            path,
 
             encoding="utf-8"
 
         ) as f:
 
-
             data=json.load(f)
 
 
 
+        print()
 
-        for k,v in data["lotteries"].items():
+        print("版本:",data.get("version"))
+
+        print("时间:",data.get("time"))
+
+
+
+        for key,item in data.get("lotteries",{}).items():
 
 
             print()
 
-            print("======================")
+            print("==============================")
 
             print(
 
-                v.get(
+                item.get(
 
                     "彩种",
 
-                    k
+                    key
 
                 )
 
             )
 
-            print("======================")
+            print("==============================")
 
 
-            if "error" in v:
+            if "error" in item:
 
-                print(v["error"])
+                print(
+
+                    "错误:",
+
+                    item["error"]
+
+                )
 
                 continue
 
 
 
-            print(
+            p=item.get(
 
-                "状态:",
+                "预测",
 
-                v["状态"]["名称"]
+                {}
 
             )
+
+
+
+            # 兼容 V7/V8/V9
+
+            state=p.get(
+
+                "市场状态",
+
+                {}
+
+            )
+
+
+
+            状态=(
+
+                state.get("状态")
+
+                or
+
+                state.get("state")
+
+                or
+
+                "未知"
+
+            )
+
+
+
+            print(
+
+                "市场状态:",
+
+                状态
+
+            )
+
+
+
+            if "entropy" in state:
+
+                print(
+
+                    "熵值:",
+
+                    state["entropy"]
+
+                )
 
 
 
@@ -177,59 +236,80 @@ jobs:
 
                 "特码10码:",
 
-                v["预测"]["特码10码"]
+                p.get(
+
+                    "特码10码",
+
+                    []
+
+                )
 
             )
-
 
 
             print(
 
                 "重点3码:",
 
-                v["预测"]["重点3码"]
+                p.get(
+
+                    "重点3码",
+
+                    []
+
+                )
 
             )
-
 
 
             print(
 
                 "第一推荐:",
 
-                v["预测"]["第一推荐"]
+                p.get(
+
+                    "第一推荐"
+
+                )
 
             )
-
 
 
             print(
 
-                "属性:",
+                "评分:",
 
-                v["属性"]
+                p.get(
+
+                    "评分",
+
+                    {}
+
+                )
 
             )
 
 
 
+            属性=p.get(
+
+                "属性",
+
+                {}
+
+            )
+
+
+            if 属性:
+
+                print(
+
+                    "属性:",
+
+                    属性
+
+                )
+
+
+
         PY
-
-
-
-
-    - name: 保存预测文件
-
-
-      uses: actions/upload-artifact@v4
-
-
-      with:
-
-
-        name: 六合AI预测结果
-
-
-        path:
-
-          output/prediction.json
