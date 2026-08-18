@@ -1,146 +1,42 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.2 FINAL
+六合AI V10.0 FINAL
 
-core/engine.py
-
-
-系统总控制器
-
-
-流程:
-
-初始化
- ↓
-数据库
- ↓
-API同步
- ↓
-质量检测
- ↓
-状态分析
- ↓
-策略选择
- ↓
-预测
- ↓
-回测
- ↓
-JSON输出
-
-
+系统引擎
 """
 
-
-from __future__ import annotations
-
-
+import os
 import json
-
-
 from datetime import datetime
 
 
-from pathlib import Path
-
-
-
-from .sqlite_manager import (
-
-    init_database,
-
-    load_history
-
+from .api import (
+    get_realtime
 )
 
-
-
-from .api_sync import (
-
-    sync_all
-
+from .database import (
+    init_db,
+    save_draw,
+    get_history,
+    count_history
 )
-
-
-
-from .data_quality import (
-
-    quality_report
-
-)
-
-
 
 from .predictor import (
-
     predict_next
-
 )
 
-
-
-try:
-
-    from .backtest import walk_forward
-
-
-except Exception:
-
-
-    walk_forward=None
-
-
-
-
-
-
-
-# =====================================================
-# 路径
-# =====================================================
-
-
-BASE_DIR=Path(__file__).resolve().parent.parent
-
-
-OUTPUT_DIR=BASE_DIR/"output"
-
-
-OUTPUT_DIR.mkdir(
-
-    exist_ok=True
-
-)
-
-
-
-
-
-
-
-# =====================================================
-# 彩种
-# =====================================================
 
 
 LOTTERIES={
 
-
     "hk":
-
     "香港六合彩",
 
-
-
     "newMacau":
-
     "新澳门六合彩",
 
-
-
     "oldMacau":
-
     "老澳门六合彩"
 
 }
@@ -148,235 +44,56 @@ LOTTERIES={
 
 
 
+# ==========================
+# 同步API
+# ==========================
 
+def sync_api():
 
 
-# =====================================================
-# 输出
-# =====================================================
+    result={}
 
 
-def save_json(
+    for key in LOTTERIES:
 
-        name,
 
-        data
+        print(
+            "实时同步:",
+            key
+        )
 
-):
 
+        data=get_realtime(
+            key
+        )
 
-    path=OUTPUT_DIR/name
 
+        if data:
 
 
-    path.write_text(
+            ok=save_draw(
 
-        json.dumps(
+                key,
 
-            data,
+                data.get(
+                    "issue",
+                    ""
+                ),
 
-            ensure_ascii=False,
-
-            indent=2
-
-        ),
-
-        encoding="utf-8"
-
-    )
-
-
-    print(
-
-        "输出:",
-
-        path
-
-    )
-
-
-    return path
-
-
-
-
-
-
-
-# =====================================================
-# 单彩种运行
-# =====================================================
-
-
-def run_lottery(
-
-        key:str
-
-):
-
-
-    print()
-
-    print("="*70)
-
-    print(
-
-        "分析:",
-
-        LOTTERIES[key]
-
-    )
-
-    print("="*70)
-
-
-
-
-
-    history=load_history(
-
-        key
-
-    )
-
-
-
-    quality=quality_report(
-
-        history
-
-    )
-
-
-
-    print(
-
-        "数据质量:",
-
-        quality["质量评分"]
-
-    )
-
-
-
-
-
-    if not quality["可以预测"]:
-
-
-        return {
-
-
-            "error":
-
-            "数据质量不足",
-
-
-            "quality":
-
-            quality
-
-        }
-
-
-
-
-
-
-    specials=[]
-
-
-
-    for row in history:
-
-
-        if isinstance(row,dict):
-
-
-            specials.append(
-
-                int(
-
-                    row["special"]
-
+                data.get(
+                    "numbers",
+                    []
                 )
 
             )
 
 
+            result[key]=ok
 
 
+        else:
 
-    prediction=predict_next(
-
-        specials
-
-    )
-
-
-
-
-
-    result={
-
-
-        "彩种":
-
-        LOTTERIES[key],
-
-
-
-        "历史数量":
-
-        len(history),
-
-
-
-        "数据质量":
-
-        quality,
-
-
-
-        "预测":
-
-        prediction,
-
-
-
-        "时间":
-
-        datetime.now().isoformat()
-
-    }
-
-
-
-
-
-
-    if walk_forward:
-
-
-        try:
-
-
-            result["回测"]=walk_forward(
-
-                specials,
-
-                20
-
-            )
-
-
-        except Exception as e:
-
-
-            result["回测异常"]=str(e)
-
-
-
+            result[key]=False
 
 
 
@@ -386,99 +103,151 @@ def run_lottery(
 
 
 
+# ==========================
+# 分析单个彩种
+# ==========================
+
+def analyze(
+    key
+):
 
 
-# =====================================================
-# 总运行
-# =====================================================
+    name=LOTTERIES[key]
 
-
-def run():
-
-
-
-    print("="*70)
-
-    print(
-
-        "六合彩 AI 智能预测系统 V5.2 FINAL"
-
-    )
-
-    print(
-
-        datetime.now()
-
-    )
-
-    print("="*70)
-
-
-
-
-
-
-    # 1 数据库
 
 
     print(
-
-        "【1】初始化数据库"
-
+        "分析:",
+        name
     )
 
 
-    init_database()
 
-
-
-
-
-
-
-    # 2 同步
-
-
-    print(
-
-        "【2】API同步"
-
+    history=get_history(
+        key
     )
 
 
-    try:
+
+    total=count_history(
+        key
+    )
 
 
-        sync_result=sync_all()
+
+    if not history:
 
 
-    except Exception as e:
+        return {
 
-
-        sync_result={
+            "彩种":name,
 
             "error":
-
-            str(e)
+            "没有读取到历史号码"
 
         }
 
 
 
+    prediction=predict_next(
 
+        history,
 
-    # 3预测
-
-
-    print(
-
-        "【3】开始预测"
+        key
 
     )
 
 
 
-    results={}
+    return {
+
+
+        "彩种":
+
+        name,
+
+
+        "历史数量":
+
+        total,
+
+
+        "预测":
+
+        prediction,
+
+
+        "时间":
+
+        datetime.now().isoformat()
+
+
+    }
+
+
+
+
+
+# ==========================
+# 主运行
+# ==========================
+
+def run():
+
+
+    print("="*60)
+
+    print(
+        "六合彩 AI 智能预测系统 V10.0 FINAL"
+    )
+
+    print(
+        datetime.now()
+    )
+
+    print("="*60)
+
+
+
+    print(
+        "初始化数据库"
+    )
+
+
+    init_db()
+
+
+
+    print(
+        "开始API同步"
+    )
+
+
+    sync=sync_api()
+
+
+
+    output={
+
+        "version":
+
+        "V10.0 FINAL",
+
+
+        "time":
+
+        datetime.now().isoformat(),
+
+
+        "sync":
+
+        sync,
+
+
+        "lotteries":{}
+
+    }
+
 
 
 
@@ -488,20 +257,17 @@ def run():
         try:
 
 
-            results[key]=run_lottery(
-
+            output["lotteries"][key]=analyze(
                 key
-
             )
 
 
         except Exception as e:
 
 
-            results[key]={
+            output["lotteries"][key]={
 
                 "error":
-
                 str(e)
 
             }
@@ -509,74 +275,46 @@ def run():
 
 
 
+    os.makedirs(
 
-    final={
+        "output",
 
-
-        "version":
-
-        "V5.2 FINAL",
-
-
-
-        "time":
-
-        datetime.now().isoformat(),
-
-
-
-        "sync":
-
-        sync_result,
-
-
-
-        "lotteries":
-
-        results
-
-    }
-
-
-
-
-
-    save_json(
-
-        "prediction.json",
-
-        final
+        exist_ok=True
 
     )
 
 
 
+    with open(
+
+        "output/prediction.json",
+
+        "w",
+
+        encoding="utf-8"
+
+    ) as f:
 
 
-    print()
+        json.dump(
 
-    print("="*70)
+            output,
+
+            f,
+
+            ensure_ascii=False,
+
+            indent=2
+
+        )
+
+
 
     print(
 
-        "系统运行完成"
+        "输出完成: output/prediction.json"
 
     )
 
-    print("="*70)
 
-
-
-    return final
-
-
-
-
-
-
-
-__all__=[
-
-    "run"
-
-]
+    return output
