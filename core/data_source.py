@@ -1,20 +1,20 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 data_source.py
 
-数据源模块
+数据源管理模块
 
 
-功能:
+功能：
 
 1. API请求
-2. SSL fallback
-3. 历史同步
-4. 实时同步
-5. 数据标准化
+2. SSL异常处理
+3. 历史开奖同步
+4. 最新开奖同步
+5. 数据格式统一
 
 
 """
@@ -32,60 +32,15 @@ from datetime import datetime
 
 
 
-# =====================================================
-# API配置
-# =====================================================
+from .config import (
 
+    历史数据接口,
 
-BASE_API = (
+    实时数据接口,
 
-    "https://marksix6.net"
-
-)
-
-
-HISTORY_API = (
-
-    BASE_API +
-
-    "/index.php?api=1"
+    彩种列表
 
 )
-
-
-
-LOTTERY_API = (
-
-    BASE_API +
-
-    "/api/lottery_api.php"
-
-)
-
-
-
-
-
-LOTTERY_MAP={
-
-
-    "hk":
-
-    "香港六合彩",
-
-
-    "newMacau":
-
-    "新澳门六合彩",
-
-
-    "oldMacau":
-
-    "老澳门六合彩"
-
-
-}
-
 
 
 
@@ -96,23 +51,48 @@ LOTTERY_MAP={
 # =====================================================
 
 
-def request_url(url,timeout=15):
+def 请求数据(url):
 
 
     try:
 
 
-        context=ssl.create_default_context()
+        print(
+
+            "正在请求数据:",
+
+            url
+
+        )
+
+
+        ssl_context = ssl.create_default_context()
+
+
+
+        request = urllib.request.Request(
+
+            url,
+
+            headers={
+
+                "User-Agent":
+
+                "Mozilla/5.0"
+
+            }
+
+        )
 
 
 
         with urllib.request.urlopen(
 
-            url,
+            request,
 
-            timeout=timeout,
+            timeout=15,
 
-            context=context
+            context=ssl_context
 
         ) as response:
 
@@ -130,7 +110,7 @@ def request_url(url,timeout=15):
 
         print(
 
-            "SSL正常验证失败:",
+            "⚠️ SSL正常验证失败:",
 
             e
 
@@ -138,7 +118,11 @@ def request_url(url,timeout=15):
 
 
 
-    # fallback
+
+
+    # =================================================
+    # SSL备用模式
+    # =================================================
 
 
     try:
@@ -146,31 +130,49 @@ def request_url(url,timeout=15):
 
         print(
 
-            "尝试受控SSL fallback..."
+            "正在尝试备用SSL模式..."
 
         )
 
 
-        context=ssl._create_unverified_context()
+
+        ssl_context = ssl._create_unverified_context()
+
+
+
+        request = urllib.request.Request(
+
+            url,
+
+            headers={
+
+                "User-Agent":
+
+                "Mozilla/5.0"
+
+            }
+
+        )
 
 
 
         with urllib.request.urlopen(
 
-            url,
+            request,
 
-            timeout=timeout,
+            timeout=15,
 
-            context=context
+            context=ssl_context
 
         ) as response:
 
 
             print(
 
-                "SSL fallback成功"
+                "✅ SSL备用模式成功"
 
             )
+
 
 
             return response.read().decode(
@@ -180,12 +182,13 @@ def request_url(url,timeout=15):
             )
 
 
+
     except Exception as e:
 
 
         print(
 
-            "请求失败:",
+            "❌ 数据请求失败:",
 
             e
 
@@ -203,15 +206,7 @@ def request_url(url,timeout=15):
 # =====================================================
 
 
-def load_json(url):
-
-
-    text=request_url(
-
-        url
-
-    )
-
+def 解析JSON(text):
 
 
     if not text:
@@ -236,7 +231,7 @@ def load_json(url):
 
         print(
 
-            "JSON解析失败",
+            "JSON解析失败:",
 
             e
 
@@ -250,30 +245,42 @@ def load_json(url):
 
 
 # =====================================================
-# 数字解析
+# 号码标准化
 # =====================================================
 
 
-def parse_numbers(value):
+def 标准化号码(numbers):
 
 
-    if isinstance(value,list):
+    if isinstance(
+
+        numbers,
+
+        list
+
+    ):
 
 
         return [
 
             int(x)
 
-            for x in value
+            for x in numbers
 
         ]
 
 
 
-    if isinstance(value,str):
+    if isinstance(
+
+        numbers,
+
+        str
+
+    ):
 
 
-        value=value.replace(
+        numbers=numbers.replace(
 
             ",",
 
@@ -282,11 +289,12 @@ def parse_numbers(value):
         )
 
 
+
         return [
 
             int(x)
 
-            for x in value.split()
+            for x in numbers.split()
 
             if x.isdigit()
 
@@ -301,51 +309,59 @@ def parse_numbers(value):
 
 
 # =====================================================
-# 标准化开奖
+# 单期开奖转换
 # =====================================================
 
 
-def normalize_draw(item):
+def 标准化开奖(data):
 
 
-    numbers=[]
+    if not data:
+
+
+        return None
 
 
 
-    if "numbers" in item:
+    号码=[]
 
 
-        numbers=parse_numbers(
 
-            item["numbers"]
+    if "numbers" in data:
+
+
+        号码=标准化号码(
+
+            data["numbers"]
+
+        )
+
+
+    elif "openCode" in data:
+
+
+        号码=标准化号码(
+
+            data["openCode"]
 
         )
 
 
-
-    elif "openCode" in item:
-
-
-        numbers=parse_numbers(
-
-            item["openCode"]
-
-        )
 
 
 
     return {
 
 
-        "issue":
+        "期号":
 
         str(
 
-            item.get(
+            data.get(
 
                 "expect",
 
-                item.get(
+                data.get(
 
                     "issue",
 
@@ -359,15 +375,39 @@ def normalize_draw(item):
 
 
 
-        "numbers":
+        "号码":
 
-        numbers,
+        号码,
 
 
 
-        "open_time":
+        "生肖":
 
-        item.get(
+        data.get(
+
+            "zodiac",
+
+            []
+
+        ),
+
+
+
+        "波色":
+
+        data.get(
+
+            "wave",
+
+            []
+
+        ),
+
+
+
+        "开奖时间":
+
+        data.get(
 
             "openTime",
 
@@ -377,15 +417,11 @@ def normalize_draw(item):
 
 
 
-        "source":
+        "来源":
 
-        "marksix6",
+        "marksix6"
 
 
-
-        "update_time":
-
-        datetime.now().isoformat()
 
     }
 
@@ -394,25 +430,24 @@ def normalize_draw(item):
 
 
 # =====================================================
-# 获取历史数据
+# 获取历史开奖
 # =====================================================
 
 
-def fetch_history():
-
+def 获取历史数据():
 
 
     print("="*60)
 
     print(
 
-        "正在获取历史数据"
+        "正在获取历史开奖数据"
 
     )
 
     print(
 
-        HISTORY_API
+        历史数据接口
 
     )
 
@@ -420,9 +455,17 @@ def fetch_history():
 
 
 
-    data=load_json(
+    text = 请求数据(
 
-        HISTORY_API
+        历史数据接口
+
+    )
+
+
+
+    data = 解析JSON(
+
+        text
 
     )
 
@@ -435,11 +478,15 @@ def fetch_history():
 
 
 
+
+
     result={}
 
 
 
-    lottery_data=data.get(
+
+
+    彩种数据=data.get(
 
         "lottery_data",
 
@@ -449,20 +496,10 @@ def fetch_history():
 
 
 
-    for lottery in lottery_data:
+    for item in 彩种数据:
 
 
-
-        name=lottery.get(
-
-            "name",
-
-            ""
-
-        )
-
-
-        code=lottery.get(
+        code=item.get(
 
             "code",
 
@@ -472,14 +509,14 @@ def fetch_history():
 
 
 
-        if code not in LOTTERY_MAP:
+        if code not in 彩种列表:
 
 
             continue
 
 
 
-        history=lottery.get(
+        history=item.get(
 
             "history",
 
@@ -491,11 +528,25 @@ def fetch_history():
 
         result[code]=[
 
-            normalize_draw(x)
+            标准化开奖(x)
 
             for x in history
 
         ]
+
+
+
+        print(
+
+            彩种列表[code],
+
+            "历史数据:",
+
+            len(result[code]),
+
+            "期"
+
+        )
 
 
 
@@ -506,16 +557,16 @@ def fetch_history():
 
 
 # =====================================================
-# 获取实时开奖
+# 获取最新开奖
 # =====================================================
 
 
-def fetch_latest(code):
+def 获取最新开奖(code):
 
 
     url=(
 
-        LOTTERY_API
+        实时数据接口
 
         +
 
@@ -531,7 +582,21 @@ def fetch_latest(code):
 
     print(
 
-        "请求API:",
+        "正在更新:",
+
+        彩种列表.get(
+
+            code,
+
+            code
+
+        )
+
+    )
+
+
+
+    text=请求数据(
 
         url
 
@@ -539,9 +604,9 @@ def fetch_latest(code):
 
 
 
-    data=load_json(
+    data=解析JSON(
 
-        url
+        text
 
     )
 
@@ -554,9 +619,26 @@ def fetch_latest(code):
 
 
 
-    lottery=data.get(
 
-        "lottery_data",
+
+    if isinstance(
+
+        data.get(
+
+            "lottery_data"
+
+        ),
+
+        list
+
+    ):
+
+
+        data=data["lottery_data"][0]
+
+
+
+    return 标准化开奖(
 
         data
 
@@ -564,61 +646,29 @@ def fetch_latest(code):
 
 
 
-    if isinstance(
-
-        lottery,
-
-        list
-
-    ):
-
-
-        lottery=lottery[0]
-
-
-
-    return normalize_draw(
-
-        lottery
-
-    )
-
-
-
 
 
 # =====================================================
-# 同步三个彩种
+# 同步全部彩种
 # =====================================================
 
 
-def sync_all():
+def 同步全部彩种():
+
 
 
     result={}
 
 
 
-    for code in LOTTERY_MAP:
+    for code in 彩种列表:
 
 
-        print(
-
-            "同步:",
-
-            LOTTERY_MAP[code]
-
-        )
-
-
-        draw=fetch_latest(
+        result[code]=获取最新开奖(
 
             code
 
         )
-
-
-        result[code]=draw
 
 
 
@@ -636,19 +686,24 @@ def sync_all():
 if __name__=="__main__":
 
 
-    data=sync_all()
+    历史=获取历史数据()
+
 
 
     print(
 
-        json.dumps(
+        "同步完成"
 
-            data,
+    )
 
-            ensure_ascii=False,
 
-            indent=2
 
-        )
+    最新=同步全部彩种()
+
+
+
+    print(
+
+        最新
 
     )
