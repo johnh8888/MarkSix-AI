@@ -349,3 +349,103 @@ __all__=[
     "get_odd_even"
 
 ]
+# =====================================================
+# V10 FINAL 兼容旧接口
+# =====================================================
+
+
+def predict_next(
+    history,
+    lottery_name="六合彩"
+):
+
+    """
+    兼容 V5-V9 engine调用
+
+    返回格式保持旧版
+    """
+
+    try:
+
+        # 调用V10核心预测
+
+        result = predict_v10(
+            history,
+            lottery_name
+        )
+
+
+        return {
+
+            "版本":
+            "V10.0 FINAL",
+
+
+            "特码10码":
+            result.get(
+                "numbers",
+                []
+            ),
+
+
+            "重点3码":
+            result.get(
+                "top3",
+                []
+            ),
+
+
+            "第一推荐":
+            result.get(
+                "first",
+                None
+            ),
+
+
+            "评分":
+            result.get(
+                "scores",
+                {}
+            ),
+
+
+            "属性":
+            result.get(
+                "attributes",
+                {})
+
+
+        }
+
+
+    except Exception as e:
+
+
+        # 防止workflow中断
+
+        return {
+
+            "版本":
+            "V10.0 FINAL ERROR",
+
+            "错误":
+            str(e),
+
+            "特码10码":
+            [],
+
+            "重点3码":
+            [],
+
+            "第一推荐":
+            None
+
+        }
+
+
+
+__all__=[
+
+    "predict_next"
+
+]
