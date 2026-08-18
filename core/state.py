@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
@@ -7,16 +7,15 @@ state.py
 
 市场状态识别模块
 
-负责:
 
-1. 热态
-2. 冷态
-3. 平衡态
-4. 混沌态
-5. 波色惯性
-6. 波色反转
-7. 数字集中度
+功能:
 
+1. 熵值计算
+2. 热度检测
+3. 趋势检测
+4. 连续模式检测
+5. 市场状态分类
+6. 动态策略建议
 
 """
 
@@ -28,9 +27,11 @@ import math
 
 from .features import (
 
-    get_special,
-
     get_wave,
+
+    get_size,
+
+    get_parity
 
 )
 
@@ -39,19 +40,59 @@ from .features import (
 
 
 # =====================================================
-# 状态类型
+# 号码解析
 # =====================================================
 
 
-STATE_HOT = "热态"
+def parse_numbers(rows):
 
-STATE_COLD = "冷态"
 
-STATE_BALANCE = "平衡态"
+    result=[]
 
-STATE_CHAOS = "混沌态"
 
-STATE_REVERSE = "反转态"
+    for row in rows:
+
+
+        nums=row.get(
+
+            "numbers",
+
+            ""
+
+        )
+
+
+        if isinstance(nums,str):
+
+
+            nums=nums.replace(
+
+                ",",
+
+                " "
+
+            ).split()
+
+
+
+        for n in nums:
+
+
+            try:
+
+                result.append(
+
+                    int(n)
+
+                )
+
+            except:
+
+                pass
+
+
+
+    return result
 
 
 
@@ -65,38 +106,45 @@ STATE_REVERSE = "反转态"
 def entropy(values):
 
 
-    if not values:
-
-        return 0
-
-
-
     counter=Counter(values)
 
 
     total=len(values)
 
 
+
+    if total==0:
+
+        return 0
+
+
+
     result=0
 
 
 
-    for c in counter.values():
+    for count in counter.values():
 
 
-        p=c/total
+        p=count/total
 
 
-        result -= p*math.log(
+        result -= p * math.log(
+
             p,
+
             2
+
         )
 
 
 
     return round(
+
         result,
+
         4
+
     )
 
 
@@ -104,47 +152,120 @@ def entropy(values):
 
 
 # =====================================================
-# 数字集中度
+# 波色熵
 # =====================================================
 
 
-def number_concentration(rows,window=20):
+def wave_entropy(numbers):
 
 
-    nums=[]
+    waves=[
+
+        get_wave(n)
+
+        for n in numbers
+
+    ]
 
 
-    for row in rows[:window]:
+    return entropy(
 
+        waves
 
-        n=get_special(row)
-
-
-        if n:
-
-            nums.append(n)
+    )
 
 
 
-    if not nums:
+
+
+# =====================================================
+# 大小熵
+# =====================================================
+
+
+def size_entropy(numbers):
+
+
+    values=[
+
+        get_size(n)
+
+        for n in numbers
+
+    ]
+
+
+    return entropy(
+
+        values
+
+    )
+
+
+
+
+
+# =====================================================
+# 单双熵
+# =====================================================
+
+
+def parity_entropy(numbers):
+
+
+    values=[
+
+        get_parity(n)
+
+        for n in numbers
+
+    ]
+
+
+    return entropy(
+
+        values
+
+    )
+
+
+
+
+
+# =====================================================
+# 热号比例
+# =====================================================
+
+
+def hot_ratio(numbers,limit=20):
+
+
+    recent=numbers[:limit]
+
+
+    counter=Counter(
+
+        recent
+
+    )
+
+
+    if not counter:
 
         return 0
 
 
 
-    counter=Counter(nums)
+    max_value=max(
 
-
-    max_count=max(
         counter.values()
+
     )
 
 
     return round(
 
-        max_count /
-
-        len(nums),
+        max_value/limit,
 
         4
 
@@ -155,258 +276,257 @@ def number_concentration(rows,window=20):
 
 
 # =====================================================
-# 波色连续检测
+# 连续波检测
 # =====================================================
 
 
-def wave_chain(rows):
+def detect_wave_streak(numbers):
 
 
-    result=[]
-
-
-    for row in rows:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            w=get_wave(n)
-
-            result.append(w)
-
-
-
-    return result
-
-
-
-
-
-def same_wave_count(rows):
-
-
-    waves=wave_chain(
-        rows
-    )
-
-
-    if not waves:
-
-        return 0
-
-
-
-    first=waves[0]
-
-
-    count=0
-
-
-    for w in waves:
-
-
-        if w==first:
-
-            count+=1
-
-        else:
-
-            break
-
-
-
-    return count
-
-
-
-
-
-# =====================================================
-# 波色反转检测
-# =====================================================
-
-
-def detect_reverse(rows):
-
-
-    waves=wave_chain(
-        rows[:10]
-    )
-
-
-    if len(waves)<5:
+    if len(numbers)<3:
 
         return False
 
 
 
-    change=0
+    waves=[
+
+        get_wave(n)
+
+        for n in numbers[:3]
+
+    ]
 
 
 
-    for i in range(
-        1,
-        len(waves)
-    ):
-
-
-        if waves[i]!=waves[i-1]:
-
-            change+=1
-
-
-
-    ratio=change/len(waves)
-
-
-
-    return ratio>0.7
+    return len(set(waves))==1
 
 
 
 
 
 # =====================================================
-# 市场状态分析
+# 反转检测
+# =====================================================
+
+
+def detect_flip(numbers):
+
+
+    if len(numbers)<6:
+
+        return False
+
+
+
+    first=[
+
+        get_wave(n)
+
+        for n in numbers[:3]
+
+    ]
+
+
+    second=[
+
+        get_wave(n)
+
+        for n in numbers[3:6]
+
+    ]
+
+
+
+    return (
+
+        len(set(first))==1
+
+        and
+
+        len(set(second))==1
+
+        and
+
+        first[0]!=second[0]
+
+    )
+
+
+
+
+
+# =====================================================
+# 趋势强度
+# =====================================================
+
+
+def trend_strength(numbers):
+
+
+    recent=numbers[:20]
+
+
+    old=numbers[20:40]
+
+
+
+    if len(old)==0:
+
+        return 0
+
+
+
+    r=Counter(recent)
+
+    o=Counter(old)
+
+
+
+    score=0
+
+
+
+    for n in range(1,50):
+
+
+        score += abs(
+
+            r[n]-o[n]
+
+        )
+
+
+
+    return round(
+
+        score/20,
+
+        4
+
+    )
+
+
+
+
+
+# =====================================================
+# 市场状态判断
 # =====================================================
 
 
 def analyze_state(rows):
 
 
-    concentration = number_concentration(
+    numbers=parse_numbers(
+
         rows
-    )
 
-
-    h = entropy(
-        [
-            get_wave(
-                get_special(r)
-            )
-
-            for r in rows[:30]
-
-            if get_special(r)
-        ]
-    )
-
-
-    same_wave=same_wave_count(
-        rows
-    )
-
-
-    reverse=detect_reverse(
-        rows
     )
 
 
 
-    # ==========================
-    # 反转状态
-    # ==========================
-
-    if reverse:
+    if len(numbers)<20:
 
 
         return {
 
 
             "state":
-                STATE_REVERSE,
+
+            "数据不足",
 
 
             "entropy":
-                h,
 
-
-            "concentration":
-                concentration
+            None
 
         }
 
 
 
-    # ==========================
-    # 热态
-    # ==========================
+    e=wave_entropy(
 
-    if concentration>=0.25:
+        numbers[:50]
 
-
-        return {
+    )
 
 
-            "state":
-                STATE_HOT,
+    hot=hot_ratio(
+
+        numbers
+
+    )
 
 
-            "entropy":
-                h,
+    trend=trend_strength(
+
+        numbers
+
+    )
 
 
-            "concentration":
-                concentration
+    streak=detect_wave_streak(
 
-        }
+        numbers
 
-
-
+    )
 
 
-    # ==========================
-    # 冷态
-    # ==========================
+    flip=detect_flip(
 
-    if concentration<=0.08:
+        numbers
 
-
-        return {
-
-
-            "state":
-                STATE_COLD,
-
-
-            "entropy":
-                h,
-
-
-            "concentration":
-                concentration
-
-        }
+    )
 
 
 
 
-
-    # ==========================
-    # 混沌
-    # ==========================
-
-    if h>1.55:
+    # -------------------------
+    # 状态判断
+    # -------------------------
 
 
-        return {
+    if streak:
 
 
-            "state":
-                STATE_CHAOS,
+        state="连续波状态"
 
 
-            "entropy":
-                h,
+
+    elif flip:
 
 
-            "concentration":
-                concentration
+        state="波色反转状态"
 
-        }
+
+
+    elif e < 1.2:
+
+
+        state="集中趋势状态"
+
+
+
+    elif e > 1.55:
+
+
+        state="混沌状态"
+
+
+
+    elif trend>2:
+
+
+        state="趋势变化状态"
+
+
+
+    else:
+
+
+        state="平衡状态"
+
 
 
 
@@ -416,18 +536,32 @@ def analyze_state(rows):
 
         "state":
 
-            STATE_BALANCE,
+        state,
 
 
         "entropy":
 
-            h,
+        e,
 
 
-        "concentration":
+        "hot_ratio":
 
-            concentration
+        hot,
 
+
+        "trend":
+
+        trend,
+
+
+        "wave_streak":
+
+        streak,
+
+
+        "flip":
+
+        flip
 
     }
 
@@ -436,117 +570,155 @@ def analyze_state(rows):
 
 
 # =====================================================
-# 动态策略建议
+# 动态权重建议
 # =====================================================
 
 
-def strategy_adjustment(state):
+def dynamic_weight(state):
 
 
-    s=state.get(
-        "state"
+    weights={
+
+
+        "frequency":0.20,
+
+
+        "trend":0.15,
+
+
+        "momentum":0.12,
+
+
+        "omission":0.10,
+
+
+        "wave":0.10,
+
+
+        "size":0.08,
+
+
+        "parity":0.08,
+
+
+        "zodiac":0.07,
+
+
+        "zone":0.05,
+
+
+        "tail":0.05
+
+    }
+
+
+
+    mode=state.get(
+
+        "state",
+
+        ""
+
     )
 
 
 
-    if s==STATE_HOT:
+    if mode=="连续波状态":
 
 
-        return {
+        weights["wave"]+=0.08
 
-
-            "trend":
-                0.25,
-
-
-            "frequency":
-                0.30,
-
-
-            "omission":
-                0.10
-
-        }
+        weights["trend"]+=0.05
 
 
 
-    if s==STATE_COLD:
+    elif mode=="波色反转状态":
 
 
-        return {
+        weights["wave"]+=0.05
 
-
-            "trend":
-                0.10,
-
-
-            "frequency":
-                0.15,
-
-
-            "omission":
-                0.30
-
-        }
+        weights["momentum"]+=0.05
 
 
 
-    if s==STATE_REVERSE:
+    elif mode=="集中趋势状态":
 
 
-        return {
+        weights["frequency"]+=0.08
 
-
-            "trend":
-                0.15,
-
-
-            "frequency":
-                0.20,
-
-
-            "wave":
-                0.30
-
-        }
+        weights["trend"]+=0.08
 
 
 
-
-    if s==STATE_CHAOS:
-
-
-        return {
+    elif mode=="混沌状态":
 
 
-            "frequency":
-                0.15,
+        weights["frequency"]-=0.05
+
+        weights["trend"]-=0.05
+
+        weights["omission"]+=0.08
 
 
-            "trend":
-                0.10,
 
+    total=sum(
 
-            "size":
-                0.20
+        weights.values()
 
-        }
-
+    )
 
 
     return {
 
 
-        "frequency":
-            0.25,
+        k:
 
+        round(
 
-        "trend":
-            0.20,
+            v/total,
 
+            4
 
-        "wave":
-            0.15
+        )
 
+        for k,v in weights.items()
 
     }
+
+
+
+
+
+# =====================================================
+# 测试
+# =====================================================
+
+
+if __name__=="__main__":
+
+
+    data=[
+
+        {
+
+        "numbers":
+
+        "39 41 08 09 07 14 49"
+
+        }
+
+    ]*10
+
+
+
+    s=analyze_state(data)
+
+
+    print(s)
+
+
+    print(
+
+        dynamic_weight(s)
+
+    )
