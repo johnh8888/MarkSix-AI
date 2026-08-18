@@ -5,33 +5,32 @@
 
 state_engine.py
 
-动态策略引擎
+动态状态权重引擎
 
 
-功能:
+输入:
+历史开奖
 
-1. 读取市场状态
-2. 动态调整模型权重
-3. 状态切换
-4. 权重归一化
+
+输出:
+
+市场状态
+
++
+模型动态权重
 
 
 """
 
 
-from .state import (
+from collections import Counter
 
-    analyze_state,
 
-    STATE_HOT,
+from .features import (
 
-    STATE_COLD,
+    get_special,
 
-    STATE_BALANCE,
-
-    STATE_CHAOS,
-
-    STATE_REVERSE,
+    get_wave,
 
 )
 
@@ -40,60 +39,69 @@ from .state import (
 
 
 # =====================================================
-# 默认模型
+# 状态定义
 # =====================================================
 
 
-DEFAULT_WEIGHTS = {
+STATE_HOT = "热态"
+
+STATE_COLD = "冷态"
+
+STATE_BALANCE = "平衡"
+
+STATE_REVERSE = "反转"
+
+STATE_CHAOS = "混沌"
+
+
+
+
+
+# =====================================================
+# 默认权重
+# =====================================================
+
+
+BASE_WEIGHTS = {
 
 
     "frequency":
-
         0.20,
 
 
     "trend":
-
         0.15,
 
 
     "momentum":
-
         0.10,
 
 
     "omission":
-
         0.10,
 
 
     "adjacency":
-
         0.08,
 
 
     "tail":
-
         0.07,
 
 
     "zone":
-
         0.05,
 
 
     "size":
-
         0.10,
 
 
     "parity":
-
         0.05,
 
 
     "wave":
-
         0.10,
 
 
@@ -104,11 +112,11 @@ DEFAULT_WEIGHTS = {
 
 
 # =====================================================
-# 权重归一化
+# 归一化
 # =====================================================
 
 
-def normalize_weights(weights):
+def normalize(weights):
 
 
     total=sum(
@@ -116,10 +124,9 @@ def normalize_weights(weights):
     )
 
 
-    if total==0:
+    if total<=0:
 
-
-        return DEFAULT_WEIGHTS.copy()
+        return BASE_WEIGHTS.copy()
 
 
 
@@ -143,159 +150,263 @@ def normalize_weights(weights):
 
 
 # =====================================================
-# 状态调整规则
+# 热冷检测
 # =====================================================
 
 
-def adjust_by_state(weights,state):
+def detect_hot_cold(rows):
 
 
-    result=weights.copy()
+    recent=[]
 
 
-
-    # =========================
-    # 热态
-    # =========================
-
-    if state==STATE_HOT:
+    for row in rows[:20]:
 
 
-        result["trend"]*=1.5
-
-        result["momentum"]*=1.4
-
-        result["frequency"]*=1.2
+        n=get_special(row)
 
 
-        result["omission"]*=0.7
+        if n:
+
+            recent.append(n)
 
 
 
+    if not recent:
 
-
-    # =========================
-    # 冷态
-    # =========================
-
-    elif state==STATE_COLD:
-
-
-        result["omission"]*=1.8
-
-        result["frequency"]*=0.8
-
-        result["trend"]*=0.8
+        return STATE_BALANCE
 
 
 
+    counter=Counter(
+        recent
+    )
 
 
-    # =========================
-    # 混沌
-    # =========================
 
-    elif state==STATE_CHAOS:
-
-
-        result["frequency"]*=1.2
-
-        result["size"]*=1.3
-
-        result["parity"]*=1.3
+    max_count=max(
+        counter.values()
+    )
 
 
-        result["momentum"]*=0.6
 
-        result["trend"]*=0.6
+    # 高频集中
+
+    if max_count>=4:
+
+        return STATE_HOT
+
+
+
+    # 最近号码重复少
+
+    if len(set(recent))>=18:
+
+        return STATE_COLD
+
+
+
+    return STATE_BALANCE
 
 
 
 
 
-    # =========================
-    # 反转
-    # =========================
-
-    elif state==STATE_REVERSE:
+# =====================================================
+# 波色状态
+# =====================================================
 
 
-        result["wave"]*=1.8
-
-        result["trend"]*=1.3
+def detect_wave_state(rows):
 
 
-        result["frequency"]*=0.8
+    waves=[]
+
+
+    for row in rows[:20]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            waves.append(
+                get_wave(n)
+            )
+
+
+
+    if len(waves)<5:
+
+        return STATE_BALANCE
+
+
+
+    count=Counter(
+        waves
+    )
+
+
+    value=max(
+        count.values()
+    )
+
+
+
+    if value>=12:
+
+        return STATE_HOT
+
+
+
+    if value<=5:
+
+        return STATE_COLD
+
+
+
+    return STATE_BALANCE
 
 
 
 
 
-    # =========================
-    # 平衡
-    # =========================
+# =====================================================
+# 连续反转检测
+# =====================================================
+
+
+def detect_reverse(rows):
+
+
+    nums=[]
+
+
+    for row in rows[:10]:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            nums.append(n)
+
+
+
+    if len(nums)<5:
+
+        return False
+
+
+
+    big_small=[]
+
+
+    for n in nums:
+
+
+        if n>=25:
+
+            big_small.append(1)
+
+        else:
+
+            big_small.append(0)
+
+
+
+    # 大小连续切换
+
+    changes=0
+
+
+    for i in range(
+        len(big_small)-1
+    ):
+
+
+        if big_small[i]!=big_small[i+1]:
+
+            changes+=1
+
+
+
+    return changes>=7
+
+
+
+
+
+# =====================================================
+# 市场状态分析
+# =====================================================
+
+
+def analyze_state(rows):
+
+
+    hot=detect_hot_cold(rows)
+
+
+    wave=detect_wave_state(rows)
+
+
+    reverse=detect_reverse(rows)
+
+
+
+    if reverse:
+
+
+        state=STATE_REVERSE
+
+
+
+    elif hot==STATE_HOT:
+
+
+        state=STATE_HOT
+
+
+
+    elif hot==STATE_COLD:
+
+
+        state=STATE_COLD
+
+
 
     else:
 
 
-        result["frequency"]*=1.1
-
-        result["trend"]*=1.1
+        state=STATE_BALANCE
 
 
-
-
-
-    return normalize_weights(
-        result
-    )
-
-
-
-
-
-# =====================================================
-# 主入口
-# =====================================================
-
-
-def generate_dynamic_weights(rows):
-
-
-    state_info=analyze_state(
-        rows
-    )
-
-
-    state=state_info.get(
-        "state",
-        STATE_BALANCE
-    )
-
-
-    weights=adjust_by_state(
-
-        DEFAULT_WEIGHTS,
-
-        state
-
-    )
 
 
     return {
 
 
-        "state":state,
+        "state":
+
+        state,
 
 
-        "state_info":
+        "hot_state":
 
-            state_info,
+        hot,
 
 
-        "weights":
+        "wave_state":
 
-            weights
+        wave,
+
+
+        "reverse":
+
+        reverse,
 
 
     }
@@ -305,19 +416,127 @@ def generate_dynamic_weights(rows):
 
 
 # =====================================================
-# 获取单独权重
+# 状态调整权重
+# =====================================================
+
+
+def adjust_weights(rows):
+
+
+    info=analyze_state(
+        rows
+    )
+
+
+    state=info["state"]
+
+
+
+    weights=BASE_WEIGHTS.copy()
+
+
+
+    # ====================
+    # 热态
+    # ====================
+
+    if state==STATE_HOT:
+
+
+        weights["trend"]*=1.5
+
+        weights["momentum"]*=1.5
+
+        weights["frequency"]*=1.2
+
+
+        weights["omission"]*=0.7
+
+
+
+
+    # ====================
+    # 冷态
+    # ====================
+
+    elif state==STATE_COLD:
+
+
+        weights["omission"]*=1.8
+
+        weights["frequency"]*=0.8
+
+
+        weights["trend"]*=0.8
+
+
+
+
+
+    # ====================
+    # 反转
+    # ====================
+
+    elif state==STATE_REVERSE:
+
+
+        weights["wave"]*=1.8
+
+        weights["parity"]*=1.4
+
+        weights["size"]*=1.3
+
+
+        weights["momentum"]*=0.6
+
+
+
+
+
+    # ====================
+    # 平衡
+    # ====================
+
+    else:
+
+
+        weights["frequency"]*=1.1
+
+        weights["trend"]*=1.1
+
+
+
+
+
+    return {
+
+
+        "state":
+
+        info,
+
+
+        "weights":
+
+        normalize(weights)
+
+    }
+
+
+
+
+
+# =====================================================
+# 外部调用
 # =====================================================
 
 
 def get_weights(rows):
 
 
-    result=generate_dynamic_weights(
+    return adjust_weights(
         rows
-    )
-
-
-    return result["weights"]
+    )["weights"]
 
 
 
@@ -331,47 +550,27 @@ def get_weights(rows):
 if __name__=="__main__":
 
 
-    rows=[
+    test=[
+
 
         {
-
         "numbers":
         "38,26,08,06,29,18,23"
-
         },
+
 
         {
-
         "numbers":
         "33,27,16,28,04,25,14"
-
-        },
+        }
 
     ]
 
 
 
-    result=generate_dynamic_weights(
-        rows
+    result=adjust_weights(
+        test
     )
 
 
-    print("="*60)
-
-    print(
-        "状态:",
-        result["state"]
-    )
-
-
-    print(
-        "权重:"
-    )
-
-
-    for k,v in result["weights"].items():
-
-        print(
-            k,
-            v
-        )
+    print(result)
