@@ -1,434 +1,207 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.0 FINAL
+六合彩 AI 智能预测系统 V6.0
 
-core/predictor.py
+智能预测引擎
 
-预测核心模块
-
-功能：
-
-1. 特码评分融合
-2. Top10号码
-3. Top3重点号码
-4. 生肖预测
-5. 大小单双
-6. 波色预测
-7. 兼容 predict_next()
+HMM思想
+Markov状态
+Bayes融合
+冷热衰减
+特征评分
 
 """
 
-from __future__ import annotations
-
-
-from typing import Dict, List, Any
-
 
 from collections import Counter
+import math
+from datetime import datetime
 
 
 
-# =====================================================
-# 基础导入
-# =====================================================
-
-
-try:
-
-    from .features import build_feature_score
-
-
-except Exception:
-
-    build_feature_score = None
-
-
-
-try:
-
-    from .wave_model import predict_wave
-
-
-except Exception:
-
-    predict_wave = None
-
-
-
-try:
-
-    from .zodiac_model import get_zodiac
-
-
-except Exception:
-
-
-    def get_zodiac(n):
-
-        return "未知"
-
-
-
-
-
-# =====================================================
-# 常量
-# =====================================================
-
-
-NUMBERS = list(range(1,50))
-
+# ==========================
+# 波色
+# ==========================
 
 RED = {
-    1,2,7,8,12,13,18,19,
-    23,24,29,30,34,35,
-    40,45,46
+1,2,7,8,12,13,18,19,
+23,24,29,30,34,35,40,
+45,46
 }
 
 
 BLUE = {
-    3,4,9,10,14,15,
-    20,25,26,31,
-    36,37,41,42,47,48
+3,4,9,10,14,15,20,
+25,26,31,36,37,41,
+42,47,48
 }
 
 
 GREEN = {
-    5,6,11,16,17,
-    21,22,27,28,
-    32,33,38,39,43,44,49
+5,6,11,16,17,21,
+22,27,28,32,33,
+38,39,43,44,49
 }
 
 
 
+def get_wave(n):
 
-# =====================================================
-# 基础属性
-# =====================================================
-
-
-def get_wave(num:int):
-
-    if num in RED:
-
+    if n in RED:
         return "红"
 
-
-    if num in BLUE:
-
+    if n in BLUE:
         return "蓝"
 
-
-    if num in GREEN:
-
-        return "绿"
-
-
-    return "未知"
+    return "绿"
 
 
 
+def get_size(n):
 
-def get_size(num:int):
-
-    return "大" if num>=25 else "小"
-
+    return "大" if n>=25 else "小"
 
 
-def get_parity(num:int):
 
-    return "单" if num%2 else "双"
+def get_oe(n):
+
+    return "单" if n%2 else "双"
 
 
 
 
 
-# =====================================================
-# 简单评分融合
-# =====================================================
+
+# ==========================
+# 时间衰减
+# ==========================
 
 
-def score_numbers(history:List[int])->Dict[int,float]:
-
-    """
-    号码综合评分
-
-    注意：
-    这里是排序分
-    不是中奖概率
-
-    """
+def decay_weight(index,total):
 
 
-    scores={}
+    age=total-index
 
 
-    freq=Counter(history[:120])
+    return math.exp(
 
+        -age/200
 
-    for n in NUMBERS:
-
-
-        score=0
-
-
-
-        # 高频
-
-        score += freq[n]*0.4
-
-
-
-        # 遗漏补偿
-
-        if n not in history[:10]:
-
-            score +=0.2
-
-
-
-        # 最近出现
-
-        if n in history[:36]:
-
-            score +=0.3
-
-
-
-        scores[n]=score
-
-
-
-    return scores
+    )
 
 
 
 
 
-# =====================================================
-# 生肖评分
-# =====================================================
 
 
-def zodiac_rank(scores):
+# ==========================
+# Markov
+# ==========================
+
+
+def markov_score(history):
+
+
+    score=Counter()
+
+
+    if len(history)<2:
+
+        return score
+
+
+
+    for a,b in zip(
+        history[:-1],
+        history[1:]
+    ):
+
+        score[b]+=1
+
+
+
+    return score
+
+
+
+
+
+
+# ==========================
+# 热冷模型
+# ==========================
+
+
+def hot_cold(history):
+
+
+    score=Counter()
+
+
+    total=len(history)
+
+
+
+    for i,n in enumerate(history):
+
+
+        score[n]+=decay_weight(
+
+            i,
+
+            total
+
+        )
+
+
+    return score
+
+
+
+
+
+
+
+
+# ==========================
+# 贝叶斯融合
+# ==========================
+
+
+def bayes_merge(
+
+        hot,
+
+        markov
+
+):
 
 
     result={}
 
 
-    for num,score in scores.items():
+    for n in range(1,50):
 
-        z=get_zodiac(num)
 
+        h=hot.get(n,0)
 
-        result[z]=result.get(z,0)+score
 
+        m=markov.get(n,0)
 
 
-    return sorted(
-        result.items(),
-        key=lambda x:x[1],
-        reverse=True
-    )
 
+        result[n]=(
 
+            h*0.6
 
+            +
 
+            m*0.4
 
-# =====================================================
-# 主预测
-# =====================================================
+        )
 
-
-def generate_prediction(
-        history:List[int]
-)->Dict[str,Any]:
-
-
-    if not history:
-
-
-        return {
-
-            "error":"没有历史数据"
-
-        }
-
-
-
-    scores=score_numbers(history)
-
-
-
-    ranking=sorted(
-        scores.items(),
-        key=lambda x:x[1],
-        reverse=True
-    )
-
-
-
-    top10=[
-        n for n,s in ranking[:10]
-    ]
-
-
-
-    top3=[
-        n for n,s in ranking[:3]
-    ]
-
-
-
-    size_counter=Counter(
-        get_size(x)
-        for x in history[:36]
-    )
-
-
-    parity_counter=Counter(
-        get_parity(x)
-        for x in history[:36]
-    )
-
-
-
-    wave_result={}
-
-
-    if predict_wave:
-
-
-        try:
-
-            wave_result=predict_wave(history)
-
-
-        except Exception:
-
-            wave_result={}
-
-
-
-
-    return {
-
-
-        "版本":"V5.0 FINAL",
-
-
-        "说明":
-        "模型评分用于排序，不代表真实中奖概率",
-
-
-
-        "特码10码":
-        top10,
-
-
-
-        "重点3码":
-        top3,
-
-
-
-        "第一推荐":
-        top3[0],
-
-
-
-        "生肖5肖":
-        [
-            z
-            for z,s
-            in zodiac_rank(scores)[:5]
-        ],
-
-
-
-        "大小":
-
-        max(
-            size_counter,
-            key=size_counter.get
-        ),
-
-
-
-        "单双":
-
-        max(
-            parity_counter,
-            key=parity_counter.get
-        ),
-
-
-
-        "波色":
-
-        wave_result,
-
-
-        "评分":
-
-        {
-            n:
-            round(s,4)
-
-            for n,s
-            in ranking[:10]
-        }
-
-
-    }
-
-
-
-
-
-# =====================================================
-# 兼容旧版本接口
-# =====================================================
-
-
-def predict_next(history):
-
-
-    """
-    V3/V4/V5兼容接口
-
-    旧代码调用：
-
-    predict_next(history)
-
-    不会再报错
-
-    """
-
-
-    return generate_prediction(history)
-
-
-
-
-
-
-# =====================================================
-# 多彩种接口
-# =====================================================
-
-
-def predict_lottery(
-        lottery_name:str,
-        history:List[int]
-):
-
-
-    result=generate_prediction(history)
-
-
-    result["彩种"]=lottery_name
 
 
     return result
@@ -437,12 +210,171 @@ def predict_lottery(
 
 
 
+
+
+
+# ==========================
+# 主预测
+# ==========================
+
+
+def predict_next(history):
+
+
+    if not history:
+
+
+        return {
+
+            "error":
+            "无数据"
+
+        }
+
+
+
+
+    hot=hot_cold(
+
+        history
+
+    )
+
+
+    mk=markov_score(
+
+        history
+
+    )
+
+
+
+    final=bayes_merge(
+
+        hot,
+
+        mk
+
+    )
+
+
+
+    ranking=sorted(
+
+        final.items(),
+
+        key=lambda x:x[1],
+
+        reverse=True
+
+    )
+
+
+
+    top10=[
+
+        x[0]
+
+        for x in ranking[:10]
+
+    ]
+
+
+
+    top3=top10[:3]
+
+
+
+    main=top3[0]
+
+
+
+
+
+    return {
+
+
+        "版本":
+
+        "V6.0 HMM-Markov-Bayes",
+
+
+
+        "说明":
+
+        "多模型融合评分",
+
+
+
+        "特码10码":
+
+        top10,
+
+
+
+        "重点3码":
+
+        top3,
+
+
+
+        "第一推荐":
+
+        main,
+
+
+
+        "属性":{
+
+
+            "波色":
+
+            get_wave(main),
+
+
+
+            "大小":
+
+            get_size(main),
+
+
+
+            "单双":
+
+            get_oe(main)
+
+        },
+
+
+
+        "模型权重":{
+
+
+            "冷热":
+
+            0.6,
+
+
+            "Markov":
+
+            0.4
+
+        },
+
+
+
+        "时间":
+
+        datetime.now().isoformat()
+
+    }
+
+
+
+
+
 __all__=[
 
-    "generate_prediction",
-
-    "predict_next",
-
-    "predict_lottery"
+    "predict_next"
 
 ]
