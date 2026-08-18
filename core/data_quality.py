@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 data_quality.py
 
@@ -10,31 +10,49 @@ data_quality.py
 
 功能:
 
-1. 开奖数据验证
-2. 异常过滤
-3. 完整性评分
-4. 数据清洗
+1. 检查开奖数据完整性
+2. 检查号码范围
+3. 检查重复期号
+4. 检查异常数据
+5. 输出数据质量评分
 
 
 """
 
 
-from datetime import datetime
+from collections import Counter
 
 
 
 
 
 # =====================================================
-# 基础配置
+# 基础检查
 # =====================================================
 
 
-MIN_NUMBER = 1
+def 检查基础数据(数据):
 
-MAX_NUMBER = 49
 
-VALID_COUNT = 7
+    if not 数据:
+
+        return False
+
+
+
+    if not isinstance(
+
+        数据,
+
+        list
+
+    ):
+
+        return False
+
+
+
+    return True
 
 
 
@@ -45,294 +63,160 @@ VALID_COUNT = 7
 # =====================================================
 
 
-def check_numbers(numbers):
+def 检查号码(号码):
 
 
-    result = {
+    if not isinstance(
 
+        号码,
 
-        "valid":True,
+        list
 
+    ):
 
-        "errors":[]
-
-
-    }
-
-
-
-    if not isinstance(numbers,list):
-
-
-        result["valid"]=False
-
-
-        result["errors"].append(
-
-            "号码格式错误"
-
-        )
-
-
-        return result
+        return False
 
 
 
+    # 正常六合彩:
 
+    # 6个正码+1特码
 
-    if len(numbers)!=VALID_COUNT:
+    if len(号码) != 7:
 
-
-        result["valid"]=False
-
-
-        result["errors"].append(
-
-            f"号码数量错误:{len(numbers)}"
-
-        )
+        return False
 
 
 
-
-
-    for n in numbers:
+    for num in 号码:
 
 
         try:
 
-
-            n=int(n)
-
+            num=int(num)
 
         except:
 
 
-            result["valid"]=False
-
-
-            result["errors"].append(
-
-                "存在非数字号码"
-
-            )
-
-            continue
+            return False
 
 
 
+        if num < 1 or num > 49:
 
-
-        if n<MIN_NUMBER or n>MAX_NUMBER:
-
-
-            result["valid"]=False
-
-
-            result["errors"].append(
-
-                f"号码越界:{n}"
-
-            )
+            return False
 
 
 
-    return result
+    return True
 
 
 
 
 
 # =====================================================
-# 重复号码检查
+# 检查重复号码
 # =====================================================
 
 
-def check_duplicate(numbers):
+def 检查重复号码(号码):
 
 
-    return len(numbers)==len(set(numbers))
+    return len(
+
+        set(号码)
+
+    ) == len(号码)
 
 
 
 
 
 # =====================================================
-# 期号检查
+# 检查期号
 # =====================================================
 
 
-def check_issue(issue):
+def 检查期号(期号):
 
 
-    if issue is None:
-
+    if not 期号:
 
         return False
 
 
 
-    try:
+    return True
 
 
-        int(issue)
 
 
-        return True
+
+# =====================================================
+# 单条开奖检测
+# =====================================================
 
 
-    except:
+def 检查开奖(开奖):
 
+
+    if not isinstance(
+
+        开奖,
+
+        dict
+
+    ):
 
         return False
 
 
 
+    if not 检查期号(
 
+        开奖.get(
 
-# =====================================================
-# 时间检查
-# =====================================================
-
-
-def check_time(open_time):
-
-
-    if not open_time:
-
-
-        return False
-
-
-
-    try:
-
-
-        datetime.fromisoformat(
-
-            str(open_time)
-
-            .replace(
-
-                "Z",
-
-                ""
-
-            )
-
-        )
-
-
-        return True
-
-
-    except:
-
-
-        return False
-
-
-
-
-
-# =====================================================
-# 单条数据检测
-# =====================================================
-
-
-def validate_draw(draw):
-
-
-    errors=[]
-
-
-
-    numbers=draw.get(
-
-        "numbers",
-
-        []
-
-    )
-
-
-
-    # 号码
-
-    check=check_numbers(
-
-        numbers
-
-    )
-
-
-
-    if not check["valid"]:
-
-
-        errors.extend(
-
-            check["errors"]
-
-        )
-
-
-
-
-
-    # 重复
-
-
-    if not check_duplicate(numbers):
-
-
-        errors.append(
-
-            "号码重复"
-
-        )
-
-
-
-
-
-    # 期号
-
-
-    if not check_issue(
-
-        draw.get(
-
-            "issue"
+            "期号"
 
         )
 
     ):
 
+        return False
 
-        errors.append(
 
-            "期号错误"
+
+    if not 检查号码(
+
+        开奖.get(
+
+            "号码",
+
+            []
 
         )
 
+    ):
+
+        return False
 
 
 
+    if not 检查重复号码(
 
-    return {
+        开奖.get(
+
+            "号码"
+
+        )
+
+    ):
+
+        return False
 
 
-        "valid":
 
-        len(errors)==0,
-
-
-        "errors":
-
-        errors
-
-    }
+    return True
 
 
 
@@ -343,121 +227,107 @@ def validate_draw(draw):
 # =====================================================
 
 
-def validate_history(rows):
+def 检查历史数据(历史数据):
 
 
-    clean=[]
+    if not 检查基础数据(
 
-    bad=[]
+        历史数据
 
+    ):
 
-
-    for row in rows:
-
-
-        result=validate_draw(
-
-            row
-
-        )
+        return {
 
 
-        if result["valid"]:
+            "状态":
+
+            "失败",
 
 
-            clean.append(row)
+            "原因":
+
+            "没有历史数据"
+
+        }
 
 
-        else:
 
 
-            bad.append(
 
-                {
+    总数=len(
 
-                    "data":row,
+        历史数据
 
-                    "errors":
+    )
 
-                    result["errors"]
 
-                }
+
+    合格=0
+
+
+
+    失败列表=[]
+
+
+
+    期号记录=set()
+
+
+
+    for index,item in enumerate(历史数据):
+
+
+        if not 检查开奖(item):
+
+
+            失败列表.append(
+
+                index
 
             )
 
 
-
-    return {
-
-
-        "total":
-
-        len(rows),
-
-
-        "valid":
-
-        len(clean),
-
-
-        "invalid":
-
-        len(bad),
-
-
-        "clean_data":
-
-        clean,
-
-
-        "bad_data":
-
-        bad
-
-    }
+            continue
 
 
 
 
 
-# =====================================================
-# 数据评分
-# =====================================================
-
-
-def quality_score(rows):
-
-
-    if not rows:
-
-
-        return 0
+        期号=item["期号"]
 
 
 
-    result=validate_history(
-
-        rows
-
-    )
+        if 期号 in 期号记录:
 
 
+            失败列表.append(
 
-    score=(
+                index
 
-        result["valid"]
+            )
 
-        /
 
-        result["total"]
-
-    )
+            continue
 
 
 
-    return round(
+        期号记录.add(
 
-        score*100,
+            期号
+
+        )
+
+
+
+        合格 += 1
+
+
+
+
+
+    评分=round(
+
+        合格 / 总数 * 100,
 
         2
 
@@ -467,17 +337,177 @@ def quality_score(rows):
 
 
 
+    if 评分 >= 95:
+
+
+        状态="优秀"
+
+
+
+    elif 评分 >=80:
+
+
+        状态="正常"
+
+
+
+    else:
+
+
+        状态="异常"
+
+
+
+
+
+    return {
+
+
+        "状态":
+
+        状态,
+
+
+        "质量评分":
+
+        评分,
+
+
+        "总数据":
+
+        总数,
+
+
+        "有效数据":
+
+        合格,
+
+
+        "异常数量":
+
+        len(
+
+            失败列表
+
+        )
+
+
+    }
+
+
+
+
+
 # =====================================================
-# 数据报告
+# 清理异常数据
 # =====================================================
 
 
-def quality_report(rows):
+def 清理异常数据(历史数据):
 
 
-    result=validate_history(
+    result=[]
 
-        rows
+
+    已存在=set()
+
+
+
+    for item in 历史数据:
+
+
+        if not 检查开奖(item):
+
+            continue
+
+
+
+        期号=item["期号"]
+
+
+
+        if 期号 in 已存在:
+
+            continue
+
+
+
+        已存在.add(
+
+            期号
+
+        )
+
+
+        result.append(
+
+            item
+
+        )
+
+
+
+    return result
+
+
+
+
+
+# =====================================================
+# 数据统计
+# =====================================================
+
+
+def 数据统计(历史数据):
+
+
+    if not 历史数据:
+
+
+        return {}
+
+
+
+    总期数=len(
+
+        历史数据
+
+    )
+
+
+
+    号码=[]
+
+
+
+    for item in 历史数据:
+
+
+        号码.extend(
+
+            item.get(
+
+                "号码",
+
+                []
+
+            )
+
+        )
+
+
+
+    频率=Counter(
+
+        号码
+
+    )
+
+
+
+    热门=频率.most_common(
+
+        10
 
     )
 
@@ -486,28 +516,61 @@ def quality_report(rows):
     return {
 
 
-        "数据总量":
+        "历史期数":
 
-        result["total"],
-
-
-        "有效":
-
-        result["valid"],
+        总期数,
 
 
-        "异常":
+        "号码数量":
 
-        result["invalid"],
+        len(号码),
 
 
-        "质量评分":
+        "热门号码":
 
-        quality_score(
+        热门
 
-            rows
+    }
 
-        )
+
+
+
+
+# =====================================================
+# V5统一入口
+# =====================================================
+
+
+def 数据质量分析(历史数据):
+
+
+    检测=检查历史数据(
+
+        历史数据
+
+    )
+
+
+
+    统计=数据统计(
+
+        历史数据
+
+    )
+
+
+
+    return {
+
+
+        "检测结果":
+
+        检测,
+
+
+        "统计":
+
+        统计
 
     }
 
@@ -523,48 +586,8 @@ def quality_report(rows):
 if __name__=="__main__":
 
 
-    data=[
-
-
-        {
-
-        "issue":
-
-        "2026090",
-
-
-        "numbers":
-
-        [
-
-            39,
-
-            41,
-
-            8,
-
-            9,
-
-            7,
-
-            14,
-
-            49
-
-        ]
-
-        }
-
-    ]
-
-
-
     print(
 
-        quality_report(
-
-            data
-
-        )
+        "数据质量模块正常"
 
     )
