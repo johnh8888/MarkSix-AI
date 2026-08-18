@@ -1,1 +1,68 @@
+name: MarkSix AI V3.2
 
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Compile check
+        run: python -m compileall -q .
+
+      - name: Import check
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python - <<'PY'
+          import importlib
+          modules = [
+              'core.config','core.database','core.data_source','core.data_quality',
+              'core.features','core.strategies','core.state','core.state_engine',
+              'core.wave_model','core.predictor','core.backtest'
+          ]
+          for name in modules:
+              importlib.import_module(name)
+              print('✅', name)
+          from core.database import init_database
+          init_database()
+          print('✅ database interface')
+          PY
+
+      - name: Run MarkSix AI
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -u main.py
+
+      - name: Show outputs
+        if: always()
+        run: |
+          echo '--- output ---'
+          find output -maxdepth 2 -type f -print 2>/dev/null || true
+
+      - name: Commit results
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add output/*.json *.db core/*.db 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo '没有新的结果需要提交'
+          else
+            git commit -m 'Update MarkSix AI prediction and backtest'
+            git push
+          fi
