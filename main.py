@@ -1,12 +1,11 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩AI智能预测系统 V5.1
 
 main.py
 
 系统启动入口
-
 
 """
 
@@ -19,14 +18,9 @@ from datetime import datetime
 
 
 
-
-
-# =====================================================
-# 加入项目路径
-# =====================================================
-
-
 sys.path.append(".")
+
+
 
 
 
@@ -37,9 +31,7 @@ sys.path.append(".")
 
 try:
 
-
-    from core.main_engine import run
-
+    from core.engine import run
 
 
 except Exception as e:
@@ -48,17 +40,11 @@ except Exception as e:
     print()
 
     print(
-
         "核心模块加载失败"
-
     )
 
 
-    print(
-
-        e
-
-    )
+    print(e)
 
 
     traceback.print_exc()
@@ -66,59 +52,6 @@ except Exception as e:
 
     sys.exit(1)
 
-
-
-
-
-# =====================================================
-# 数据加载
-# =====================================================
-
-
-def 加载数据():
-
-    """
-
-    V5标准数据格式
-
-
-    实际使用时:
-
-    可以替换为:
-
-    SQLite
-
-    API
-
-    CSV
-
-    JSON
-
-
-    """
-
-
-    示例数据=[]
-
-
-
-    return {
-
-        "香港六合彩":
-
-        示例数据,
-
-
-        "老澳门彩":
-
-        示例数据,
-
-
-        "新澳门彩":
-
-        示例数据
-
-    }
 
 
 
@@ -134,52 +67,57 @@ def 显示标题():
 
     print()
 
-    print(
 
-        "="*70
-
-    )
+    print("="*70)
 
 
     print(
-
-        "          六合 AI 智能预测系统 V5.0"
-
+        "          六合 AI 智能预测系统 V5.1"
     )
 
 
     print()
 
+
     print(
-
-        "  状态识别 + 贝叶斯融合 + 动态策略"
-
+        "  API真实数据 + SQLite数据库"
     )
 
 
     print()
 
+
     print(
-
-        "  Walk-Forward 防过拟合回测"
-
+        "  HMM状态识别 + 马尔可夫链"
     )
 
 
     print()
 
-    print(
 
+    print(
+        "  贝叶斯融合 + 在线学习"
+    )
+
+
+    print()
+
+
+    print(
+        "  防过拟合 Walk-Forward 回测"
+    )
+
+
+    print()
+
+
+    print(
         datetime.now()
-
     )
 
 
-    print(
+    print("="*70)
 
-        "="*70
-
-    )
 
 
 
@@ -204,73 +142,27 @@ def main():
 
 
         print(
-
-            "正在加载历史数据..."
-
+            "启动V5.1智能分析系统..."
         )
 
 
 
-        数据=加载数据()
-
-
-
-        print(
-
-            "数据加载完成"
-
-        )
-
-
-        print(
-
-            f"彩种数量:{len(数据)}"
-
-        )
+        结果=run()
 
 
 
         print()
 
 
-        print(
-
-            "启动V5智能分析..."
-
-        )
-
-
-
-        结果=run(
-
-            数据
-
-        )
-
-
-
-        print()
+        print("="*70)
 
 
         print(
-
-            "="*70
-
-        )
-
-
-        print(
-
             "系统运行完成"
-
         )
 
 
-        print(
-
-            "="*70
-
-        )
+        print("="*70)
 
 
 
@@ -283,28 +175,22 @@ def main():
     except Exception as e:
 
 
-
         print()
 
-        print(
 
+        print(
             "系统运行异常"
-
         )
 
 
-        print(
-
-            e
-
-        )
+        print(e)
 
 
         traceback.print_exc()
 
 
-
         return None
+
 
 
 
