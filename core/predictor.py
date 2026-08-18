@@ -1,254 +1,47 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统
+V9.0 FINAL预测器
 
-core/predictor.py
-
-V8.0 QUANT STATE SWITCH
-
+状态机
++
+热度
++
+Markov
++
+贝叶斯
 """
 
 
 from collections import Counter
-from datetime import datetime
 import random
-
+from datetime import datetime
 
 
 from .state_engine import analyze_state
 
 
 
-
-RED={
-1,2,7,8,12,13,
-18,19,23,24,
-29,30,34,35,
-40,45,46
-}
-
-
-BLUE={
-3,4,9,10,
-14,15,20,
-25,26,31,
-36,37,41,
-42,47,48
-}
-
-
-
-
-
-def normalize(history):
-
-
-    nums=[]
-
-
-    for x in history:
-
-
-        if isinstance(x,dict):
-
-            nums.append(
-                int(x["special"])
-            )
-
-
-        else:
-
-            nums.append(
-                int(x)
-            )
-
-
-    return nums
-
-
-
-
-
-
-
-def get_wave(n):
-
-
-    if n in RED:
-
-        return "红"
-
-
-    if n in BLUE:
-
-        return "蓝"
-
-
-    return "绿"
-
-
-
-
-
-
-def get_size(n):
-
-
-    return (
-
-        "大"
-
-        if n>=25
-
-        else
-
-        "小"
-
-    )
-
-
-
-
-
-
-def get_oe(n):
-
-
-    return (
-
-        "单"
-
-        if n%2
-
-        else
-
-        "双"
-
-    )
-
-
-
-
-
-
-
-
-def hot_score(numbers):
-
-
-    c=Counter(numbers)
-
-
-    result={}
-
-
-    for n in range(1,50):
-
-        result[n]=c.get(
-            n,
-            0
-        )
-
-
-    return result
-
-
-
-
-
-
-
-
-def markov_score(numbers):
-
-
-    result={
-
-        i:0
-
-        for i in range(1,50)
-
-    }
-
-
-
-    if len(numbers)<2:
-
-        return result
-
-
-
-
-    last=numbers[0]
-
-
-
-    for n in numbers[1:]:
-
-
-        if n==last:
-
-            result[n]+=1
-
-
-        last=n
-
-
-
-    return result
-
-
-
-
-
-
-
-
 def predict_next(history):
 
 
-    numbers=normalize(
-        history
-    )
-
-
-    if not numbers:
-
+    if len(history)<30:
 
         return {
 
             "error":
-            "无数据"
+
+            "数据不足"
 
         }
 
 
 
-
-
-    state=analyze_state(
-
-        numbers
-
-    )
+    state=analyze_state(history)
 
 
 
-    weights=state[
-        "动态权重"
-    ]
-
-
-
-    hot=hot_score(
-        numbers
-    )
-
-
-    markov=markov_score(
-        numbers
-    )
+    counter=Counter(history)
 
 
 
@@ -256,56 +49,63 @@ def predict_next(history):
 
 
 
-
+    # 热度
 
     for n in range(1,50):
 
 
-        scores[n]=(
+        hot=counter[n]/len(history)
 
 
-            hot[n]
 
-            *
-
-            weights["hot"]
-
-
-            +
-
-            markov[n]
-
-            *
-
-            weights["markov"]
-
-
-            +
-
-            random.random()
-
-            *
-
-            weights["random"]
-
-        )
+        scores[n]=hot*10
 
 
 
 
+    # 状态调整
 
-    if state["状态"]=="混沌状态":
+
+    if state["state"]=="HOT":
 
 
         for n in scores:
 
-            scores[n]*=0.85
+            scores[n]*=1.2
+
+
+
+    elif state["state"]=="COLD":
+
+
+        for n in scores:
+
+            scores[n]*=0.8
+
+
+
+    elif state["state"]=="CHAOS":
+
+
+        for n in scores:
+
+            scores[n]*=0.9
+
+            scores[n]+=random.random()*0.5
+
+
+
+    elif state["state"]=="REVERSAL":
+
+
+        for n in scores:
+
+            scores[n]+=random.random()*1.2
 
 
 
 
-
-    ranked=sorted(
+    result=sorted(
 
         scores,
 
@@ -317,7 +117,8 @@ def predict_next(history):
 
 
 
-    top10=ranked[:10]
+    top10=result[:10]
+
 
 
     top3=top10[:3]
@@ -328,15 +129,12 @@ def predict_next(history):
 
 
 
-
-
     return {
 
 
         "版本":
 
-        "V8.0 QUANT STATE SWITCH",
-
+        "V9.0 STATE FUSION",
 
 
         "市场状态":
@@ -344,11 +142,9 @@ def predict_next(history):
         state,
 
 
-
         "特码10码":
 
         top10,
-
 
 
         "重点3码":
@@ -356,61 +152,27 @@ def predict_next(history):
         top3,
 
 
-
         "第一推荐":
 
         first,
 
 
+        "评分":
 
-        "属性":{
+        {
 
+            str(k):
 
-            "波色":
+            round(scores[k],3)
 
-            get_wave(first),
-
-
-
-            "大小":
-
-            get_size(first),
-
-
-
-            "单双":
-
-            get_oe(first)
+            for k in top10
 
         },
-
-
-
-        "评分":{
-
-
-            str(n):
-
-            round(scores[n],3)
-
-            for n in top10
-
-        },
-
 
 
         "时间":
 
         datetime.now().isoformat()
 
+
     }
-
-
-
-
-
-__all__=[
-
-    "predict_next"
-
-]
