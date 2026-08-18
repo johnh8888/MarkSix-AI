@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
@@ -7,23 +7,29 @@ wave_model.py
 
 波色智能模型
 
+
 功能:
 
 1. 波色概率
 2. 波色趋势
-3. 主波预测
-4. 双波预测
-5. 排除波
-6. 波色评分
+3. 波色冷热
+4. 双推
+5. 排除色
+6. 波色状态
+
 
 """
 
 
 from collections import Counter
 
+
 from .features import (
+
     get_special,
+
     get_wave,
+
 )
 
 
@@ -31,11 +37,11 @@ from .features import (
 
 
 # =====================================================
-# 波色基础
+# 基础颜色
 # =====================================================
 
 
-WAVES = [
+WAVES=[
 
     "红",
 
@@ -50,94 +56,29 @@ WAVES = [
 
 
 # =====================================================
-# 波色统计
+# 获取历史波色
 # =====================================================
 
 
-def wave_count(rows, window=50):
+def get_history_wave(rows,limit=100):
 
 
-    counter=Counter()
+    result=[]
 
 
-    for row in rows[:window]:
+    for row in rows[:limit]:
 
 
         n=get_special(row)
 
 
-        if n is None:
-
-            continue
+        if n:
 
 
-        w=get_wave(n)
+            result.append(
+                get_wave(n)
+            )
 
-
-        if w:
-
-            counter[w]+=1
-
-
-
-    return counter
-
-
-
-
-
-# =====================================================
-# 概率计算
-# =====================================================
-
-
-def wave_probability(rows,window=50):
-
-
-    counter=wave_count(
-        rows,
-        window
-    )
-
-
-    total=sum(
-        counter.values()
-    )
-
-
-    if total==0:
-
-
-        return {
-
-            "红":0.333,
-
-            "蓝":0.333,
-
-            "绿":0.333
-
-        }
-
-
-
-    result={}
-
-
-
-    for w in WAVES:
-
-
-        result[w]=round(
-
-            counter.get(w,0)
-
-            /
-
-            total,
-
-            6
-
-        )
 
 
     return result
@@ -147,68 +88,85 @@ def wave_probability(rows,window=50):
 
 
 # =====================================================
-# 波色趋势
+# 基础概率
+# =====================================================
+
+
+def wave_frequency(rows,limit=100):
+
+
+    waves=get_history_wave(
+        rows,
+        limit
+    )
+
+
+    counter=Counter(
+        waves
+    )
+
+
+    total=sum(
+        counter.values()
+    )
+
+
+
+    if total==0:
+
+
+        return {
+
+
+            x:1/3
+
+            for x in WAVES
+
+        }
+
+
+
+    return {
+
+
+        x:
+
+        round(
+
+            counter[x]/total,
+
+            4
+
+        )
+
+
+        for x in WAVES
+
+    }
+
+
+
+
+
+# =====================================================
+# 最近趋势
 # =====================================================
 
 
 def wave_trend(rows):
 
 
-    short=wave_probability(
+    recent=wave_frequency(
         rows,
         20
     )
 
 
-    long=wave_probability(
+    long=wave_frequency(
         rows,
         100
     )
 
-
-    trend={}
-
-
-
-    for w in WAVES:
-
-
-        trend[w]=round(
-
-            short[w]
-
-            -
-
-            long[w],
-
-            6
-
-        )
-
-
-    return trend
-
-
-
-
-
-# =====================================================
-# 波色综合评分
-# =====================================================
-
-
-def wave_score(rows):
-
-
-    prob=wave_probability(
-        rows,
-        50
-    )
-
-
-    trend=wave_trend(
-        rows
-    )
 
 
     score={}
@@ -218,70 +176,278 @@ def wave_score(rows):
     for w in WAVES:
 
 
-        score[w]=round(
+        score[w]=(
 
-            prob[w]*0.7
+            recent[w]*0.7
 
             +
 
-            max(
-                trend[w],
-                0
-            )*0.3,
-
-
-            6
+            long[w]*0.3
 
         )
 
 
-    return score
+
+    total=sum(
+        score.values()
+    )
+
+
+    return {
+
+
+        k:
+
+        round(
+            v/total,
+            4
+        )
+
+
+        for k,v in score.items()
+
+    }
 
 
 
 
 
 # =====================================================
-# 主波
+# 冷热检测
 # =====================================================
 
 
-def predict_main_wave(rows):
+def wave_hot_cold(rows):
 
 
-    scores=wave_score(
+    prob=wave_frequency(
+        rows,
+        30
+    )
+
+
+
+    hot=max(
+
+        prob,
+
+        key=prob.get
+
+    )
+
+
+    cold=min(
+
+        prob,
+
+        key=prob.get
+
+    )
+
+
+
+    return {
+
+
+        "hot":
+
+        hot,
+
+
+        "cold":
+
+        cold,
+
+
+        "prob":
+
+        prob
+
+    }
+
+
+
+
+
+# =====================================================
+# 连续检测
+# =====================================================
+
+
+def detect_wave_streak(rows):
+
+
+    waves=get_history_wave(
+        rows,
+        20
+    )
+
+
+    if not waves:
+
+        return None
+
+
+
+    last=waves[0]
+
+
+    count=0
+
+
+
+    for w in waves:
+
+
+        if w==last:
+
+            count+=1
+
+        else:
+
+            break
+
+
+
+    return {
+
+
+        "wave":
+
+        last,
+
+
+        "length":
+
+        count
+
+    }
+
+
+
+
+
+# =====================================================
+# 反转检测
+# =====================================================
+
+
+def detect_wave_reverse(rows):
+
+
+    waves=get_history_wave(
+        rows,
+        10
+    )
+
+
+    if len(waves)<6:
+
+        return False
+
+
+
+    first=waves[:3]
+
+
+    second=waves[3:6]
+
+
+
+    return (
+
+        len(set(first))==1
+
+        and
+
+        len(set(second))==3
+
+    )
+
+
+
+
+
+# =====================================================
+# 最终波色预测
+# =====================================================
+
+
+def predict_wave(rows):
+
+
+    trend=wave_trend(
         rows
     )
 
 
-    return max(
-
-        scores,
-
-        key=scores.get
-
-    )
-
-
-
-
-
-# =====================================================
-# 双波推荐
-# =====================================================
-
-
-def predict_double_wave(rows):
-
-
-    scores=wave_score(
+    hotcold=wave_hot_cold(
         rows
     )
 
 
-    result=sorted(
+    streak=detect_wave_streak(
+        rows
+    )
 
-        scores.items(),
+
+
+    score=trend.copy()
+
+
+
+    # 连续出现降低惯性
+
+    if streak:
+
+
+        if streak["length"]>=4:
+
+
+            score[streak["wave"]] *=0.7
+
+
+
+
+    # 反转提高其他颜色
+
+
+    if detect_wave_reverse(rows):
+
+
+        for w in score:
+
+
+            score[w]*=1.2
+
+
+
+    total=sum(
+        score.values()
+    )
+
+
+
+    score={
+
+
+        k:
+
+        round(
+            v/total,
+            4
+        )
+
+
+        for k,v in score.items()
+
+    }
+
+
+
+    order=sorted(
+
+        score.items(),
 
         key=lambda x:x[1],
 
@@ -290,154 +456,55 @@ def predict_double_wave(rows):
     )
 
 
-    return [
-
-        result[0][0],
-
-        result[1][0]
-
-    ]
-
-
-
-
-
-# =====================================================
-# 排除波
-# =====================================================
-
-
-def predict_exclude_wave(rows):
-
-
-    scores=wave_score(
-        rows
-    )
-
-
-    return min(
-
-        scores,
-
-        key=scores.get
-
-    )
-
-
-
-
-
-# =====================================================
-# 波色覆盖率
-# =====================================================
-
-
-def coverage(rows,waves,window=100):
-
-
-    hit=0
-
-    total=0
-
-
-    for row in rows[:window]:
-
-
-        n=get_special(row)
-
-
-        if n is None:
-
-            continue
-
-
-        total+=1
-
-
-        w=get_wave(n)
-
-
-        if w in waves:
-
-            hit+=1
-
-
-
-    if total==0:
-
-        return 0
-
-
-
-    return round(
-
-        hit/total*100,
-
-        2
-
-    )
-
-
-
-
-
-# =====================================================
-# 输出完整波色分析
-# =====================================================
-
-
-def analyze_wave(rows):
-
-
-    probability=wave_probability(
-        rows
-    )
-
-
-    main=predict_main_wave(
-        rows
-    )
-
-
-    double=predict_double_wave(
-        rows
-    )
-
-
-    exclude=predict_exclude_wave(
-        rows
-    )
-
 
     return {
 
 
-        "probability":
+        "single":
 
-            probability,
+        order[0][0],
 
-
-        "main":
-
-            main,
 
 
         "double":
 
-            double,
+        [
+
+            order[0][0],
+
+            order[1][0]
+
+        ],
+
 
 
         "exclude":
 
-            exclude,
+        order[2][0],
 
 
-        "double_coverage":
 
-            coverage(
-                rows,
-                double
-            )
+        "probability":
+
+        score,
+
+
+
+        "hot":
+
+        hotcold["hot"],
+
+
+
+        "cold":
+
+        hotcold["cold"],
+
+
+
+        "streak":
+
+        streak
 
     }
 
@@ -453,23 +520,33 @@ def analyze_wave(rows):
 if __name__=="__main__":
 
 
-    test=[
+    rows=[
+
 
         {
-            "numbers":
-            "38,26,08,06,29,18,23"
+
+        "numbers":
+
+        "38,26,08,06,29,18,23"
+
         },
 
+
         {
-            "numbers":
-            "33,27,16,28,04,25,14"
-        },
+
+        "numbers":
+
+        "33,27,16,28,04,25,14"
+
+        }
+
 
     ]
 
 
+
     print(
 
-        analyze_wave(test)
+        predict_wave(rows)
 
     )
