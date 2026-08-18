@@ -1,42 +1,70 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V7.0 STATE ENGINE
+六合彩 AI 智能预测系统
 
-状态识别:
-1 高频
-2 低频
-3 连续
-4 反转
-5 混沌
+core/predictor.py
+
+V8.0 QUANT STATE SWITCH
+
+
+功能:
+
+1. 热冷分析
+2. Markov趋势
+3. 状态切换
+4. 熵调整
+5. 动态权重
+
 
 """
 
-from collections import Counter
-import math
-from datetime import datetime
 
+from __future__ import annotations
+
+
+from collections import Counter
+from datetime import datetime
+import random
+
+
+
+from .state_engine import analyze_state
+
+
+
+
+
+# =====================================================
+# 属性
+# =====================================================
 
 
 RED={
-1,2,7,8,12,13,18,19,
-23,24,29,30,34,35,40,45,46
+
+1,2,7,8,12,13,
+18,19,23,24,
+29,30,34,35,
+40,45,46
+
 }
+
 
 BLUE={
-3,4,9,10,14,15,20,
-25,26,31,36,37,41,42,47,48
+
+3,4,9,10,
+14,15,20,
+25,26,31,
+36,37,41,
+42,47,48
+
 }
 
-GREEN={
-5,6,11,16,17,21,22,
-27,28,32,33,38,39,43,44,49
-}
 
 
 
 
-def wave(n):
+def get_wave(n):
 
     if n in RED:
         return "红"
@@ -48,13 +76,17 @@ def wave(n):
 
 
 
-def size(n):
+
+
+def get_size(n):
 
     return "大" if n>=25 else "小"
 
 
 
-def oe(n):
+
+
+def get_oe(n):
 
     return "单" if n%2 else "双"
 
@@ -62,243 +94,246 @@ def oe(n):
 
 
 
-# ==========================
-# 熵
-# ==========================
 
 
-def entropy(nums):
+# =====================================================
+# 热冷评分
+# =====================================================
 
 
-    c=Counter(nums)
+def hot_score(history):
 
-    total=len(nums)
 
+    nums=[
 
-    h=0
+        x["special"]
 
+        for x in history
 
-    for v in c.values():
+    ]
 
-        p=v/total
 
-        h-=p*math.log(
-            p
-        )
+    counter=Counter(nums)
 
 
-    return h
 
-
-
-
-
-# ==========================
-# 状态分析
-# ==========================
-
-
-def detect_state(history):
-
-
-    recent=history[:30]
-
-
-    c=Counter(recent)
-
-
-
-    max_count=max(
-        c.values()
-    )
-
-
-    ent=entropy(
-        recent
-    )
-
-
-
-    # 连续检测
-
-    repeat=0
-
-
-    for i in range(
-        1,
-        len(recent)
-    ):
-
-
-        if recent[i]==recent[i-1]:
-
-            repeat+=1
-
-
-
-
-    if repeat>=5:
-
-
-        return {
-
-            "状态":
-            "连续状态",
-
-            "entropy":
-            ent
-
-        }
-
-
-
-
-    if max_count>=5:
-
-
-        return {
-
-            "状态":
-            "高频状态",
-
-            "entropy":
-            ent
-
-        }
-
-
-
-    if ent>3.3:
-
-
-        return {
-
-            "状态":
-            "混沌状态",
-
-            "entropy":
-            ent
-
-        }
-
-
-
-    return {
-
-
-        "状态":
-        "正常状态",
-
-        "entropy":
-        ent
-
-    }
-
-
-
-
-
-# ==========================
-# 动态权重
-# ==========================
-
-
-def state_weight(state):
-
-
-    name=state["状态"]
-
-
-
-    if name=="高频状态":
-
-        return {
-
-            "hot":0.5,
-
-            "markov":0.4,
-
-            "random":0.1
-
-        }
-
-
-
-    if name=="混沌状态":
-
-        return {
-
-            "hot":0.3,
-
-            "markov":0.2,
-
-            "random":0.5
-
-        }
-
-
-
-    return {
-
-
-        "hot":0.6,
-
-        "markov":0.35,
-
-        "random":0.05
-
-    }
-
-
-
-
-
-# ==========================
-# 主预测
-# ==========================
-
-
-def predict_next(history):
-
-
-    state=detect_state(
-        history
-    )
-
-
-    weights=state_weight(
-        state
-    )
-
-
-
-    freq=Counter(
-        history
-    )
-
-
-
-    score={}
+    scores={}
 
 
 
     for n in range(1,50):
 
 
-        score[n]=(
+        freq=counter.get(
 
-            freq[n]*weights["hot"]
+            n,
+
+            0
+
+        )
+
+
+        scores[n]=freq
+
+
+
+    return scores
+
+
+
+
+
+
+
+# =====================================================
+# Markov趋势
+# =====================================================
+
+
+def markov_score(history):
+
+
+    scores={
+
+        i:0
+
+        for i in range(1,50)
+
+    }
+
+
+
+    nums=[
+
+        x["special"]
+
+        for x in history
+
+    ]
+
+
+
+    if len(nums)<2:
+
+        return scores
+
+
+
+    last=nums[0]
+
+
+
+    for i,n in enumerate(nums[1:]):
+
+
+        if n==last:
+
+            scores[n]+=1
+
+
+        last=n
+
+
+
+    return scores
+
+
+
+
+
+
+
+# =====================================================
+# V8预测
+# =====================================================
+
+
+def predict_next(history):
+
+
+
+    if not history:
+
+
+        return {
+
+            "error":
+
+            "无数据"
+
+        }
+
+
+
+
+    # 状态
+
+    state=analyze_state(
+
+        history
+
+    )
+
+
+
+    weights=state[
+
+        "动态权重"
+
+    ]
+
+
+
+
+
+    hot=hot_score(
+
+        history
+
+    )
+
+
+
+    markov=markov_score(
+
+        history
+
+    )
+
+
+
+
+
+    scores={}
+
+
+
+
+
+    # =====================
+    # 综合评分
+    # =====================
+
+
+    for n in range(1,50):
+
+
+        scores[n]=(
+
+
+            hot[n]
+
+            *
+
+            weights["hot"]
+
+
+            +
+
+            markov[n]
+
+            *
+
+            weights["markov"]
+
+
+            +
+
+            random.random()
+
+            *
+
+            weights["random"]
+
 
         )
 
 
 
 
-    ranking=sorted(
 
-        score.items(),
+    # =====================
+    # 熵高降趋势
+    # =====================
 
-        key=lambda x:x[1],
+
+    if state["状态"]=="混沌状态":
+
+
+        for n in scores:
+
+
+            scores[n]*=0.85
+
+
+
+
+
+    ranked=sorted(
+
+        scores,
+
+        key=scores.get,
 
         reverse=True
 
@@ -306,38 +341,32 @@ def predict_next(history):
 
 
 
-    top10=[
-
-        x[0]
-
-        for x in ranking[:10]
-
-    ]
+    top10=ranked[:10]
 
 
 
-    main=top10[0]
+    top3=top10[:3]
 
 
 
-    return {
+    first=top3[0]
+
+
+
+
+
+    result={
 
 
         "版本":
 
-        "V7.0 STATE ENGINE",
+        "V8.0 QUANT STATE SWITCH",
 
 
 
         "市场状态":
 
         state,
-
-
-
-        "动态权重":
-
-        weights,
 
 
 
@@ -349,41 +378,68 @@ def predict_next(history):
 
         "重点3码":
 
-        top10[:3],
+        top3,
 
 
 
         "第一推荐":
 
-        main,
+        first,
 
 
 
-        "属性":{
+        "属性":
+
+        {
 
 
             "波色":
 
-            wave(main),
+            get_wave(first),
+
 
 
             "大小":
 
-            size(main),
+            get_size(first),
+
 
 
             "单双":
 
-            oe(main)
+            get_oe(first)
+
 
         },
+
+
+
+        "评分":{
+
+
+            str(k):
+
+            round(scores[k],3)
+
+            for k in top10
+
+        },
+
 
 
         "时间":
 
         datetime.now().isoformat()
 
+
     }
+
+
+
+    return result
+
+
+
 
 
 
