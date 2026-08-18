@@ -3,17 +3,11 @@
 """
 六合彩 AI 智能预测系统
 
+core/state_engine.py
+
 V8.0 QUANT STATE SWITCH
 
-市场状态识别
-
-功能:
-
-1. 熵检测
-2. 热冷切换
-3. 连续波检测
-4. 反转检测
-5. 动态策略权重
+状态检测模块
 
 """
 
@@ -43,13 +37,67 @@ BLUE={
 
 
 
+def normalize_history(history):
+
+    """
+    兼容:
+
+    [
+      49,
+      16,
+      22
+    ]
+
+
+    和:
+
+    [
+      {"special":49}
+    ]
+
+    """
+
+    numbers=[]
+
+
+    for x in history:
+
+
+        if isinstance(x,dict):
+
+            if "special" in x:
+
+                numbers.append(
+                    int(x["special"])
+                )
+
+
+        else:
+
+            numbers.append(
+                int(x)
+            )
+
+
+    return numbers
+
+
+
+
+
+
 def get_wave(n):
 
+
     if n in RED:
+
         return "红"
 
+
     if n in BLUE:
+
         return "蓝"
+
 
     return "绿"
 
@@ -57,9 +105,6 @@ def get_wave(n):
 
 
 
-# =====================================================
-# 熵
-# =====================================================
 
 
 def entropy(numbers):
@@ -71,34 +116,33 @@ def entropy(numbers):
 
 
 
-    c=Counter(numbers)
+    counter=Counter(numbers)
 
 
     total=len(numbers)
 
 
-    e=0
-
-
-    for v in c.values():
-
-        p=v/total
-
-        e-=p*math.log2(p)
+    value=0
 
 
 
-    return round(e,3)
+    for c in counter.values():
+
+
+        p=c/total
+
+
+        value-=p*math.log2(p)
+
+
+
+    return round(value,4)
 
 
 
 
 
 
-
-# =====================================================
-# 连续波检测
-# =====================================================
 
 
 def repeat_wave(numbers):
@@ -119,17 +163,12 @@ def repeat_wave(numbers):
     ]
 
 
-
     return len(set(waves))==1
 
 
 
 
 
-
-# =====================================================
-# 波色反转
-# =====================================================
 
 
 def flip_wave(numbers):
@@ -150,6 +189,7 @@ def flip_wave(numbers):
     ]
 
 
+
     return (
 
         waves[0]!=waves[1]
@@ -166,28 +206,18 @@ def flip_wave(numbers):
 
 
 
-# =====================================================
-# 市场状态
-# =====================================================
-
 
 def analyze_state(history):
 
 
-    numbers=[
-
-        x["special"]
-
-        for x in history
-
-        if "special" in x
-
-    ]
+    numbers=normalize_history(
+        history
+    )
 
 
-
-    e=entropy(numbers[:100])
-
+    e=entropy(
+        numbers[:100]
+    )
 
 
 
@@ -204,7 +234,6 @@ def analyze_state(history):
 
 
 
-    # 高熵
 
     if e>3.4:
 
@@ -221,9 +250,6 @@ def analyze_state(history):
 
 
 
-
-
-    # 连续同波
 
 
     if repeat_wave(numbers):
@@ -243,9 +269,6 @@ def analyze_state(history):
 
 
 
-    # 反转
-
-
     if flip_wave(numbers):
 
 
@@ -257,7 +280,6 @@ def analyze_state(history):
         markov=0.4
 
         random=0.1
-
 
 
 
@@ -301,8 +323,9 @@ def analyze_state(history):
 
 
 
+
 __all__=[
 
-"analyze_state"
+    "analyze_state"
 
 ]
