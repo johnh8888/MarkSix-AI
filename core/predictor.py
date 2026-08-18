@@ -1,18 +1,16 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V6.0
+六合彩 AI V7.0 STATE ENGINE
 
-智能预测引擎
-
-HMM思想
-Markov状态
-Bayes融合
-冷热衰减
-特征评分
+状态识别:
+1 高频
+2 低频
+3 连续
+4 反转
+5 混沌
 
 """
-
 
 from collections import Counter
 import math
@@ -20,33 +18,25 @@ from datetime import datetime
 
 
 
-# ==========================
-# 波色
-# ==========================
-
-RED = {
+RED={
 1,2,7,8,12,13,18,19,
-23,24,29,30,34,35,40,
-45,46
+23,24,29,30,34,35,40,45,46
 }
 
-
-BLUE = {
+BLUE={
 3,4,9,10,14,15,20,
-25,26,31,36,37,41,
-42,47,48
+25,26,31,36,37,41,42,47,48
+}
+
+GREEN={
+5,6,11,16,17,21,22,
+27,28,32,33,38,39,43,44,49
 }
 
 
-GREEN = {
-5,6,11,16,17,21,
-22,27,28,32,33,
-38,39,43,44,49
-}
 
 
-
-def get_wave(n):
+def wave(n):
 
     if n in RED:
         return "红"
@@ -58,13 +48,13 @@ def get_wave(n):
 
 
 
-def get_size(n):
+def size(n):
 
     return "大" if n>=25 else "小"
 
 
 
-def get_oe(n):
+def oe(n):
 
     return "单" if n%2 else "双"
 
@@ -72,142 +62,192 @@ def get_oe(n):
 
 
 
+# ==========================
+# 熵
+# ==========================
+
+
+def entropy(nums):
+
+
+    c=Counter(nums)
+
+    total=len(nums)
+
+
+    h=0
+
+
+    for v in c.values():
+
+        p=v/total
+
+        h-=p*math.log(
+            p
+        )
+
+
+    return h
+
+
+
+
 
 # ==========================
-# 时间衰减
+# 状态分析
 # ==========================
 
 
-def decay_weight(index,total):
+def detect_state(history):
 
 
-    age=total-index
+    recent=history[:30]
 
 
-    return math.exp(
+    c=Counter(recent)
 
-        -age/200
 
+
+    max_count=max(
+        c.values()
+    )
+
+
+    ent=entropy(
+        recent
     )
 
 
 
+    # 连续检测
+
+    repeat=0
 
 
-
-
-# ==========================
-# Markov
-# ==========================
-
-
-def markov_score(history):
-
-
-    score=Counter()
-
-
-    if len(history)<2:
-
-        return score
-
-
-
-    for a,b in zip(
-        history[:-1],
-        history[1:]
+    for i in range(
+        1,
+        len(recent)
     ):
 
-        score[b]+=1
+
+        if recent[i]==recent[i-1]:
+
+            repeat+=1
 
 
 
-    return score
 
+    if repeat>=5:
+
+
+        return {
+
+            "状态":
+            "连续状态",
+
+            "entropy":
+            ent
+
+        }
+
+
+
+
+    if max_count>=5:
+
+
+        return {
+
+            "状态":
+            "高频状态",
+
+            "entropy":
+            ent
+
+        }
+
+
+
+    if ent>3.3:
+
+
+        return {
+
+            "状态":
+            "混沌状态",
+
+            "entropy":
+            ent
+
+        }
+
+
+
+    return {
+
+
+        "状态":
+        "正常状态",
+
+        "entropy":
+        ent
+
+    }
 
 
 
 
 
 # ==========================
-# 热冷模型
+# 动态权重
 # ==========================
 
 
-def hot_cold(history):
+def state_weight(state):
 
 
-    score=Counter()
-
-
-    total=len(history)
+    name=state["状态"]
 
 
 
-    for i,n in enumerate(history):
+    if name=="高频状态":
 
+        return {
 
-        score[n]+=decay_weight(
+            "hot":0.5,
 
-            i,
+            "markov":0.4,
 
-            total
+            "random":0.1
 
-        )
-
-
-    return score
-
+        }
 
 
 
+    if name=="混沌状态":
+
+        return {
+
+            "hot":0.3,
+
+            "markov":0.2,
+
+            "random":0.5
+
+        }
 
 
 
-
-# ==========================
-# 贝叶斯融合
-# ==========================
+    return {
 
 
-def bayes_merge(
+        "hot":0.6,
 
-        hot,
+        "markov":0.35,
 
-        markov
+        "random":0.05
 
-):
-
-
-    result={}
-
-
-    for n in range(1,50):
-
-
-        h=hot.get(n,0)
-
-
-        m=markov.get(n,0)
-
-
-
-        result[n]=(
-
-            h*0.6
-
-            +
-
-            m*0.4
-
-        )
-
-
-
-    return result
-
-
-
+    }
 
 
 
@@ -221,47 +261,42 @@ def bayes_merge(
 def predict_next(history):
 
 
-    if not history:
-
-
-        return {
-
-            "error":
-            "无数据"
-
-        }
-
-
-
-
-    hot=hot_cold(
-
+    state=detect_state(
         history
-
     )
 
 
-    mk=markov_score(
+    weights=state_weight(
+        state
+    )
 
+
+
+    freq=Counter(
         history
-
     )
 
 
 
-    final=bayes_merge(
+    score={}
 
-        hot,
 
-        mk
 
-    )
+    for n in range(1,50):
+
+
+        score[n]=(
+
+            freq[n]*weights["hot"]
+
+        )
+
 
 
 
     ranking=sorted(
 
-        final.items(),
+        score.items(),
 
         key=lambda x:x[1],
 
@@ -281,13 +316,7 @@ def predict_next(history):
 
 
 
-    top3=top10[:3]
-
-
-
-    main=top3[0]
-
-
+    main=top10[0]
 
 
 
@@ -296,13 +325,19 @@ def predict_next(history):
 
         "版本":
 
-        "V6.0 HMM-Markov-Bayes",
+        "V7.0 STATE ENGINE",
 
 
 
-        "说明":
+        "市场状态":
 
-        "多模型融合评分",
+        state,
+
+
+
+        "动态权重":
+
+        weights,
 
 
 
@@ -314,7 +349,7 @@ def predict_next(history):
 
         "重点3码":
 
-        top3,
+        top10[:3],
 
 
 
@@ -329,38 +364,19 @@ def predict_next(history):
 
             "波色":
 
-            get_wave(main),
-
+            wave(main),
 
 
             "大小":
 
-            get_size(main),
-
+            size(main),
 
 
             "单双":
 
-            get_oe(main)
+            oe(main)
 
         },
-
-
-
-        "模型权重":{
-
-
-            "冷热":
-
-            0.6,
-
-
-            "Markov":
-
-            0.4
-
-        },
-
 
 
         "时间":
@@ -372,9 +388,8 @@ def predict_next(history):
 
 
 
-
 __all__=[
 
-    "predict_next"
+"predict_next"
 
 ]
