@@ -1,102 +1,131 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-api_sync.py
+core/api_sync.py
 
-真实开奖数据同步模块
+在线数据同步模块
+
+流程：
+
+marksix6 API
+        |
+        ↓
+数据解析
+        |
+        ↓
+SQLite保存
 
 
-功能:
+支持：
 
-1. 请求开奖API
-2. 解析开奖数据
-3. 标准化格式
-4. 提供给SQLite
-
+香港六合彩
+新澳门六合彩
+老澳门六合彩
 
 """
 
 
-import requests
+from __future__ import annotations
+
+
+import json
+import ssl
+import urllib.request
+import re
 
 from datetime import datetime
 
 
+from .sqlite_manager import (
+    save_draw
+)
 
 
 
 # =====================================================
-# API地址
+# API
 # =====================================================
 
 
-API_LIST={
+API_HISTORY = (
+    "https://marksix6.net/index.php?api=1"
+)
 
 
-    "香港六合彩":
-
-    "https://marksix6.net/api/lottery_api.php",
-
-
-
-    "新澳门彩":
-
-    "https://marksix6.net/api/lottery_api.php",
-
-
-
-    "老澳门彩":
-
+API_REALTIME = (
     "https://marksix6.net/api/lottery_api.php"
+)
 
+
+
+LOTTERIES = {
+
+    "hk":
+    "香港六合彩",
+
+    "newMacau":
+    "新澳门六合彩",
+
+    "oldMacau":
+    "老澳门六合彩"
 
 }
 
 
 
-
-
-
 # =====================================================
-# 请求API
+# HTTP
 # =====================================================
 
 
-def 请求数据(
+def ssl_context(verify=True):
 
+    if verify:
+
+        return ssl.create_default_context()
+
+    return ssl._create_unverified_context()
+
+
+
+def request_json(url):
+
+
+    headers={
+
+        "User-Agent":
+        "Mozilla/5.0",
+
+        "Accept":
+        "application/json"
+
+    }
+
+
+    req=urllib.request.Request(
         url,
-
-        timeout=10
-
-):
+        headers=headers
+    )
 
 
     try:
 
 
-        response=requests.get(
-
-            url,
-
-            timeout=timeout,
-
-            headers={
-
-                "User-Agent":
-
-                "Mozilla/5.0"
-
-            }
-
-        )
+        with urllib.request.urlopen(
+            req,
+            timeout=20,
+            context=ssl_context(True)
+        ) as r:
 
 
-        response.encoding="utf-8"
+            text=r.read().decode(
+                "utf-8-sig"
+            )
 
 
-        return response.json()
+            return json.loads(text)
 
 
 
@@ -104,76 +133,69 @@ def 请求数据(
 
 
         print(
-
-            "API请求失败:",
-
+            "SSL正常失败:",
             e
-
         )
 
 
-        return {}
+        # 仅指定网站关闭验证
+
+        with urllib.request.urlopen(
+            req,
+            timeout=20,
+            context=ssl_context(False)
+        ) as r:
+
+
+            text=r.read().decode(
+                "utf-8-sig"
+            )
+
+
+            return json.loads(text)
 
 
 
 
 
 # =====================================================
-# 号码解析
+# 数字解析
 # =====================================================
 
 
-def 解析号码(
-
-        code
-
-):
+def parse_numbers(value):
 
 
-    if not code:
+    if isinstance(value,list):
+
+        result=[]
+
+        for x in value:
+
+            n=int(
+                re.findall(
+                    r"\d+",
+                    str(x)
+                )[0]
+            )
+
+            result.append(n)
 
 
-        return []
+        return result
 
 
 
-    if isinstance(
-
-        code,
-
-        list
-
-    ):
-
-
-        return [
-
-            int(x)
-
-            for x in code
-
-        ]
-
+    nums=re.findall(
+        r"\d+",
+        str(value)
+    )
 
 
     return [
-
         int(x)
-
-        for x in str(code)
-
-        .replace(
-
-            " ",
-
-            ""
-
-        )
-
-        .split(",")
-
-        if x
-
+        for x in nums
+        if 1<=int(x)<=49
     ]
 
 
@@ -181,135 +203,260 @@ def 解析号码(
 
 
 # =====================================================
-# 单期开奖标准化
+# 彩种识别
 # =====================================================
 
 
-def 标准化开奖(
-
-        item
-
-):
+def identify(item):
 
 
-    return {
-
-
-        "期号":
-
-        item.get(
-
-            "expect",
-
-            ""
-
-        ),
-
-
-
-        "号码":
-
-        解析号码(
-
-            item.get(
-
-                "openCode",
-
-                ""
-
-            )
-
-        ),
-
-
-
-        "开奖时间":
-
-        item.get(
-
-            "openTime",
-
-            ""
-
-        ),
-
-
-
-        "更新时间":
+    text=(
 
         str(
-
-            datetime.now()
-
+            item.get("name","")
         )
 
-    }
+        +
 
-
-
-
-
-# =====================================================
-# 解析历史
-# =====================================================
-
-
-def 解析历史(
-
-        data
-
-):
-
-
-    result=[]
-
-
-
-    if not data:
-
-
-        return result
-
-
-
-
-
-    # 不同API兼容
-
-
-    history=data.get(
-
-        "history",
-
-        []
+        str(
+            item.get("type","")
+        )
 
     )
 
 
+    if "香港" in text:
 
-    if isinstance(
-
-        history,
-
-        list
-
-    ):
+        return "hk"
 
 
-        for item in history:
+    if "新澳门" in text:
+
+        return "newMacau"
 
 
-            result.append(
+    if "老澳门" in text:
 
-                标准化开奖(
+        return "oldMacau"
 
-                    item
 
-                )
+
+    return None
+
+
+
+
+
+# =====================================================
+# 历史同步
+# =====================================================
+
+
+def sync_history():
+
+
+    print(
+        "正在获取历史数据"
+    )
+
+
+    data=request_json(
+        API_HISTORY
+    )
+
+
+    result={}
+
+
+    items=data.get(
+        "lottery_data",
+        []
+    )
+
+
+    for item in items:
+
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            continue
+
+
+
+        key=identify(item)
+
+
+        if not key:
+
+            continue
+
+
+
+        history=item.get(
+            "history",
+            []
+        )
+
+
+        count=0
+
+
+        for row in history:
+
+
+            m=re.search(
+                r"(\d+)期.*?([\d, ]+)",
+                str(row)
+            )
+
+
+            if not m:
+
+                continue
+
+
+
+            issue=m.group(1)
+
+
+            nums=parse_numbers(
+                m.group(2)
+            )
+
+
+            if len(nums)<7:
+
+                continue
+
+
+
+            status=save_draw(
+
+                key,
+
+                issue,
+
+                nums[:6],
+
+                nums[6],
+
+                "history_api"
 
             )
 
 
+            if status:
+
+                count+=1
+
+
+
+        result[key]=count
+
+
+
+        print(
+            LOTTERIES[key],
+            "同步",
+            count,
+            "期"
+        )
+
+
+    return result
+
+
+
+
+
+# =====================================================
+# 实时同步
+# =====================================================
+
+
+def sync_realtime():
+
+
+    result={}
+
+
+
+    for key in LOTTERIES:
+
+
+        try:
+
+
+            url=(
+
+                API_REALTIME
+
+                +
+
+                "?type="
+
+                +
+
+                key
+
+            )
+
+
+            data=request_json(
+                url
+            )
+
+
+            nums=parse_numbers(
+                json.dumps(data,ensure_ascii=False)
+            )
+
+
+            if len(nums)<7:
+
+                result[key]=False
+
+                continue
+
+
+
+            issue=str(
+                datetime.now()
+                .strftime("%Y%m%d")
+            )
+
+
+            ok=save_draw(
+
+                key,
+
+                issue,
+
+                nums[:6],
+
+                nums[6],
+
+                "realtime_api"
+
+            )
+
+
+            result[key]=ok
+
+
+
+        except Exception as e:
+
+
+            print(
+                key,
+                e
+            )
+
+            result[key]=False
 
 
 
@@ -320,117 +467,88 @@ def 解析历史(
 
 
 # =====================================================
-# 获取彩种数据
+# 总同步入口
 # =====================================================
 
 
-def 获取彩种(
-
-        彩种
-
-):
-
-
-    url=API_LIST.get(
-
-        彩种
-
-    )
-
-
-
-    if not url:
-
-
-        return []
-
+def sync_all():
 
 
     print(
-
-        "正在同步:",
-
-        彩种
-
+        "="*70
     )
-
-
-
-    data=请求数据(
-
-        url
-
-    )
-
-
-
-    历史=解析历史(
-
-        data
-
-    )
-
-
 
     print(
+        "开始API同步"
+    )
 
-        彩种,
-
-        "获取",
-
-        len(历史),
-
-        "期"
-
+    print(
+        "="*70
     )
 
 
 
-    return 历史
+    history={}
 
 
+    try:
+
+        history=sync_history()
 
 
-
-# =====================================================
-# 三彩种同步
-# =====================================================
+    except Exception as e:
 
 
-def 同步全部():
-
-
-
-    数据={}
-
-
-
-    for name in API_LIST:
-
-
-        数据[name]=获取彩种(
-
-            name
-
+        print(
+            "历史同步失败:",
+            e
         )
 
 
 
-    return 数据
+    realtime={}
+
+
+    try:
+
+        realtime=sync_realtime()
+
+
+    except Exception as e:
+
+
+        print(
+            "实时同步失败:",
+            e
+        )
+
+
+
+    return {
+
+
+        "history":
+
+        history,
+
+
+        "realtime":
+
+        realtime,
+
+
+        "time":
+
+        datetime.now().isoformat()
+
+    }
 
 
 
 
 
-if __name__=="__main__":
+__all__=[
 
+    "sync_all"
 
-    result=同步全部()
-
-
-
-    print(
-
-        result.keys()
-
-    )
+]
