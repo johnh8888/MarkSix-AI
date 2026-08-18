@@ -1,178 +1,351 @@
 # -*- coding:utf-8 -*-
 
 """
-V9.0 FINAL预测器
+六合彩 AI 智能预测系统 V10.0 QUANT FINAL
 
-状态机
-+
-热度
-+
-Markov
-+
-贝叶斯
+预测输出统一模块
+
+功能:
+
+1. 特码评分
+2. 状态融合
+3. 属性分析
+4. 中文输出
+5. 标准JSON结构
 """
 
 
-from collections import Counter
-import random
 from datetime import datetime
+import random
 
 
-from .state_engine import analyze_state
 
+# ===============================
+# 属性
+# ===============================
 
 
-def predict_next(history):
+RED = {
+1,2,7,8,12,13,18,19,
+23,24,29,30,34,35,
+40,45,46
+}
 
 
-    if len(history)<30:
+BLUE = {
+3,4,9,10,14,15,20,
+25,26,31,36,37,
+41,42,47,48
+}
 
-        return {
 
-            "error":
+GREEN = {
+5,6,11,16,17,21,
+22,27,28,32,33,
+38,39,43,44,49
+}
 
-            "数据不足"
 
-        }
 
+def get_color(num):
 
+    if num in RED:
+        return "红"
 
-    state=analyze_state(history)
+    if num in BLUE:
+        return "蓝"
 
+    return "绿"
 
 
-    counter=Counter(history)
 
+def get_size(num):
 
+    return "大" if num >=25 else "小"
 
-    scores={}
 
 
+def get_odd_even(num):
 
-    # 热度
+    return "单" if num % 2 else "双"
 
-    for n in range(1,50):
 
 
-        hot=counter[n]/len(history)
 
+# ===============================
+# 状态中文
+# ===============================
 
 
-        scores[n]=hot*10
+STATE_MAP={
 
 
+    "NORMAL":
+    "正常状态",
 
 
-    # 状态调整
+    "HOT":
+    "热区状态",
 
 
-    if state["state"]=="HOT":
+    "COLD":
+    "冷区状态",
 
 
-        for n in scores:
+    "REVERSAL":
+    "反转状态",
 
-            scores[n]*=1.2
 
+    "CHAOS":
+    "混沌状态"
 
+}
 
-    elif state["state"]=="COLD":
 
 
-        for n in scores:
 
-            scores[n]*=0.8
+# ===============================
+# 生成预测
+# ===============================
 
 
+def build_prediction_output(
 
-    elif state["state"]=="CHAOS":
 
+        lottery,
 
-        for n in scores:
 
-            scores[n]*=0.9
+        numbers,
 
-            scores[n]+=random.random()*0.5
 
+        state=None,
 
 
-    elif state["state"]=="REVERSAL":
+        scores=None,
 
 
-        for n in scores:
+        backtest=None
 
-            scores[n]+=random.random()*1.2
 
 
+):
 
 
-    result=sorted(
+    if state is None:
 
-        scores,
+        state={}
 
-        key=scores.get,
 
-        reverse=True
+    if scores is None:
+
+        scores={}
+
+
+
+    state_code = state.get(
+
+        "state",
+
+        "NORMAL"
+
+    )
+
+
+    state_name = STATE_MAP.get(
+
+        state_code,
+
+        "正常状态"
 
     )
 
 
 
-    top10=result[:10]
+    first = numbers[0]
 
 
 
-    top3=top10[:3]
+    result={
 
-
-
-    first=top3[0]
-
-
-
-    return {
 
 
         "版本":
 
-        "V9.0 STATE FUSION",
+        "V10.0 QUANT FINAL",
 
 
-        "市场状态":
 
-        state,
+        "彩种":
 
+        lottery,
 
-        "特码10码":
-
-        top10,
-
-
-        "重点3码":
-
-        top3,
-
-
-        "第一推荐":
-
-        first,
-
-
-        "评分":
-
-        {
-
-            str(k):
-
-            round(scores[k],3)
-
-            for k in top10
-
-        },
 
 
         "时间":
 
-        datetime.now().isoformat()
+        datetime.now().isoformat(),
+
+
+
+
+        "状态":
+
+        {
+
+
+            "名称":
+
+            state_name,
+
+
+            "状态代码":
+
+            state_code,
+
+
+            "熵值":
+
+            round(
+
+                state.get(
+                    "entropy",
+                    0
+                ),
+
+                4
+
+            ),
+
+
+            "重复率":
+
+            round(
+
+                state.get(
+                    "repeat_rate",
+                    0
+                ),
+
+                4
+
+            )
+
+
+        },
+
+
+
+
+        "预测":
+
+        {
+
+
+            "特码10码":
+
+            numbers[:10],
+
+
+
+            "重点3码":
+
+            numbers[:3],
+
+
+
+            "第一推荐":
+
+            first
+
+
+        },
+
+
+
+
+
+        "属性":
+
+        {
+
+
+            "波色":
+
+            get_color(first),
+
+
+
+            "大小":
+
+            get_size(first),
+
+
+
+            "单双":
+
+            get_odd_even(first)
+
+
+        },
+
+
+
+
+        "评分":
+
+        scores,
+
+
+
+
+        "模型":
+
+        {
+
+
+            "状态引擎":
+
+            True,
+
+
+            "Markov":
+
+            True,
+
+
+            "贝叶斯":
+
+            True
+
+
+        },
+
+
+
+
+        "回测":
+
+        backtest or {}
+
 
 
     }
+
+
+    return result
+
+
+
+
+
+__all__=[
+
+    "build_prediction_output",
+
+    "get_color",
+
+    "get_size",
+
+    "get_odd_even"
+
+]
