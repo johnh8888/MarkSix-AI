@@ -1,24 +1,17 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.1 FINAL
+六合彩 AI 智能预测系统
 
 core/backtest.py
 
-Walk Forward 回测模块
+V7.1 BACKTEST FINAL
 
+支持:
 
-原则：
-
-预测第N期
-
-只能使用：
-
-第N期之前的数据
-
-
-禁止未来数据泄漏
-
+V5旧格式
+V6属性格式
+V7状态引擎格式
 
 """
 
@@ -26,56 +19,131 @@ Walk Forward 回测模块
 from __future__ import annotations
 
 
-from typing import List, Dict, Any
+
+from .predictor import predict_next
+
+
 
 
 
 
 # =====================================================
-# 基础指标
+# 属性兼容读取
 # =====================================================
 
 
-def empty_metric():
-
-    return {
-
-        "total":0,
-
-        "hit":0,
-
-        "rate":0
-
-    }
-
-
-
-
-
-def add_result(
-        metric,
-        hit
+def get_attribute(
+        prediction,
+        key
 ):
 
 
-    metric["total"]+=1
+    """
+    兼容:
+
+    V5:
+        prediction["大小"]
+
+    V6/V7:
+        prediction["属性"]["大小"]
+
+    """
 
 
-    if hit:
+    # 新格式
 
-        metric["hit"]+=1
+    attr = prediction.get(
+        "属性",
+        {}
+    )
+
+
+    if key in attr:
+
+        return attr[key]
 
 
 
-    metric["rate"]=round(
+    # 旧格式
 
-        metric["hit"]
+    return prediction.get(
+        key
+    )
 
-        /
 
-        metric["total"],
 
-        4
+
+
+
+
+# =====================================================
+# 特码判断
+# =====================================================
+
+
+def hit_number(
+
+        nums,
+
+        target
+
+):
+
+
+    return target in nums
+
+
+
+
+
+
+
+# =====================================================
+# 大小
+# =====================================================
+
+
+def check_size(
+        number
+):
+
+
+    return (
+
+        "大"
+
+        if number >=25
+
+        else
+
+        "小"
+
+    )
+
+
+
+
+
+
+# =====================================================
+# 单双
+# =====================================================
+
+
+def check_oe(
+        number
+):
+
+
+    return (
+
+        "单"
+
+        if number %2
+
+        else
+
+        "双"
 
     )
 
@@ -86,68 +154,49 @@ def add_result(
 
 
 # =====================================================
-# 回测预测接口
+# 波色
 # =====================================================
 
 
-def simple_predict(history):
+RED={
 
+1,2,7,8,12,13,
+18,19,23,24,
+29,30,34,35,
+40,45,46
 
-    """
-    调用预测模块
-
-    防止循环导入
-
-    """
-
-
-    try:
-
-
-        from .predictor import predict_next
-
-
-        result=predict_next(
-            history
-        )
-
-
-        return result
+}
 
 
 
-    except Exception:
+BLUE={
+
+3,4,9,10,
+14,15,20,
+25,26,31,
+36,37,41,
+42,47,48
+
+}
 
 
-        return {}
+
+def check_wave(
+        n
+):
 
 
+    if n in RED:
+
+        return "红"
 
 
+    if n in BLUE:
+
+        return "蓝"
 
 
-
-
-# =====================================================
-# 提取号码
-# =====================================================
-
-
-def get_top10(pred):
-
-
-    try:
-
-        return pred.get(
-            "特码10码",
-            []
-        )
-
-
-    except:
-
-        return []
-
+    return "绿"
 
 
 
@@ -156,20 +205,21 @@ def get_top10(pred):
 
 
 # =====================================================
-# Walk Forward
+# 单次预测回测
 # =====================================================
 
 
-def walk_forward(
+def evaluate(
 
-        history:List[int],
+        history,
 
-        test_size:int=20
+        test_size=20
 
-)->Dict[str,Any]:
+):
 
 
     result={
+
 
 
         "测试期数":
@@ -177,46 +227,75 @@ def walk_forward(
         test_size,
 
 
+
         "有效测试":
 
         0,
 
 
+
         "特码10码":
 
-        empty_metric(),
+        {
+
+            "total":0,
+
+            "hit":0,
+
+            "rate":0
+
+        },
 
 
 
         "大小":
 
-        empty_metric(),
+        {
+
+            "total":0,
+
+            "hit":0,
+
+            "rate":0
+
+        },
 
 
 
         "单双":
 
-        empty_metric(),
+        {
+
+            "total":0,
+
+            "hit":0,
+
+            "rate":0
+
+        },
 
 
 
         "波色":
 
-        empty_metric()
+        {
+
+            "total":0,
+
+            "hit":0,
+
+            "rate":0
+
+        }
+
+
 
     }
 
 
 
 
-
-    if len(history)<30:
-
-
-        result["错误"]=(
-            "历史数据不足"
-        )
-
+    if len(history)<=test_size:
 
         return result
 
@@ -224,152 +303,184 @@ def walk_forward(
 
 
 
-    # history:
-
-    # 新 -> 旧
 
 
-    max_test=min(
+    # 最近多少期测试
 
-        test_size,
 
-        len(history)-20
+    tests = history[:test_size]
 
-    )
+
+
+    train = history[test_size:]
 
 
 
 
 
-
-    for i in range(max_test):
-
+    for i,target in enumerate(tests):
 
 
-        # 当前目标期
-
-        actual=history[i]
+        try:
 
 
+            prediction = predict_next(
 
-        # 只使用更旧数据
-
-        train=history[i+1:]
-
-
-
-        if len(train)<20:
-
-            continue
-
-
-
-
-        prediction=simple_predict(
-            train
-        )
-
-
-
-        if not prediction:
-
-            continue
-
-
-
-        result["有效测试"]+=1
-
-
-
-
-        # -----------------------
-        # 特码10码
-        # -----------------------
-
-
-        top10=get_top10(
-            prediction
-        )
-
-
-        add_result(
-
-            result["特码10码"],
-
-            actual in top10
-
-        )
-
-
-
-
-
-        # -----------------------
-        # 大小
-        # -----------------------
-
-
-        size=prediction.get(
-            "大小"
-        )
-
-
-        if size:
-
-
-            hit=(
-
-                size
-
-                ==
-
-                ("大" if actual>=25 else "小")
+                train
 
             )
 
 
-            add_result(
 
-                result["大小"],
+            result["有效测试"] +=1
 
-                hit
+
+
+
+            # =====================
+            # 特码
+            # =====================
+
+
+            numbers = prediction.get(
+
+                "特码10码",
+
+                []
 
             )
 
 
 
+            result["特码10码"]["total"] +=1
 
 
-        # -----------------------
-        # 单双
-        # -----------------------
+
+            if hit_number(
+
+                numbers,
+
+                target
+
+            ):
 
 
-        parity=prediction.get(
-            "单双"
-        )
+                result["特码10码"]["hit"] +=1
 
 
-        if parity:
 
 
-            hit=(
 
-                parity
 
-                ==
+            # =====================
+            # 大小
+            # =====================
 
-                ("单" if actual%2 else "双")
+
+            pred_size=get_attribute(
+
+                prediction,
+
+                "大小"
 
             )
 
 
-            add_result(
 
-                result["单双"],
+            if pred_size:
 
-                hit
 
+                result["大小"]["total"] +=1
+
+
+
+                if pred_size == check_size(target):
+
+
+                    result["大小"]["hit"] +=1
+
+
+
+
+
+
+            # =====================
+            # 单双
+            # =====================
+
+
+            pred_oe=get_attribute(
+
+                prediction,
+
+                "单双"
+
+            )
+
+
+
+            if pred_oe:
+
+
+                result["单双"]["total"] +=1
+
+
+
+                if pred_oe == check_oe(target):
+
+
+                    result["单双"]["hit"] +=1
+
+
+
+
+
+
+            # =====================
+            # 波色
+            # =====================
+
+
+            pred_wave=get_attribute(
+
+                prediction,
+
+                "波色"
+
+            )
+
+
+
+            if pred_wave:
+
+
+                result["波色"]["total"] +=1
+
+
+
+                if pred_wave == check_wave(target):
+
+
+                    result["波色"]["hit"] +=1
+
+
+
+
+
+            # 下一期加入训练
+
+            train=[target]+train
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "回测异常:",
+                e
             )
 
 
@@ -377,64 +488,73 @@ def walk_forward(
 
 
 
-        # -----------------------
-        # 波色
-        # -----------------------
+    # =====================
+    # 计算比例
+    # =====================
 
 
-        wave=prediction.get(
-            "波色",
-            {}
-        )
+    for key in [
+
+        "特码10码",
+
+        "大小",
+
+        "单双",
+
+        "波色"
+
+    ]:
 
 
-        if isinstance(wave,dict):
+        total=result[key]["total"]
 
 
-            single=wave.get(
-                "single"
+        hit=result[key]["hit"]
+
+
+
+        if total:
+
+
+            result[key]["rate"]=round(
+
+                hit/total,
+
+                3
+
             )
-
-
-            try:
-
-
-                from .wave_model import get_wave
-
-
-                hit=(
-
-                    get_wave(actual)
-
-                    ==
-
-                    single
-
-                )
-
-
-                add_result(
-
-                    result["波色"],
-
-                    hit
-
-                )
-
-
-            except:
-
-                pass
-
-
-
-
 
 
 
     return result
 
 
+
+
+
+
+
+# =====================================================
+# 外部接口
+# =====================================================
+
+
+def walk_forward(
+
+        history,
+
+        test_size=20
+
+):
+
+
+    return evaluate(
+
+        history,
+
+        test_size
+
+    )
 
 
 
