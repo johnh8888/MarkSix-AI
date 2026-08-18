@@ -1,496 +1,151 @@
 # -*- coding: utf-8 -*-
-
 """
-六合彩 AI V2.0 Walk-Forward 回测
-
-只使用预测时点之前的数据。
-
-输出：
-10期
-20期
-
-不再输出30/60/100。
+六合彩 AI V3.0 - Walk-Forward 回测
+只使用预测时点之前的数据，输出最近 10 / 20 期命中率
 """
 
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from .config import NUMBER_TO_ZODIAC, NUMBER_TO_WAVE
 from .predictor import generate_prediction
 
 
-# =========================================================
-# 单期回测
-# =========================================================
-
-def test_one(
-    train_rows,
-    actual_row
-):
-
-    prediction = generate_prediction(
-        train_rows
-    )
+def _get_zodiac(n: int) -> str:
+    return NUMBER_TO_ZODIAC.get(n, "未知")
 
 
-    # -----------------------------------------------------
-    # 实际特码
-    # -----------------------------------------------------
+def _get_wave(n: int) -> str:
+    return NUMBER_TO_WAVE.get(n, "未知")
 
+
+def _get_size(n: int) -> str:
+    return "大" if n >= 25 else "小"
+
+
+def _get_parity(n: int) -> str:
+    return "单" if n % 2 else "双"
+
+
+def empty_metric() -> Dict[str, Any]:
+    return {"total": 0, "hit": 0, "rate": 0.0}
+
+
+def add_hit(metric: Dict[str, Any], ok: bool) -> None:
+    metric["total"] += 1
+    if ok:
+        metric["hit"] += 1
+    metric["rate"] = metric["hit"] / metric["total"] if metric["total"] else 0.0
+
+
+def test_one(train_rows: List[Dict[str, Any]], actual_row: Dict[str, Any]) -> Dict[str, bool] | None:
     try:
-        actual = int(
-            actual_row["special"]
-        )
+        actual = int(actual_row["special"])
+        if not (1 <= actual <= 49):
+            return None
     except Exception:
         return None
 
+    try:
+        pred = generate_prediction(train_rows)
+        if pred.get("error"):
+            return None
+    except Exception:
+        return None
 
-    # -----------------------------------------------------
     # Top10
-    # -----------------------------------------------------
+    top10 = {item["number"] for item in pred.get("top10_numbers", [])}
+    number_hit = actual in top10
 
-    top10 = {
+    # 生肖 Top5
+    actual_zodiac = _get_zodiac(actual)
+    top5_z = {item["zodiac"] for item in pred.get("top5_zodiac", [])}
+    zodiac_hit = actual_zodiac in top5_z
 
-        int(item["number"])
+    # 平特 Top2
+    top2_p = {item["zodiac"] for item in pred.get("top2_pingte_zodiac", [])}
+    pingte_hit = actual_zodiac in top2_p
 
-        for item
-        in prediction.get(
-            "top10_numbers",
-            []
-        )
-    }
-
-
-    number_hit = (
-        actual in top10
-    )
-
-
-    # -----------------------------------------------------
-    # 生肖
-    # -----------------------------------------------------
-
-    zodiac_map = {
-
-        "马":
-            [1, 13, 25, 37, 49],
-
-        "蛇":
-            [2, 14, 26, 38],
-
-        "龙":
-            [3, 15, 27, 39],
-
-        "兔":
-            [4, 16, 28, 40],
-
-        "虎":
-            [5, 17, 29, 41],
-
-        "牛":
-            [6, 18, 30, 42],
-
-        "鼠":
-            [7, 19, 31, 43],
-
-        "猪":
-            [8, 20, 32, 44],
-
-        "狗":
-            [9, 21, 33, 45],
-
-        "鸡":
-            [10, 22, 34, 46],
-
-        "猴":
-            [11, 23, 35, 47],
-
-        "羊":
-            [12, 24, 36, 48],
-    }
-
-
-    actual_zodiac = None
-
-    for zodiac, numbers in zodiac_map.items():
-
-        if actual in numbers:
-
-            actual_zodiac = zodiac
-
-            break
-
-
-    top5_zodiac = {
-
-        item["zodiac"]
-
-        for item
-        in prediction.get(
-            "top5_zodiac",
-            []
-        )
-    }
-
-
-    zodiac_hit = (
-        actual_zodiac
-        in top5_zodiac
-    )
-
-
-    # -----------------------------------------------------
-    # 平特
-    # -----------------------------------------------------
-
-    top2_pingte = {
-
-        item["zodiac"]
-
-        for item
-        in prediction.get(
-            "top2_pingte_zodiac",
-            []
-        )
-    }
-
-
-    pingte_hit = (
-        actual_zodiac
-        in top2_pingte
-    )
-
-
-    # -----------------------------------------------------
     # 大小
-    # -----------------------------------------------------
+    size_hit = _get_size(actual) == pred.get("size", {}).get("prediction")
 
-    actual_size = (
-        "大"
-        if actual >= 25
-        else "小"
-    )
-
-
-    predicted_size = (
-        prediction
-        .get(
-            "size",
-            {}
-        )
-        .get(
-            "prediction"
-        )
-    )
-
-
-    size_hit = (
-        actual_size
-        == predicted_size
-    )
-
-
-    # -----------------------------------------------------
     # 单双
-    # -----------------------------------------------------
+    parity_hit = _get_parity(actual) == pred.get("parity", {}).get("prediction")
 
-    actual_parity = (
-        "单"
-        if actual % 2
-        else "双"
-    )
-
-
-    predicted_parity = (
-        prediction
-        .get(
-            "parity",
-            {}
-        )
-        .get(
-            "prediction"
-        )
-    )
-
-
-    parity_hit = (
-        actual_parity
-        == predicted_parity
-    )
-
-
-    # -----------------------------------------------------
     # 波色
-    # -----------------------------------------------------
-
-    wave_map = {
-
-        "红": {
-            1, 2, 7, 8, 12, 13,
-            18, 19, 23, 24,
-            29, 30, 34, 35,
-            40, 45, 46
-        },
-
-        "蓝": {
-            3, 4, 9, 10, 14, 15,
-            20, 25, 26, 31,
-            36, 37, 41, 42,
-            47, 48
-        },
-
-        "绿": {
-            5, 6, 11, 16, 17,
-            21, 22, 27, 28,
-            32, 33, 38, 39,
-            43, 44, 49
-        },
-    }
-
-
-    actual_wave = None
-
-    for wave, numbers in wave_map.items():
-
-        if actual in numbers:
-
-            actual_wave = wave
-
-            break
-
-
-    predicted_wave = (
-        prediction
-        .get(
-            "wave",
-            {}
-        )
-        .get(
-            "single"
-        )
-    )
-
-
-    predicted_double = (
-        prediction
-        .get(
-            "wave",
-            {}
-        )
-        .get(
-            "double",
-            []
-        )
-    )
-
-
-    wave_single_hit = (
-        actual_wave
-        == predicted_wave
-    )
-
-
-    wave_double_hit = (
-        actual_wave
-        in predicted_double
-    )
-
+    actual_wave = _get_wave(actual)
+    wave_single = pred.get("wave", {}).get("single")
+    wave_double = pred.get("wave", {}).get("double", [])
+    wave_single_hit = actual_wave == wave_single
+    wave_double_hit = actual_wave in wave_double
 
     return {
-
-        "number_hit":
-            number_hit,
-
-        "zodiac_hit":
-            zodiac_hit,
-
-        "pingte_hit":
-            pingte_hit,
-
-        "size_hit":
-            size_hit,
-
-        "parity_hit":
-            parity_hit,
-
-        "wave_single_hit":
-            wave_single_hit,
-
-        "wave_double_hit":
-            wave_double_hit,
+        "number_hit": number_hit,
+        "zodiac_hit": zodiac_hit,
+        "pingte_hit": pingte_hit,
+        "size_hit": size_hit,
+        "parity_hit": parity_hit,
+        "wave_single_hit": wave_single_hit,
+        "wave_double_hit": wave_double_hit,
     }
 
 
-# =========================================================
-# Walk Forward
-# =========================================================
-
-def walk_forward(
-    rows,
-    window
-):
-
-    if len(rows) < window + 30:
-
-        return {
-            "error":
-                "历史数据不足"
-        }
-
-
-    # -----------------------------------------------------
-    # 只测试最近 window 期
-    # -----------------------------------------------------
-
-    test_count = min(
-        window,
-        len(rows) - 30
-    )
-
-
-    results = {
-
-        "number_hit": 0,
-
-        "zodiac_hit": 0,
-
-        "pingte_hit": 0,
-
-        "size_hit": 0,
-
-        "parity_hit": 0,
-
-        "wave_single_hit": 0,
-
-        "wave_double_hit": 0,
+def walk_forward(rows: List[Dict[str, Any]], window: int = 20) -> Dict[str, Any]:
+    """
+    rows: 最新 → 最旧
+    只测试最近 window 期，每期只用更旧的数据做预测
+    """
+    result = {
+        "test_size": window,
+        "valid_tests": 0,
+        "number10": empty_metric(),
+        "zodiac5": empty_metric(),
+        "pingte2": empty_metric(),
+        "size": empty_metric(),
+        "parity": empty_metric(),
+        "wave_single": empty_metric(),
+        "wave_double": empty_metric(),
     }
 
+    if len(rows) < 30:
+        result["error"] = "历史样本不足"
+        return result
 
-    tests = 0
+    # 最多测试 window 期，且保证训练集至少 20 期
+    test_count = min(window, len(rows) - 20)
+    start = len(rows) - test_count   # 从较旧的位置开始往新走
 
-
-    # -----------------------------------------------------
-    # rows 通常是：
-    #
-    # 最新 → 最旧
-    #
-    # 因此从较旧的数据开始，
-    # 每次只允许使用当时之前的数据。
-    # -----------------------------------------------------
-
-    start = len(rows) - test_count
-
-
-    for i in range(
-        start,
-        len(rows)
-    ):
-
-        train_end = i
-
-        train_rows = rows[
-            train_end:
-        ]
-
-
-        if len(train_rows) < 30:
+    for i in range(start, len(rows)):
+        train_rows = rows[i + 1:] if i + 1 < len(rows) else []
+        # 注意：rows 是 新→旧，所以 train 应该是比当前更旧的部分
+        # 修正：train 使用 rows[i+1 :] （更旧）
+        train_rows = rows[i + 1 :]
+        if len(train_rows) < 20:
             continue
-
 
         actual_row = rows[i]
-
-
-        result = test_one(
-            train_rows,
-            actual_row
-        )
-
-
-        if result is None:
+        one = test_one(train_rows, actual_row)
+        if one is None:
             continue
 
+        result["valid_tests"] += 1
+        add_hit(result["number10"], one["number_hit"])
+        add_hit(result["zodiac5"], one["zodiac_hit"])
+        add_hit(result["pingte2"], one["pingte_hit"])
+        add_hit(result["size"], one["size_hit"])
+        add_hit(result["parity"], one["parity_hit"])
+        add_hit(result["wave_single"], one["wave_single_hit"])
+        add_hit(result["wave_double"], one["wave_double_hit"])
 
-        tests += 1
+    if result["valid_tests"] == 0:
+        result["error"] = "没有有效测试"
 
-
-        for key in results:
-
-            if result.get(
-                key,
-                False
-            ):
-
-                results[key] += 1
-
-
-    if tests == 0:
-
-        return {
-            "error":
-                "没有有效测试"
-        }
+    return result
 
 
-    return {
-
-        "tests":
-            tests,
-
-        "number_top10_hit_rate":
-            results["number_hit"]
-            / tests,
-
-        "zodiac_top5_hit_rate":
-            results["zodiac_hit"]
-            / tests,
-
-        "pingte_top2_hit_rate":
-            results["pingte_hit"]
-            / tests,
-
-        "size_hit_rate":
-            results["size_hit"]
-            / tests,
-
-        "parity_hit_rate":
-            results["parity_hit"]
-            / tests,
-
-        "wave_single_hit_rate":
-            results["wave_single_hit"]
-            / tests,
-
-        "wave_double_hit_rate":
-            results["wave_double_hit"]
-            / tests,
-
-        "wave_double_improvement":
-            (
-                results["wave_double_hit"]
-                -
-                results["wave_single_hit"]
-            )
-            / tests,
-    }
-
-
-# =========================================================
-# 多窗口
-# =========================================================
-
-def multi_window_backtest(
-    rows
-):
-
+def multi_window_backtest(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     results = {}
-
-    for window in [
-        10,
-        20,
-    ]:
-
-        result = walk_forward(
-            rows,
-            window
-        )
-
-        results[str(window)] = result
-
-
+    for window in (10, 20):
+        results[str(window)] = walk_forward(rows, window)
     return results
