@@ -1,47 +1,454 @@
 # -*- coding: utf-8 -*-
-"""MarkSix AI V3.2 统一配置。"""
-from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-CORE_DIR = BASE_DIR / "core"
-OUTPUT_DIR = BASE_DIR / "output"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+"""
+六合彩AI智能预测系统 V4.0
 
-API_HISTORY = "https://marksix6.net/index.php?api=1"
-API_REALTIME = "https://marksix6.net/api/lottery_api.php"
+核心配置
+
+升级:
+1. 动态权重
+2. 状态切换
+3. Softmax评分
+4. 波色双推
+5. Walk Forward
+
+"""
+
+
+# =========================================================
+# 基础配置
+# =========================================================
+
+
+VERSION = "V4.0"
+
+
+NUMBER_MIN = 1
+
+NUMBER_MAX = 49
+
+
+
+# =========================================================
+# 数据窗口
+# =========================================================
+
+
+# 近期趋势
+
+SHORT_WINDOW = 20
+
+
+# 中期趋势
+
+MEDIUM_WINDOW = 50
+
+
+# 长期参考
+
+LONG_WINDOW = 200
+
+
+
+# 回测窗口
+
+BACKTEST_WINDOWS = [
+    10,
+    20,
+    40
+]
+
+
+
+# =========================================================
+# 号码评分模型权重
+# =========================================================
+
+
+MODEL_WEIGHTS = {
+
+
+    # 基础频率
+
+    "frequency":
+        0.18,
+
+
+    # 趋势
+
+    "trend":
+        0.15,
+
+
+    # 动量
+
+    "momentum":
+        0.12,
+
+
+    # 遗漏
+
+    "omission":
+        0.10,
+
+
+    # 连续压力
+
+    "pressure":
+        0.08,
+
+
+    # 号码距离
+
+    "distance":
+        0.08,
+
+
+    # 尾数
+
+    "tail":
+        0.06,
+
+
+    # 区域
+
+    "zone":
+        0.05,
+
+
+    # 大小
+
+    "size":
+        0.07,
+
+
+    # 单双
+
+    "parity":
+        0.06,
+
+
+    # 波色
+
+    "wave":
+        0.05,
+
+}
+
+
+
+# =========================================================
+# 市场状态
+# =========================================================
+
+
+STATE_LIST = [
+
+    "NORMAL",
+
+    "HOT",
+
+    "COLD",
+
+    "SHIFT",
+
+    "CHAOS"
+
+]
+
+
+
+# 默认状态
+
+DEFAULT_STATE = "NORMAL"
+
+
+
+# 状态调整参数
+
+
+STATE_BOOST = {
+
+
+    "NORMAL":
+    {
+
+
+        "frequency":
+            1.0,
+
+
+        "trend":
+            1.0,
+
+
+        "omission":
+            1.0,
+
+    },
+
+
+    "HOT":
+    {
+
+
+        "frequency":
+            0.9,
+
+
+        "trend":
+            1.25,
+
+
+        "momentum":
+            1.25,
+
+
+    },
+
+
+    "COLD":
+    {
+
+
+        "omission":
+            1.35,
+
+
+        "pressure":
+            1.25,
+
+
+    },
+
+
+    "SHIFT":
+    {
+
+
+        "distance":
+            1.30,
+
+
+        "wave":
+            1.20,
+
+
+        "trend":
+            0.85,
+
+    },
+
+
+    "CHAOS":
+    {
+
+
+        "frequency":
+            0.75,
+
+
+        "trend":
+            0.75,
+
+
+        "random":
+            1.20,
+
+    }
+
+}
+
+
+
+
+# =========================================================
+# Softmax评分
+# =========================================================
+
+
+SOFTMAX_TEMPERATURE = 0.8
+
+
+
+# 输出数量
+
+
+TOP_NUMBER_COUNT = 10
+
+
+SPECIAL_RECOMMEND_COUNT = 3
+
+
+
+# =========================================================
+# 波色配置
+# =========================================================
+
+
+WAVE_LIST = [
+
+    "红",
+
+    "蓝",
+
+    "绿"
+
+]
+
+
+
+# 波色输出
+
+WAVE_SINGLE_COUNT = 1
+
+
+WAVE_DOUBLE_COUNT = 2
+
+
+
+# 波色历史窗口
+
+WAVE_SHORT_WINDOW = 20
+
+
+WAVE_LONG_WINDOW = 100
+
+
+
+# =========================================================
+# 生肖
+# =========================================================
+
+
+ZODIAC_COUNT = 12
+
+
+ZODIAC_TOP5 = 5
+
+
+ZODIAC_TOP2 = 2
+
+
+
+# =========================================================
+# 特征开关
+# =========================================================
+
+
+FEATURE_ENABLE = {
+
+
+    "frequency":
+        True,
+
+
+    "trend":
+        True,
+
+
+    "momentum":
+        True,
+
+
+    "omission":
+        True,
+
+
+    "pressure":
+        True,
+
+
+    "distance":
+        True,
+
+
+    "tail":
+        True,
+
+
+    "zone":
+        True,
+
+
+    "size":
+        True,
+
+
+    "parity":
+        True,
+
+
+    "wave":
+        True,
+
+}
+
+
+
+# =========================================================
+# 数据库
+# =========================================================
+
 
 DB_FILES = {
-    "hk": BASE_DIR / "hk_macau.db",
-    "newMacau": BASE_DIR / "new_macau.db",
-    "oldMacau": BASE_DIR / "old_macau.db",
-}
-LOTTERY_NAMES = {
-    "hk": "香港六合彩",
-    "newMacau": "新澳门六合彩",
-    "oldMacau": "老澳门六合彩",
+
+
+    "hk":
+
+        "hk.db",
+
+
+    "newMacau":
+
+        "new_macau.db",
+
+
+    "oldMacau":
+
+        "old_macau.db",
+
 }
 
-# 预测窗口：删除旧版30/60/100回测窗口；模型内部仍可使用多尺度特征。
-SHORT_WINDOW = 12
-MEDIUM_WINDOW = 36
-LONG_WINDOW = 120
-BACKTEST_WINDOWS = (10, 20)
-MIN_TRAIN_SIZE = 20
 
-ZODIAC_MAP_2026 = {
-    "马": [1, 13, 25, 37, 49], "蛇": [2, 14, 26, 38],
-    "龙": [3, 15, 27, 39], "兔": [4, 16, 28, 40],
-    "虎": [5, 17, 29, 41], "牛": [6, 18, 30, 42],
-    "鼠": [7, 19, 31, 43], "猪": [8, 20, 32, 44],
-    "狗": [9, 21, 33, 45], "鸡": [10, 22, 34, 46],
-    "猴": [11, 23, 35, 47], "羊": [12, 24, 36, 48],
-}
-NUMBER_TO_ZODIAC = {n: z for z, nums in ZODIAC_MAP_2026.items() for n in nums}
 
-RED_WAVE = {1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46}
-BLUE_WAVE = {3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48}
-GREEN_WAVE = {5,6,11,16,17,21,22,27,28,32,33,38,39,43,44,49}
-WAVE_MAP = {"红": RED_WAVE, "蓝": BLUE_WAVE, "绿": GREEN_WAVE}
-NUMBER_TO_WAVE = {n: w for w, nums in WAVE_MAP.items() for n in nums}
-ALL_NUMBERS = list(range(1, 50))
-ALL_WAVES = ["红", "蓝", "绿"]
+# =========================================================
+# API
+# =========================================================
+
+
+API_HISTORY_URL = (
+
+    "https://marksix6.net/index.php?api=1"
+
+)
+
+
+API_DETAIL_URL = (
+
+    "https://marksix6.net/api/lottery_api.php"
+
+)
+
+
+
+# =========================================================
+# 输出
+# =========================================================
+
+
+OUTPUT_DIR = "output"
+
+
+PREDICTION_FILE = (
+
+    "output/prediction.json"
+
+)
+
+
+BACKTEST_FILE = (
+
+    "output/backtest.json"
+
+)
