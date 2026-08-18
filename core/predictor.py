@@ -2,203 +2,212 @@
 
 """
 六合彩AI智能预测系统 V4.0
-核心预测引擎
 
-功能:
+predictor.py
 
-1. 动态模块融合
-2. 49码评分
-3. 概率归一化
-4. 生肖修正
-5. 波色双推
-6. 大小单双预测
+预测输出模块
 
 """
 
 
-from collections import defaultdict
+from collections import Counter
 
 
-from core.features import (
+from .strategies import combine_models
+
+
+from .features import (
+
     get_special,
-    get_color,
-    get_size,
-    get_parity,
+
+    get_wave,
+
+    get_zodiac,
+
 )
 
 
-from core.strategies import (
-    combine_strategies
-)
-
-
-from core.config import (
-    NUMBER_MAX,
-    TOP_N,
-)
-
-
-# =====================================================
-# 2026生肖系统
-# =====================================================
-
-
-ZODIAC_2026 = [
-
-    "马",
-    "羊",
-    "猴",
-    "鸡",
-    "狗",
-    "猪",
-    "鼠",
-    "牛",
-    "虎",
-    "兔",
-    "龙",
-    "蛇"
-
-]
-
-
-# 澳门六合彩生肖号码
-# 2026 马年
-
-ZODIAC_MAP = {
-
-1:"马",
-2:"蛇",
-3:"龙",
-4:"兔",
-5:"虎",
-6:"牛",
-7:"鼠",
-8:"猪",
-9:"狗",
-10:"鸡",
-11:"猴",
-12:"羊",
-
-13:"马",
-14:"蛇",
-15:"龙",
-16:"兔",
-17:"虎",
-18:"牛",
-19:"鼠",
-20:"猪",
-21:"狗",
-22:"鸡",
-23:"猴",
-24:"羊",
-
-25:"马",
-26:"蛇",
-27:"龙",
-28:"兔",
-29:"虎",
-30:"牛",
-31:"鼠",
-32:"猪",
-33:"狗",
-34:"鸡",
-35:"猴",
-36:"羊",
-
-37:"马",
-38:"蛇",
-39:"龙",
-40:"兔",
-41:"虎",
-42:"牛",
-43:"鼠",
-44:"猪",
-45:"狗",
-46:"鸡",
-47:"猴",
-48:"羊",
-
-49:"马"
-
-}
 
 
 
 # =====================================================
-# 号码生肖
+# 排序Top
 # =====================================================
 
-def get_zodiac(num):
 
-    return ZODIAC_MAP.get(
-        int(num),
-        "未知"
-    )
+def get_top_numbers(scores,limit=10):
 
-
-
-# =====================================================
-# TOP号码
-# =====================================================
-
-def get_top_numbers(scores,n=10):
 
     return sorted(
+
         scores.items(),
+
         key=lambda x:x[1],
+
         reverse=True
-    )[:n]
+
+    )[:limit]
+
 
 
 
 
 # =====================================================
-# 生肖预测
+# 特码10码
 # =====================================================
 
 
-def predict_zodiac(scores):
+def predict_special10(rows):
 
 
-    zodiac_score = defaultdict(float)
+    scores,models,weights = combine_models(rows)
 
 
-    for num,score in scores.items():
-
-        z = get_zodiac(num)
-
-        zodiac_score[z]+=score
-
-
-
-    result = sorted(
-        zodiac_score.items(),
-        key=lambda x:x[1],
-        reverse=True
+    top10=get_top_numbers(
+        scores,
+        10
     )
+
+
+    return {
+
+
+        "numbers":
+
+        [
+            n
+            for n,s in top10
+        ],
+
+
+        "scores":
+
+        {
+
+            str(n):
+
+            round(s,4)
+
+            for n,s in top10
+
+        },
+
+
+        "all_scores":
+
+        scores,
+
+
+        "models":
+
+        models,
+
+
+        "weights":
+
+        weights,
+
+    }
+
+
+
+
+
+# =====================================================
+# 重点推荐
+# =====================================================
+
+
+def predict_focus(rows):
+
+
+    result=predict_special10(rows)
+
+
+    nums=result["numbers"]
+
+
+
+    return nums[:3]
+
+
+
+
+
+# =====================================================
+# 生肖5肖
+# =====================================================
+
+
+def predict_zodiac(rows):
+
+
+    result=predict_special10(rows)
+
+
+    counter=Counter()
+
+
+
+    for n in result["numbers"]:
+
+
+        counter[
+            get_zodiac(n)
+        ]+=1
+
 
 
     return [
+
         x[0]
-        for x in result[:5]
+
+        for x in counter.most_common(5)
+
     ]
 
 
 
 
-# =====================================================
-# 平特生肖
-# =====================================================
-
-def predict_pingte(zodiac):
-
-    return zodiac[:2]
-
-
-
 
 # =====================================================
-# 大小预测
+# 平特2肖
+# =====================================================
+
+
+def predict_flat_zodiac(rows):
+
+
+    result=predict_special10(rows)
+
+
+    counter=Counter()
+
+
+
+    for n in result["numbers"]:
+
+
+        counter[
+            get_zodiac(n)
+        ]+=1
+
+
+
+    return [
+
+        x[0]
+
+        for x in counter.most_common(2)
+
+    ]
+
+
+
+
+
+# =====================================================
+# 大小
 # =====================================================
 
 
@@ -206,59 +215,82 @@ def predict_size(rows):
 
 
     big=0
+
     small=0
 
 
-    for row in rows[:50]:
 
-        n=get_special(row)
+    result=predict_special10(rows)
+
+
+    for n in result["numbers"]:
 
 
         if n>=25:
+
             big+=1
 
         else:
+
             small+=1
 
 
-    total=big+small
+
+    if big>=small:
+
+        return {
 
 
-    if total==0:
+            "recommend":
 
-        return (
-            "未知",
+            "大",
+
+
+            "prob":
+
             {
-                "大":0.5,
-                "小":0.5
+
+                "大":
+
+                round(big/10,3),
+
+
+                "小":
+
+                round(small/10,3)
+
             }
-        )
 
-
-    p_big=round(
-        big/total,
-        3
-    )
-
-
-    p_small=round(
-        small/total,
-        3
-    )
-
-
-    return (
-
-        "大"
-        if p_big>=p_small
-        else "小",
-
-        {
-            "大":p_big,
-            "小":p_small
         }
 
-    )
+
+    else:
+
+        return {
+
+
+            "recommend":
+
+            "小",
+
+
+            "prob":
+
+            {
+
+                "大":
+
+                round(big/10,3),
+
+
+                "小":
+
+                round(small/10,3)
+
+            }
+
+        }
+
 
 
 
@@ -267,63 +299,66 @@ def predict_size(rows):
 # 单双
 # =====================================================
 
+
 def predict_parity(rows):
 
 
     odd=0
+
     even=0
 
 
-    for row in rows[:50]:
+
+    result=predict_special10(rows)
 
 
-        n=get_special(row)
+
+    for n in result["numbers"]:
 
 
         if n%2:
+
             odd+=1
 
         else:
+
             even+=1
 
 
-    total=odd+even
+
+    if odd>=even:
+
+        r="单"
+
+    else:
+
+        r="双"
 
 
-    if total==0:
 
-        return (
-            "未知",
-            {
-                "单":0.5,
-                "双":0.5
-            }
-        )
+    return {
 
 
-    po=round(
-        odd/total,
-        3
-    )
-
-    pe=round(
-        even/total,
-        3
-    )
+        "recommend":r,
 
 
-    return (
-
-        "单"
-        if po>=pe
-        else "双",
+        "prob":
 
         {
-            "单":po,
-            "双":pe
+
+        "单":
+
+        round(odd/10,3),
+
+
+        "双":
+
+        round(even/10,3)
+
         }
 
-    )
+    }
+
 
 
 
@@ -333,188 +368,86 @@ def predict_parity(rows):
 # =====================================================
 
 
-def predict_wave(scores):
+def predict_wave(rows):
 
 
-    wave={
-
-        "红":0,
-        "蓝":0,
-        "绿":0
-
-    }
+    result=predict_special10(rows)
 
 
-    for num,score in scores.items():
 
-        c=get_color(num)
+    counter=Counter()
 
-        wave[c]+=score
+
+
+    for n in result["numbers"]:
+
+
+        counter[
+            get_wave(n)
+        ]+=1
 
 
 
     total=sum(
-        wave.values()
+        counter.values()
     )
 
 
-    if total:
 
-        for k in wave:
+    probs={}
 
-            wave[k]=round(
-                wave[k]/total,
-                4
-            )
+
+    for k,v in counter.items():
+
+        probs[k]=round(
+            v/total,
+           3
+        )
+
 
 
     order=sorted(
-        wave.items(),
+
+        probs.items(),
+
         key=lambda x:x[1],
+
         reverse=True
-    )
-
-
-    return (
-
-        order[0][0],
-
-        order[:2],
-
-        wave
 
     )
 
-
-
-
-# =====================================================
-# 主预测函数
-# =====================================================
-
-
-def predict(rows):
-
-
-    scores,modules = combine_strategies(
-        rows
-    )
-
-
-    # top10
-
-    top10=get_top_numbers(
-        scores,
-        10
-    )
-
-
-    # 三码
-
-    recommend=[
-
-        x[0]
-        for x in top10[:3]
-
-    ]
-
-
-    #生肖
-
-    zodiac=predict_zodiac(
-        scores
-    )
-
-
-    pingte=predict_pingte(
-        zodiac
-    )
-
-
-    size,size_prob=predict_size(
-        rows
-    )
-
-
-    parity,parity_prob=predict_parity(
-        rows
-    )
-
-
-    wave_single,wave_double,wave_prob=predict_wave(
-        scores
-    )
 
 
     return {
 
 
-        "top10":
+        "single":
 
-        top10,
-
-
-        "recommend":
-
-        recommend,
+        order[0][0],
 
 
-        "first":
 
-        top10[0],
-
-
-        "zodiac":
-
-        zodiac,
-
-
-        "pingte":
-
-        pingte,
-
-
-        "size":
-
-        size,
-
-
-        "size_prob":
-
-        size_prob,
-
-
-        "parity":
-
-        parity,
-
-
-        "parity_prob":
-
-        parity_prob,
-
-
-        "wave_single":
-
-        wave_single,
-
-
-        "wave_double":
+        "double":
 
         [
-            x[0]
-            for x in wave_double
+
+            order[0][0],
+
+            order[1][0]
+
         ],
 
 
-        "wave_prob":
 
-        wave_prob,
+        "exclude":
+
+        order[-1][0],
 
 
-        "modules":
 
-        modules
+        "prob":
+
+        probs
 
     }
 
@@ -522,20 +455,113 @@ def predict(rows):
 
 
 
+# =====================================================
+# 完整预测
+# =====================================================
+
+
+def predict_all(rows,name="unknown"):
+
+
+    special=predict_special10(rows)
+
+
+
+    result={
+
+
+        "name":
+
+        name,
+
+
+        "special10":
+
+        special["numbers"],
+
+
+        "top10_score":
+
+        special["scores"],
+
+
+        "focus":
+
+        predict_focus(rows),
+
+
+
+        "zodiac5":
+
+        predict_zodiac(rows),
+
+
+
+        "flat_zodiac2":
+
+        predict_flat_zodiac(rows),
+
+
+
+        "size":
+
+        predict_size(rows),
+
+
+
+        "parity":
+
+        predict_parity(rows),
+
+
+
+        "wave":
+
+        predict_wave(rows),
+
+
+
+        "weights":
+
+        special["weights"],
+
+    }
+
+
+
+    return result
+
+
+
+
+
+# =====================================================
+# 测试
+# =====================================================
+
 
 if __name__=="__main__":
 
 
-    test=[
+    rows=[
 
         {
-            "numbers":
-            "39,41,08,09,07,14,49"
+        "numbers":
+        "38,26,08,06,29,18,23"
+        },
+
+        {
+        "numbers":
+        "33,27,16,28,04,25,14"
         }
 
     ]
 
 
-    print(
-        predict(test)
+    data=predict_all(
+        rows,
+        "test"
     )
+
+
+    print(data)
