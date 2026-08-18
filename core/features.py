@@ -5,135 +5,145 @@
 
 features.py
 
-高级特征模块
+功能:
+
+号码基础特征工程
+
+包含:
+
+1. 特码解析
+2. 波色
+3. 大小
+4. 单双
+5. 尾数
+6. 分区
+7. 邻号
+8. 冷热
+9. 周期
+10. 生肖动态映射
 
 """
 
 
 from collections import Counter
-import math
 
-
-from core.config import (
-    NUMBER_MIN,
-    NUMBER_MAX,
+from .config import (
+    RED_NUMBERS,
+    BLUE_NUMBERS,
+    GREEN_NUMBERS,
     SHORT_WINDOW,
-    MEDIUM_WINDOW,
+    ZODIAC_BASE_YEAR,
+    ZODIAC_LIST,
 )
 
 
 
-# =========================================================
-# 基础解析
-# =========================================================
 
 
-def get_special(row):
+# =====================================================
+# 基础号码解析
+# =====================================================
+
+
+def parse_numbers(row):
 
     """
-    获取特码
+    解析开奖数据
 
-    row:
+    支持:
+
     {
-        numbers:
-        "01,02,03..."
+        numbers:"01,02,03..."
     }
 
     """
 
-    try:
+    if not row:
+        return []
 
-        nums = row["numbers"]
 
-        if isinstance(nums,str):
+    numbers = row.get(
+        "numbers",
+        ""
+    )
 
-            nums = nums.replace(
-                " ",
-                ","
+
+    if isinstance(
+        numbers,
+        list
+    ):
+
+        return [
+
+            int(x)
+
+            for x in numbers
+
+            if str(x).isdigit()
+
+        ]
+
+
+    result=[]
+
+
+    for x in str(numbers).split(","):
+
+        x=x.strip()
+
+        if x.isdigit():
+
+            result.append(
+                int(x)
             )
 
-            nums = [
 
-                int(x)
-
-                for x in nums.split(",")
-
-                if x.strip()
-
-            ]
-
-
-        if len(nums) >= 7:
-
-            return nums[-1]
-
-
-    except:
-
-        pass
-
-
-    return 0
+    return result
 
 
 
 
 
-# =========================================================
-# 号码颜色
-# =========================================================
+# =====================================================
+# 获取特码
+# =====================================================
 
 
-RED = {
+def get_special(row):
 
-1,2,7,8,
-12,13,18,19,
-23,24,29,30,
-34,35,40,45,
-46
-
-}
+    nums=parse_numbers(row)
 
 
-BLUE = {
+    if not nums:
 
-3,4,9,10,
-14,15,20,
-25,26,31,
-36,37,41,
-42,47,48
-
-}
+        return None
 
 
-
-GREEN = {
-
-5,6,11,
-16,17,21,
-22,27,28,
-32,33,38,
-39,43,44,
-49
-
-}
+    return nums[0]
 
 
 
 
-def get_wave(num):
 
-    if num in RED:
+# =====================================================
+# 波色
+# =====================================================
+
+
+def get_wave(number):
+
+
+    if number in RED_NUMBERS:
 
         return "红"
 
 
-    if num in BLUE:
+    if number in BLUE_NUMBERS:
 
         return "蓝"
 
 
-    if num in GREEN:
+    if number in GREEN_NUMBERS:
 
         return "绿"
 
@@ -144,16 +154,17 @@ def get_wave(num):
 
 
 
-# =========================================================
+# =====================================================
 # 大小
-# =========================================================
+# =====================================================
 
 
-def get_size(num):
+def get_size(number):
 
-    if num >= 25:
+    if number >=25:
 
         return "大"
+
 
     return "小"
 
@@ -161,16 +172,17 @@ def get_size(num):
 
 
 
-# =========================================================
+# =====================================================
 # 单双
-# =========================================================
+# =====================================================
 
 
-def get_parity(num):
+def get_parity(number):
 
-    if num % 2:
+    if number % 2:
 
         return "单"
+
 
     return "双"
 
@@ -178,149 +190,325 @@ def get_parity(num):
 
 
 
-# =========================================================
+# =====================================================
 # 尾数
-# =========================================================
+# =====================================================
 
 
-def get_tail(num):
+def get_tail(number):
 
-    return num % 10
-
-
+    return number % 10
 
 
 
-# =========================================================
-# 区域
-# =========================================================
 
 
-def get_zone(num):
+# =====================================================
+# 七区划分
+# =====================================================
 
-    if num <= 10:
+
+def get_zone(number):
+
+
+    if number <=7:
 
         return 1
 
 
-    if num <=20:
+    if number <=14:
 
         return 2
 
 
-    if num <=30:
+    if number <=21:
 
         return 3
 
 
-    if num <=40:
+    if number <=28:
 
         return 4
 
 
-    return 5
+    if number <=35:
+
+        return 5
+
+
+    if number <=42:
+
+        return 6
+
+
+    return 7
 
 
 
 
 
-# =========================================================
-# 特码历史
-# =========================================================
+# =====================================================
+# 邻号
+# =====================================================
 
 
-def special_list(rows):
+def neighbor_distance(a,b):
 
-    result=[]
+    return abs(
+        a-b
+    )
+
+
+
+
+
+def is_neighbor(a,b):
+
+
+    return abs(a-b)<=2
+
+
+
+
+
+# =====================================================
+# 2026生肖动态计算
+# =====================================================
+
+
+def get_zodiac(number,year=2026):
+
+    """
+    根据年份计算号码生肖
+
+    2026 = 马年
+
+    """
+
+    offset=(
+
+        year
+
+        -
+
+        ZODIAC_BASE_YEAR
+
+    ) % 12
+
+
+    index=(
+
+        number
+
+        +
+
+        offset
+
+    ) % 12
+
+
+    return ZODIAC_LIST[index]
+
+
+
+
+
+# =====================================================
+# 开奖生肖统计
+# =====================================================
+
+
+def zodiac_frequency(rows):
+
+
+    counter=Counter()
 
 
     for row in rows:
 
+
         n=get_special(row)
 
 
-        if NUMBER_MIN <= n <= NUMBER_MAX:
+        if not n:
 
-            result.append(n)
-
-
-    return result
+            continue
 
 
+        z=get_zodiac(n)
+
+
+        counter[z]+=1
 
 
 
-# =========================================================
-# 频率
-# =========================================================
-
-
-def special_frequency(rows):
-
-
-    nums=special_list(rows)
-
-
-    c=Counter(nums)
-
-
-    return {
-
-        i:c.get(i,0)
-
-        for i in range(
-            NUMBER_MIN,
-            NUMBER_MAX+1
-        )
-
-    }
+    return counter
 
 
 
 
 
-# =========================================================
-# 遗漏
-# =========================================================
+# =====================================================
+# 波色统计
+# =====================================================
 
 
-def special_omission(rows):
+def wave_frequency(rows):
 
 
-    nums=special_list(rows)
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if not n:
+
+            continue
+
+
+        w=get_wave(n)
+
+
+        if w:
+
+            counter[w]+=1
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 大小统计
+# =====================================================
+
+
+def size_frequency(rows):
+
+
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if not n:
+
+            continue
+
+
+        counter[
+            get_size(n)
+        ] +=1
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 单双统计
+# =====================================================
+
+
+def parity_frequency(rows):
+
+
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if not n:
+
+            continue
+
+
+        counter[
+            get_parity(n)
+        ]+=1
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 号码频率
+# =====================================================
+
+
+def number_frequency(rows):
+
+
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            counter[n]+=1
+
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 遗漏计算
+# =====================================================
+
+
+def omission_count(rows):
 
 
     result={}
 
 
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
+    for n in range(1,50):
 
 
-        miss=0
+        count=0
 
 
-        for x in nums:
+        for row in rows:
 
 
-            if x==n:
+            if get_special(row)==n:
 
                 break
 
 
-            miss+=1
-
-
-        else:
-
-            miss=len(nums)
+            count+=1
 
 
 
-        result[n]=miss
-
+        result[n]=count
 
 
     return result
@@ -329,30 +517,116 @@ def special_omission(rows):
 
 
 
-# =========================================================
-# 热冷状态
-# =========================================================
+# =====================================================
+# 尾数统计
+# =====================================================
 
 
-def hot_cold_feature(rows):
+def tail_frequency(rows):
 
 
-    nums=special_list(
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            counter[
+                get_tail(n)
+            ]+=1
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 分区统计
+# =====================================================
+
+
+def zone_frequency(rows):
+
+
+    counter=Counter()
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if n:
+
+            counter[
+                get_zone(n)
+            ]+=1
+
+
+    return counter
+
+
+
+
+
+# =====================================================
+# 周期检测
+# =====================================================
+
+
+def cycle_gap(rows,number):
+
+
+    gap=0
+
+
+    for row in rows:
+
+
+        n=get_special(row)
+
+
+        if n==number:
+
+            return gap
+
+
+        gap+=1
+
+
+
+    return gap
+
+
+
+
+
+# =====================================================
+# 冷热状态
+# =====================================================
+
+
+def hot_cold(rows):
+
+
+    freq=number_frequency(
         rows[:SHORT_WINDOW]
     )
-
-
-    freq=Counter(nums)
 
 
     result={}
 
 
 
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
+    for n in range(1,50):
 
 
         result[n]=freq.get(
@@ -361,384 +635,4 @@ def hot_cold_feature(rows):
         )
 
 
-
     return result
-
-
-
-
-
-# =========================================================
-# 动量趋势
-# =========================================================
-
-
-def trend_feature(rows):
-
-
-    short=special_frequency(
-        rows[:SHORT_WINDOW]
-    )
-
-
-    medium=special_frequency(
-        rows[:MEDIUM_WINDOW]
-    )
-
-
-    result={}
-
-
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
-
-
-        result[n]=(
-
-            short[n]*0.7
-
-            +
-
-            medium[n]*0.3
-
-        )
-
-
-
-    return result
-
-
-
-
-
-# =========================================================
-# 连续压力
-# =========================================================
-
-
-def pressure_feature(rows):
-
-
-    nums=special_list(rows)
-
-
-    result={}
-
-
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
-
-
-        count=0
-
-
-        for x in nums:
-
-
-            if x==n:
-
-                count+=1
-
-            else:
-
-                break
-
-
-
-        result[n]=count
-
-
-
-    return result
-
-
-
-
-
-# =========================================================
-# 号码距离
-# =========================================================
-
-
-def distance_feature(rows):
-
-
-    nums=special_list(rows)
-
-
-    result={
-
-        n:0
-
-        for n in range(
-            NUMBER_MIN,
-            NUMBER_MAX+1
-        )
-
-    }
-
-
-    if len(nums)<2:
-
-        return result
-
-
-
-    last=nums[0]
-
-
-
-    for n in result:
-
-
-        result[n]=abs(
-            n-last
-        )
-
-
-    return result
-
-
-
-
-
-# =========================================================
-# 尾数趋势
-# =========================================================
-
-
-def tail_feature(rows):
-
-
-    nums=special_list(rows)
-
-
-    tails=[
-
-        get_tail(x)
-
-        for x in nums
-
-    ]
-
-
-    counter=Counter(
-        tails
-    )
-
-
-    result={}
-
-
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
-
-
-        result[n]=counter.get(
-
-            get_tail(n),
-
-            0
-
-        )
-
-
-    return result
-
-
-
-
-
-# =========================================================
-# 区域趋势
-# =========================================================
-
-
-def zone_feature(rows):
-
-
-    nums=special_list(rows)
-
-
-    zones=[
-
-        get_zone(x)
-
-        for x in nums
-
-    ]
-
-
-    counter=Counter(
-        zones
-    )
-
-
-    result={}
-
-
-
-    for n in range(
-        NUMBER_MIN,
-        NUMBER_MAX+1
-    ):
-
-
-        result[n]=counter.get(
-
-            get_zone(n),
-
-            0
-
-        )
-
-
-    return result
-
-
-
-
-
-# =========================================================
-# 波色趋势
-# =========================================================
-
-
-def wave_feature(rows):
-
-
-    nums=special_list(rows)
-
-
-    result={
-
-        "红":0,
-
-        "蓝":0,
-
-        "绿":0
-
-    }
-
-
-
-    for n in nums:
-
-
-        w=get_wave(n)
-
-
-        if w:
-
-            result[w]+=1
-
-
-
-    total=sum(
-        result.values()
-    )
-
-
-
-    if total==0:
-
-        return {
-
-            k:0.33
-
-            for k in result
-
-        }
-
-
-
-    return {
-
-        k:
-
-        round(
-            v/total,
-            4
-        )
-
-        for k,v in result.items()
-
-    }
-
-
-
-
-
-# =========================================================
-# 综合特征
-# =========================================================
-
-
-def build_features(rows):
-
-
-    return {
-
-
-        "frequency":
-
-        special_frequency(rows),
-
-
-
-        "trend":
-
-        trend_feature(rows),
-
-
-
-        "omission":
-
-        special_omission(rows),
-
-
-
-        "momentum":
-
-        hot_cold_feature(rows),
-
-
-
-        "pressure":
-
-        pressure_feature(rows),
-
-
-
-        "distance":
-
-        distance_feature(rows),
-
-
-
-        "tail":
-
-        tail_feature(rows),
-
-
-
-        "zone":
-
-        zone_feature(rows),
-
-
-
-        "wave":
-
-        wave_feature(rows),
-
-
-    }
-
-
