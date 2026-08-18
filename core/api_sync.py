@@ -1,19 +1,18 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.3
+六合彩 AI 智能预测系统 V5.3 HISTORICAL FINAL
 
 core/api_sync.py
 
-API同步模块
-
 功能:
 
-1. api3.marksix6.net实时接口
-2. SQLite保存
-3. JSON本地缓存
-4. 自动去重
-5. 支持多彩种
+1. 历史数据同步
+2. 实时开奖同步
+3. SSL证书异常处理
+4. SQLite保存
+5. JSON缓存
+6. 三彩种支持
 
 """
 
@@ -24,6 +23,8 @@ from __future__ import annotations
 import json
 import ssl
 import urllib.request
+import urllib.error
+import re
 
 
 from pathlib import Path
@@ -31,6 +32,7 @@ from datetime import datetime
 
 
 from .sqlite_manager import save_draw
+
 
 
 
@@ -55,14 +57,27 @@ CACHE_DIR.mkdir(
 
 
 
+
 # =====================================================
 # API
 # =====================================================
 
 
-API_URL = (
-    "https://api3.marksix6.net/lottery_api.php"
+API_HISTORY = (
+
+    "https://marksix6.net/index.php?api=1"
+
 )
+
+
+
+API_REALTIME = (
+
+    "https://marksix6.net/api/lottery_api.php"
+
+)
+
+
 
 
 
@@ -70,17 +85,24 @@ LOTTERIES = {
 
 
     "hk":
+
     "香港六合彩",
 
 
+
     "newMacau":
+
     "新澳门六合彩",
 
 
+
     "oldMacau":
+
     "老澳门六合彩"
 
+
 }
+
 
 
 
@@ -92,9 +114,18 @@ LOTTERIES = {
 # =====================================================
 
 
-def ssl_context():
+def create_ssl(
+        verify=True
+):
 
-    return ssl.create_default_context()
+
+    if verify:
+
+        return ssl.create_default_context()
+
+
+    return ssl._create_unverified_context()
+
 
 
 
@@ -102,11 +133,17 @@ def ssl_context():
 
 
 # =====================================================
-# 请求JSON
+# HTTP请求
 # =====================================================
 
 
-def request_json(url):
+def request_json(
+
+        url,
+
+        verify=True
+
+):
 
 
     req = urllib.request.Request(
@@ -126,41 +163,96 @@ def request_json(url):
     )
 
 
+
+    with urllib.request.urlopen(
+
+        req,
+
+        timeout=20,
+
+        context=create_ssl(verify)
+
+    ) as r:
+
+
+        text=r.read().decode(
+
+            "utf-8-sig"
+
+        )
+
+
+        return json.loads(text)
+
+
+
+
+
+
+
+
+def safe_request(url):
+
+
     try:
 
 
-        with urllib.request.urlopen(
+        return request_json(
 
-            req,
+            url,
 
-            timeout=20,
+            True
 
-            context=ssl_context()
-
-        ) as r:
+        )
 
 
-            text = r.read().decode(
-
-                "utf-8-sig"
-
-            )
-
-
-            return json.loads(text)
-
-
-
-    except Exception as e:
+    except ssl.SSLError as e:
 
 
         print(
-            "API请求失败:",
+            "SSL错误:",
             e
         )
 
 
-        raise
+        print(
+            "启用SSL备用模式"
+        )
+
+
+        return request_json(
+
+            url,
+
+            False
+
+        )
+
+
+
+    except urllib.error.URLError as e:
+
+
+        print(
+            "网络错误:",
+            e
+        )
+
+
+        print(
+            "尝试备用SSL"
+        )
+
+
+        return request_json(
+
+            url,
+
+            False
+
+        )
+
+
 
 
 
@@ -168,18 +260,23 @@ def request_json(url):
 
 
 # =====================================================
-# 保存缓存
+# 缓存
 # =====================================================
 
 
 def save_cache(
-        key,
+
+        name,
+
         data
+
 ):
 
 
     path = CACHE_DIR / (
-        key + ".json"
+
+        name + ".json"
+
     )
 
 
@@ -205,20 +302,324 @@ def save_cache(
 
 
 
+
+
 # =====================================================
-# 号码处理
+# 数字解析
 # =====================================================
 
 
-def parse_numbers(data):
+def parse_numbers(value):
 
 
-    nums=[]
+    result=[]
 
 
-    values=data.get(
+    if isinstance(value,list):
 
-        "numbers",
+
+        for x in value:
+
+
+            m=re.findall(
+
+                r"\d+",
+
+                str(x)
+
+            )
+
+
+            if m:
+
+
+                n=int(m[0])
+
+
+                if 1 <= n <=49:
+
+                    result.append(n)
+
+
+
+    else:
+
+
+        m=re.findall(
+
+            r"\d+",
+
+            str(value)
+
+        )
+
+
+        for x in m:
+
+
+            n=int(x)
+
+
+            if 1<=n<=49:
+
+                result.append(n)
+
+
+
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 保存开奖
+# =====================================================
+
+
+def save_result(
+
+        key,
+
+        issue,
+
+        nums,
+
+        source
+
+):
+
+
+    if len(nums)<7:
+
+        return False
+
+
+
+    return save_draw(
+
+        key,
+
+        str(issue),
+
+        nums[:6],
+
+        nums[6],
+
+        source
+
+    )
+
+
+
+
+
+
+
+
+# =====================================================
+# 实时同步
+# =====================================================
+
+
+def sync_realtime():
+
+
+    result={}
+
+
+
+    for key in LOTTERIES:
+
+
+        try:
+
+
+            url=(
+
+                API_REALTIME
+
+                +
+
+                "?type="
+
+                +
+
+                key
+
+            )
+
+
+
+            print()
+
+            print(
+                "实时:",
+                url
+            )
+
+
+
+            data=safe_request(
+
+                url
+
+            )
+
+
+
+            save_cache(
+
+                key+"_realtime",
+
+                data
+
+            )
+
+
+
+            nums=parse_numbers(
+
+                data.get(
+
+                    "numbers",
+
+                    []
+
+                )
+
+            )
+
+
+            issue=data.get(
+
+                "expect",
+
+                datetime.now().strftime("%Y%m%d")
+
+            )
+
+
+
+            ok=save_result(
+
+                key,
+
+                issue,
+
+                nums,
+
+                "realtime"
+
+            )
+
+
+
+            print(
+
+                LOTTERIES[key],
+
+                "实时保存",
+
+                ok
+
+            )
+
+
+            result[key]=ok
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                key,
+
+                "实时失败:",
+
+                e
+
+            )
+
+
+            result[key]=False
+
+
+
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 历史同步
+# =====================================================
+
+
+def sync_history():
+
+
+    print()
+
+    print(
+        "开始历史同步"
+    )
+
+
+
+    result={}
+
+
+
+    try:
+
+
+        data=safe_request(
+
+            API_HISTORY
+
+        )
+
+
+        save_cache(
+
+            "history",
+
+            data
+
+        )
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "历史接口失败:",
+
+            e
+
+        )
+
+
+        return result
+
+
+
+
+
+
+    items=data.get(
+
+        "lottery_data",
 
         []
 
@@ -226,176 +627,133 @@ def parse_numbers(data):
 
 
 
-    for n in values:
+    for item in items:
 
 
-        try:
+        if not isinstance(item,dict):
 
-
-            n=int(n)
-
-
-            if 1 <= n <=49:
-
-                nums.append(n)
+            continue
 
 
 
-        except:
+        name=str(
 
+            item.get(
 
-            pass
+                "name",
 
+                ""
 
+            )
 
-    return nums
-
-
-
-
-
-
-
-# =====================================================
-# 单彩种同步
-# =====================================================
-
-
-def sync_one(key):
-
-
-    url = (
-
-        API_URL
-
-        +
-
-        "?type="
-
-        +
-
-        key
-
-    )
-
-
-
-    print()
-
-    print(
-        "请求:",
-        url
-    )
-
-
-
-    data=request_json(
-        url
-    )
-
-
-
-    save_cache(
-        key,
-        data
-    )
-
-
-
-    nums=parse_numbers(
-        data
-    )
-
-
-
-    if len(nums)!=7:
-
-
-        print(
-            "号码异常:",
-            nums
-        )
-
-
-        return False
-
-
-
-    issue=str(
-
-        data.get(
-            "expect",
-            ""
-        )
-
-    )
-
-
-
-    if not issue:
-
-
-        issue=datetime.now().strftime(
-            "%Y%m%d"
         )
 
 
 
-    # 前六正码
-
-    normal=nums[:6]
-
-
-    # 最后特码
-
-    special=nums[6]
+        key=None
 
 
 
-    result=save_draw(
+        if "香港" in name:
 
-        key,
-
-        issue,
-
-        normal,
-
-        special,
-
-        "api3"
-
-    )
+            key="hk"
 
 
+        elif "新澳门" in name:
 
-    if result:
+            key="newMacau"
+
+
+        elif "老澳门" in name:
+
+            key="oldMacau"
+
+
+
+        if not key:
+
+            continue
+
+
+
+        history=item.get(
+
+            "history",
+
+            []
+
+        )
+
+
+
+        count=0
+
+
+
+        for row in history:
+
+
+            nums=parse_numbers(
+
+                row
+
+            )
+
+
+
+            if len(nums)<7:
+
+                continue
+
+
+
+            issue=re.findall(
+
+                r"\d+",
+
+                str(row)
+
+            )
+
+
+
+            if not issue:
+
+                continue
+
+
+
+            ok=save_result(
+
+                key,
+
+                issue[0],
+
+                nums,
+
+                "history"
+
+            )
+
+
+
+            if ok:
+
+                count+=1
+
+
+
+        result[key]=count
+
 
 
         print(
 
             LOTTERIES[key],
 
-            "保存成功",
+            "历史新增",
 
-            "期号:",
-
-            issue,
-
-            "特码:",
-
-            special
-
-        )
-
-
-    else:
-
-
-        print(
-
-            LOTTERIES[key],
-
-            "保存失败"
+            count
 
         )
 
@@ -410,7 +768,7 @@ def sync_one(key):
 
 
 # =====================================================
-# 总同步
+# 总入口
 # =====================================================
 
 
@@ -427,58 +785,67 @@ def sync_all():
 
 
 
-    result={}
+    history={}
+
+
+    realtime={}
 
 
 
-    for key in LOTTERIES:
+    try:
+
+        history=sync_history()
 
 
-        try:
+    except Exception as e:
 
 
-            result[key]=sync_one(
-                key
-            )
+        print(
+
+            "历史异常:",
+
+            e
+
+        )
 
 
 
-        except Exception as e:
+    try:
+
+        realtime=sync_realtime()
 
 
-            print(
-
-                key,
-
-                "异常:",
-
-                e
-
-            )
+    except Exception as e:
 
 
-            result[key]=False
+        print(
 
+            "实时异常:",
 
+            e
+
+        )
 
 
 
     return {
 
 
+        "history":
+
+        history,
+
+
         "realtime":
 
-        result,
+        realtime,
 
 
         "time":
 
         datetime.now().isoformat()
 
-
     }
-
-
 
 
 
