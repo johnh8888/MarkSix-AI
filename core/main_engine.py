@@ -1,87 +1,47 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 main_engine.py
 
-系统总控制器
-
-
-流程:
-
-1. 初始化数据库
-2. 同步数据
-3. 数据质量检查
-4. 状态分析
-5. 动态策略
-6. 预测
-7. 回测
-8. 保存
+系统总调度引擎
 
 
 """
 
+
+import os
 
 import json
 
 from datetime import datetime
 
 
-from .config import *
 
-
-from .database import (
-
-    init_database,
-
-    save_history,
-
-    load_history
-
-)
-
-
-from .data_source import (
-
-    fetch_history,
-
-    fetch_latest
-
-)
-
-
-from .data_quality import (
-
-    quality_report
-
-)
-
-
-from .state_engine import (
-
-    analyze_state
-
-)
-
-
-from .strategies import (
-
-    build_strategy
-
-)
 
 
 from .predictor import (
+
+    full_predict,
 
     predict_next
 
 )
 
 
+
 from .backtest import (
 
-    walk_forward_test
+    快速回测
+
+)
+
+
+
+from .state_engine import (
+
+    状态引擎
 
 )
 
@@ -90,276 +50,51 @@ from .backtest import (
 
 
 # =====================================================
-# 数据同步
+# 输出目录
 # =====================================================
 
 
-def sync_data():
+OUTPUT_DIR="output"
 
 
-    print("="*70)
+os.makedirs(
 
-    print("开始同步数据")
+    OUTPUT_DIR,
 
-    print("="*70)
+    exist_ok=True
 
-
-
-    history=fetch_history()
-
-
-
-    total=0
-
-
-
-    for code,rows in history.items():
-
-
-        print(
-
-            "同步:",
-
-            LOTTERY_CODES.get(
-
-                code,
-
-                code
-
-            )
-
-        )
-
-
-
-        count=save_history(
-
-            code,
-
-            rows
-
-        )
-
-
-
-        print(
-
-            "新增:",
-
-            count
-
-        )
-
-
-        total+=count
-
-
-
-    return total
+)
 
 
 
 
 
 # =====================================================
-# 分析单彩种
+# 保存JSON
 # =====================================================
 
 
-def analyze_lottery(code):
+def 保存文件(
 
+        数据,
 
-    print()
-
-    print("#"*70)
-
-    print(
-
-        "分析:",
-
-        LOTTERY_CODES[code]
-
-    )
-
-    print("#"*70)
-
-
-
-    history=load_history(
-
-        code
-
-    )
-
-
-
-    if len(history)<MIN_HISTORY:
-
-
-        print(
-
-            "历史数据不足"
-
-        )
-
-
-        return None
-
-
-
-
-
-    numbers=[]
-
-
-
-    for row in history:
-
-
-        numbers.extend(
-
-            row["numbers"]
-
-        )
-
-
-
-
-
-    # 状态
-
-
-    state=analyze_state(
-
-        numbers
-
-    )
-
-
-
-    print(
-
-        "市场状态:",
-
-        state
-
-    )
-
-
-
-
-
-    # 策略
-
-
-    strategy=build_strategy(
-
-        numbers,
-
-        state
-
-    )
-
-
-
-
-
-    # 预测
-
-
-    prediction=predict_next(
-
-        history,
-
-        strategy
-
-    )
-
-
-
-
-
-    # 回测
-
-
-    backtest=walk_forward_test(
-
-        history
-
-    )
-
-
-
-
-
-    result={
-
-
-        "code":
-
-        code,
-
-
-        "name":
-
-        LOTTERY_CODES[code],
-
-
-        "time":
-
-        datetime.now().isoformat(),
-
-
-
-        "state":
-
-        state,
-
-
-
-        "strategy":
-
-        strategy,
-
-
-
-        "prediction":
-
-        prediction,
-
-
-
-        "backtest":
-
-        backtest
-
-    }
-
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 保存
-# =====================================================
-
-
-def save_json(
-
-        filename,
-
-        data
+        文件名
 
 ):
 
 
+    路径=os.path.join(
+
+        OUTPUT_DIR,
+
+        文件名
+
+    )
+
+
     with open(
 
-        filename,
+        路径,
 
         "w",
 
@@ -370,103 +105,152 @@ def save_json(
 
         json.dump(
 
-            data,
+            数据,
 
             f,
 
             ensure_ascii=False,
 
-            indent=2
+            indent=4
 
         )
+
+
+    return 路径
 
 
 
 
 
 # =====================================================
-# 主运行
+# 数据格式转换
 # =====================================================
 
 
-def run():
+def 标准化数据(
+
+        数据
+
+):
 
 
-    print("="*70)
+    新数据=[]
+
+
+
+    for item in 数据:
+
+
+        if isinstance(
+
+            item,
+
+            dict
+
+        ):
+
+
+            新数据.append(item)
+
+
+
+    return 新数据
+
+
+
+
+
+# =====================================================
+# 单彩种分析
+# =====================================================
+
+
+def 分析彩种(
+
+        名称,
+
+        数据
+
+):
+
 
     print(
 
-        "六合彩AI智能预测系统 V4.0"
+        "="*60
 
     )
+
 
     print(
 
-        datetime.now()
+        f"开始分析：{名称}"
 
     )
 
-    print("="*70)
+
+    print(
+
+        "="*60
+
+    )
+
+
+
+    数据=标准化数据(
+
+        数据
+
+    )
+
+
+
+    print(
+
+        f"历史数据：{len(数据)}期"
+
+    )
 
 
 
 
 
-    # 初始化数据库
+    # 状态
 
 
-    init_database()
+    状态=状态引擎(
 
+        数据
 
-
-
-
-    # 同步
-
-
-    sync_data()
+    )
 
 
 
+    print(
 
+        "当前市场状态：",
 
-    results=[]
+        状态.get(
 
-
-
-    for code in LOTTERY_CODES:
-
-
-        result=analyze_lottery(
-
-            code
+            "市场状态"
 
         )
 
-
-        if result:
-
-
-            results.append(
-
-                result
-
-            )
+    )
 
 
 
 
 
-    # 保存预测
+    # 预测
 
 
-    save_json(
+    预测=full_predict(
 
-        PREDICTION_FILE,
-
-        results
+        数据
 
     )
+
+
 
 
 
@@ -474,9 +258,112 @@ def run():
 
     print(
 
-        "预测保存完成:",
+        "【特码10码】"
 
-        PREDICTION_FILE
+    )
+
+
+
+    print(
+
+        预测["预测号码"]["特码10码"]
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "【重点推荐】"
+
+    )
+
+
+
+    print(
+
+        预测["预测号码"]["重点推荐"]
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "【生肖5肖】"
+
+    )
+
+
+
+    print(
+
+        预测["生肖"]
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "【波色预测】"
+
+    )
+
+
+    print(
+
+        预测["波色"]
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "【大小】"
+
+    )
+
+
+    print(
+
+        预测["大小"]
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "【单双】"
+
+    )
+
+
+    print(
+
+        预测["单双"]
 
     )
 
@@ -487,24 +374,88 @@ def run():
     # 回测
 
 
-    all_backtest={
+    print()
+
+    print(
+
+        "开始Walk-Forward回测"
+
+    )
 
 
-        x["code"]:
 
-        x["backtest"]
+    回测=快速回测(
 
-        for x in results
+        数据
+
+    )
+
+
+
+    print(
+
+        回测
+
+    )
+
+
+
+
+
+    return {
+
+
+        "彩种":
+
+        名称,
+
+
+        "时间":
+
+        str(
+
+            datetime.now()
+
+        ),
+
+
+        "状态":
+
+        状态,
+
+
+        "预测":
+
+        预测,
+
+
+        "回测":
+
+        回测
 
     }
 
 
 
-    save_json(
 
-        BACKTEST_FILE,
 
-        all_backtest
+# =====================================================
+# 主运行入口
+# =====================================================
+
+
+def run(
+
+        datasets
+
+):
+
+
+    print()
+
+    print(
+
+        "#"*60
 
     )
 
@@ -512,29 +463,91 @@ def run():
 
     print(
 
-        "回测保存完成:",
-
-        BACKTEST_FILE
+        "六合彩AI智能预测系统 V5.0"
 
     )
 
 
-
-
-
-    print("="*70)
 
     print(
 
-        "V4.0运行完成"
+        "工作流："
+
+        "同步 → 状态识别 → 动态权重 → 预测 → Walk-Forward"
 
     )
 
-    print("="*70)
+
+
+    print(
+
+        datetime.now()
+
+    )
 
 
 
-    return results
+    print(
+
+        "#"*60
+
+    )
+
+
+
+
+
+    全部结果=[]
+
+
+
+    for 名称,数据 in datasets.items():
+
+
+        结果=分析彩种(
+
+            名称,
+
+            数据
+
+        )
+
+
+        全部结果.append(
+
+            结果
+
+        )
+
+
+
+
+
+    文件1=保存文件(
+
+        全部结果,
+
+        "prediction.json"
+
+    )
+
+
+
+    print()
+
+    print(
+
+        "预测结果保存：",
+
+        文件1
+
+    )
+
+
+
+
+
+    return 全部结果
 
 
 
@@ -543,4 +556,8 @@ def run():
 if __name__=="__main__":
 
 
-    run()
+    print(
+
+        "V5主引擎启动"
+
+    )
