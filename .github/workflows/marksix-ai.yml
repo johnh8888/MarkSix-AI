@@ -1,68 +1,308 @@
-name: MarkSix AI V3.2
+name: 六合AI智能预测系统 V5.0
+
 
 on:
+
   workflow_dispatch:
+
   schedule:
+    # 每小时运行一次
     - cron: '5 * * * *'
 
+
+
 permissions:
+
   contents: write
 
+
+
 jobs:
-  run:
+
+
+  prediction:
+
+
+    name: 六合AI自动分析
+
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+
+
+    timeout-minutes: 20
+
+
+
     steps:
-      - name: Checkout
+
+
+      # ==========================
+      # 下载代码
+      # ==========================
+
+      - name: 下载项目代码
+
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
+
+
+      # ==========================
+      # Python环境
+      # ==========================
+
+      - name: 安装 Python 3.11
+
         uses: actions/setup-python@v5
+
         with:
+
           python-version: '3.11'
 
-      - name: Compile check
-        run: python -m compileall -q .
 
-      - name: Import check
+
+      # ==========================
+      # 编译检查
+      # ==========================
+
+      - name: Python语法检查
+
+        run:
+
+          python -m compileall -q .
+
+
+
+      # ==========================
+      # 模块检查
+      # ==========================
+
+      - name: V5核心模块检查
+
         env:
+
           PYTHONPATH: ${{ github.workspace }}
+
+
         run: |
+
+
           python - <<'PY'
+
+
           import importlib
+
+
+
           modules = [
-              'core.config','core.database','core.data_source','core.data_quality',
-              'core.features','core.strategies','core.state','core.state_engine',
-              'core.wave_model','core.predictor','core.backtest'
+
+
+          # 基础
+
+          "core.config",
+
+          "core.database",
+
+          "core.sqlite_manager",
+
+
+          # 数据
+
+          "core.data_source",
+
+          "core.api_sync",
+
+          "core.data_quality",
+
+
+          # 特征
+
+          "core.features",
+
+
+          # 模型
+
+          "core.markov_model",
+
+          "core.hmm_model",
+
+          "core.bayesian_engine",
+
+
+          # 学习
+
+          "core.online_learning",
+
+          "core.model_memory",
+
+
+          # 状态
+
+          "core.state",
+
+          "core.state_engine",
+
+
+          # 预测
+
+          "core.predictor",
+
+          "core.zodiac_model",
+
+          "core.wave_model",
+
+
+          # 策略
+
+          "core.strategies",
+
+
+          # 回测
+
+          "core.backtest",
+
+
+          # 总引擎
+
+          "core.engine",
+
+          "core.main_engine"
+
           ]
-          for name in modules:
-              importlib.import_module(name)
-              print('✅', name)
-          from core.database import init_database
-          init_database()
-          print('✅ database interface')
+
+
+
+          for m in modules:
+
+              importlib.import_module(m)
+
+              print("✅",m)
+
+
+
+          print()
+
+          print("V5模块全部加载成功")
+
+
           PY
 
-      - name: Run MarkSix AI
+
+
+
+      # ==========================
+      # 初始化数据库
+      # ==========================
+
+
+      - name: 初始化数据库
+
         env:
+
           PYTHONPATH: ${{ github.workspace }}
-        run: python -u main.py
 
-      - name: Show outputs
+
+        run: |
+
+
+          python - <<'PY'
+
+
+          from core.database import init_database
+
+
+          init_database()
+
+
+          print("✅ 数据库初始化完成")
+
+
+          PY
+
+
+
+
+      # ==========================
+      # 主程序运行
+      # ==========================
+
+
+      - name: 启动六合AI V5
+
+        env:
+
+          PYTHONPATH: ${{ github.workspace }}
+
+
+        run:
+
+
+          python -u main.py
+
+
+
+
+      # ==========================
+      # 输出检查
+      # ==========================
+
+
+      - name: 查看分析结果
+
+
         if: always()
-        run: |
-          echo '--- output ---'
-          find output -maxdepth 2 -type f -print 2>/dev/null || true
 
-      - name: Commit results
-        if: success()
+
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add output/*.json *.db core/*.db 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo '没有新的结果需要提交'
+
+
+          echo "========== 输出文件 =========="
+
+
+          find output -type f 2>/dev/null || true
+
+
+          echo "========== 数据库 =========="
+
+
+          find . -name "*.db" -o -name "*.sqlite" 2>/dev/null || true
+
+
+
+
+      # ==========================
+      # 保存结果
+      # ==========================
+
+
+      - name: 保存预测结果
+
+
+        if: success()
+
+
+        run: |
+
+
+          git config user.name "github-actions[bot]"
+
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+
+
+          git add .
+
+
+          if git diff --cached --quiet;
+
+          then
+
+              echo "没有新的结果"
+
           else
-            git commit -m 'Update MarkSix AI prediction and backtest'
-            git push
+
+
+              git commit -m "更新六合AI V5预测结果"
+
+              git push
+
+
           fi
