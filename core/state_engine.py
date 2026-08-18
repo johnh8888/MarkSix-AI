@@ -1,655 +1,308 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩 AI 智能预测系统
 
-state_engine.py
+V8.0 QUANT STATE SWITCH
 
-动态市场状态引擎
-
+市场状态识别
 
 功能:
 
-1. 熵计算
-2. 状态切换检测
-3. 高频低频转换
-4. 动态权重调整
-5. 混沌检测
-
+1. 熵检测
+2. 热冷切换
+3. 连续波检测
+4. 反转检测
+5. 动态策略权重
 
 """
 
 
+from collections import Counter
 import math
 
 
-from collections import Counter
 
 
-from .state import (
+RED={
+1,2,7,8,12,13,
+18,19,23,24,
+29,30,34,35,
+40,45,46
+}
 
-    MarketState,
 
-    分析市场状态,
+BLUE={
+3,4,9,10,
+14,15,20,
+25,26,31,
+36,37,41,
+42,47,48
+}
 
-    状态名称
 
-)
+
+
+def get_wave(n):
+
+    if n in RED:
+        return "红"
+
+    if n in BLUE:
+        return "蓝"
+
+    return "绿"
 
 
 
 
 
 # =====================================================
-# 信息熵计算
+# 熵
 # =====================================================
 
 
-def 计算熵(numbers):
+def entropy(numbers):
 
 
     if not numbers:
-
 
         return 0
 
 
 
-    counter=Counter(
-
-        numbers
-
-    )
+    c=Counter(numbers)
 
 
-
-    total=sum(
-
-        counter.values()
-
-    )
+    total=len(numbers)
 
 
+    e=0
 
-    entropy=0
+
+    for v in c.values():
+
+        p=v/total
+
+        e-=p*math.log2(p)
 
 
 
-    for value in counter.values():
+    return round(e,3)
 
 
-        p=value/total
-
-
-        entropy -= p * math.log(
-
-            p,
-
-            2
-
-        )
-
-
-
-    return round(
-
-        entropy,
-
-        4
-
-    )
 
 
 
 
 
 # =====================================================
-# 历史熵变化
+# 连续波检测
 # =====================================================
 
 
-def 熵变化检测(
+def repeat_wave(numbers):
 
-        历史数据,
 
-        周期=20
+    if len(numbers)<5:
 
-):
+        return False
 
 
-    if len(历史数据)<周期*2:
 
+    waves=[
 
-        return {
+        get_wave(x)
 
-
-            "状态":
-
-            "数据不足"
-
-        }
-
-
-
-
-
-    前=[]
-
-
-    后=[]
-
-
-
-    for item in 历史数据[-周期*2:-周期]:
-
-
-        前.extend(
-
-            item.get(
-
-                "号码",
-
-                []
-
-            )
-
-        )
-
-
-
-    for item in 历史数据[-周期:]:
-
-
-        后.extend(
-
-            item.get(
-
-                "号码",
-
-                []
-
-            )
-
-        )
-
-
-
-    e1=计算熵(
-
-        前
-
-    )
-
-
-    e2=计算熵(
-
-        后
-
-    )
-
-
-
-    差值=round(
-
-        e2-e1,
-
-        4
-
-    )
-
-
-
-    if 差值>0.3:
-
-
-        状态="混沌增加"
-
-
-
-    elif 差值<-0.3:
-
-
-        状态="规律增强"
-
-
-
-    else:
-
-
-        状态="稳定"
-
-
-
-    return {
-
-
-        "前期熵":
-
-        e1,
-
-
-        "近期熵":
-
-        e2,
-
-
-        "变化":
-
-        差值,
-
-
-        "状态":
-
-        状态
-
-    }
-
-
-
-
-
-# =====================================================
-# 高频低频转换检测
-# =====================================================
-
-
-def 高频低频检测(
-
-        历史数据,
-
-        周期=30
-
-):
-
-
-    if len(历史数据)<周期:
-
-
-        return {}
-
-
-
-
-
-    最近=历史数据[-周期:]
-
-
-
-    counter=Counter()
-
-
-
-    for item in 最近:
-
-
-        for num in item.get(
-
-            "号码",
-
-            []
-
-        ):
-
-
-            counter[num]+=1
-
-
-
-
-
-    排序=counter.most_common()
-
-
-
-    高频=[
-
-        x[0]
-
-        for x in 排序[:10]
+        for x in numbers[:5]
 
     ]
 
 
 
-    低频=[
+    return len(set(waves))==1
 
-        x[0]
 
-        for x in 排序[-10:]
+
+
+
+
+# =====================================================
+# 波色反转
+# =====================================================
+
+
+def flip_wave(numbers):
+
+
+    if len(numbers)<6:
+
+        return False
+
+
+
+    waves=[
+
+        get_wave(x)
+
+        for x in numbers[:6]
+
+    ]
+
+
+    return (
+
+        waves[0]!=waves[1]
+
+        and
+
+        waves[1]!=waves[2]
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# 市场状态
+# =====================================================
+
+
+def analyze_state(history):
+
+
+    numbers=[
+
+        x["special"]
+
+        for x in history
+
+        if "special" in x
 
     ]
 
 
 
-    return {
-
-
-        "高频号码":
-
-        高频,
-
-
-        "低频号码":
-
-        低频
-
-    }
+    e=entropy(numbers[:100])
 
 
 
 
-
-# =====================================================
-# 状态变化检测
-# =====================================================
+    state="正常状态"
 
 
-def 状态变化检测(
 
-        历史数据
+    hot=0.6
 
-):
+    markov=0.35
 
-
-    if len(历史数据)<40:
+    random=0.05
 
 
-        return {
 
 
-            "变化":
+    # 高熵
 
-            False
+    if e>3.4:
 
-        }
+
+        state="混沌状态"
+
+
+        hot=0.4
+
+        markov=0.35
+
+        random=0.25
 
 
 
 
 
-    当前=分析市场状态(
 
-        历史数据
-
-    )
+    # 连续同波
 
 
-
-    上一期=分析市场状态(
-
-        历史数据[:-10]
-
-    )
+    if repeat_wave(numbers):
 
 
-
-    if 当前 != 上一期:
-
-
-        return {
+        state="连续波状态"
 
 
-            "变化":
+        hot=0.45
 
-            True,
+        markov=0.25
 
-
-            "之前":
-
-            状态名称(
-
-                上一期
-
-            ),
+        random=0.30
 
 
-            "现在":
 
-            状态名称(
 
-                当前
 
-            )
 
-        }
+    # 反转
+
+
+    if flip_wave(numbers):
+
+
+        state="反转状态"
+
+
+        hot=0.5
+
+        markov=0.4
+
+        random=0.1
+
 
 
 
 
 
     return {
-
-
-        "变化":
-
-        False,
 
 
         "状态":
 
-        状态名称(
+        state,
 
-            当前
 
-        )
+        "entropy":
+
+        e,
+
+
+        "动态权重":{
+
+
+            "hot":
+
+            hot,
+
+
+            "markov":
+
+            markov,
+
+
+            "random":
+
+            random
+
+        }
+
 
     }
 
 
 
 
+__all__=[
 
-# =====================================================
-# 动态权重
-# =====================================================
+"analyze_state"
 
-
-def 动态权重(
-
-        历史数据
-
-):
-
-
-    state=分析市场状态(
-
-        历史数据
-
-    )
-
-
-
-    权重={
-
-
-        "frequency":0.20,
-
-
-        "trend":0.15,
-
-
-        "momentum":0.12,
-
-
-        "omission":0.10,
-
-
-        "wave":0.10,
-
-
-        "zodiac":0.10,
-
-
-        "size":0.08,
-
-
-        "parity":0.05,
-
-
-        "random":0.10
-
-    }
-
-
-
-
-
-    if state==MarketState.热态:
-
-
-        权重["frequency"]+=0.08
-
-
-        权重["momentum"]+=0.05
-
-
-
-
-
-    elif state==MarketState.冷态:
-
-
-        权重["omission"]+=0.08
-
-
-        权重["trend"]+=0.05
-
-
-
-
-
-    elif state==MarketState.连续状态:
-
-
-        权重["wave"]+=0.08
-
-
-        权重["trend"]+=0.05
-
-
-
-
-
-    elif state==MarketState.混沌状态:
-
-
-        权重["frequency"]-=0.05
-
-
-        权重["random"]+=0.08
-
-
-
-
-
-    总=sum(
-
-        权重.values()
-
-    )
-
-
-
-    for k in 权重:
-
-
-        权重[k]=round(
-
-            权重[k]/总,
-
-            4
-
-        )
-
-
-
-    return 权重
-
-
-
-
-
-# =====================================================
-# 综合状态报告
-# =====================================================
-
-
-def 状态引擎(
-
-        历史数据
-
-):
-
-
-    state=分析市场状态(
-
-        历史数据
-
-    )
-
-
-    return {
-
-
-        "市场状态":
-
-        状态名称(
-
-            state
-
-        ),
-
-
-
-        "熵变化":
-
-        熵变化检测(
-
-            历史数据
-
-        ),
-
-
-
-        "高低频":
-
-        高频低频检测(
-
-            历史数据
-
-        ),
-
-
-
-        "状态切换":
-
-        状态变化检测(
-
-            历史数据
-
-        ),
-
-
-
-        "动态权重":
-
-        动态权重(
-
-            历史数据
-
-        )
-
-    }
-
-
-
-
-
-if __name__=="__main__":
-
-
-    print(
-
-        "V5状态引擎启动"
-
-    )
+]
