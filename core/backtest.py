@@ -1,125 +1,50 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-backtest.py
+core/backtest.py
 
-Walk-Forward 回测系统
+Walk Forward 回测模块
 
 
-功能:
+原则：
 
-1. 历史滚动预测
-2. 防止未来数据泄露
-3. 自动统计命中率
-4. 中文报告输出
+预测第N期
+
+只能使用：
+
+第N期之前的数据
+
+
+禁止未来数据泄漏
 
 
 """
 
 
-from .predictor import (
+from __future__ import annotations
 
-    predict_next,
 
-    predict_wave,
-
-    predict_size,
-
-    predict_parity,
-
-    predict_zodiac
-
-)
-
+from typing import List, Dict, Any
 
 
 
 
 # =====================================================
-# 单期回测
+# 基础指标
 # =====================================================
 
 
-def 单期测试(
+def empty_metric():
 
-        历史训练,
+    return {
 
-        真实开奖
+        "total":0,
 
-):
+        "hit":0,
 
-
-    结果={}
-
-
-
-    预测=predict_next(
-
-        历史训练
-
-    )
-
-
-
-    实际号码=真实开奖.get(
-
-        "号码",
-
-        []
-
-    )
-
-
-
-    推荐号码=预测.get(
-
-        "特码10码",
-
-        []
-
-    )
-
-
-
-    命中=[]
-
-
-
-    for num in 推荐号码:
-
-
-        if num in 实际号码:
-
-
-            命中.append(num)
-
-
-
-
-
-    结果["特码10码"]= {
-
-
-        "预测":
-
-        推荐号码,
-
-
-        "实际":
-
-        实际号码,
-
-
-        "命中":
-
-        命中,
-
-
-        "数量":
-
-        len(命中)
+        "rate":0
 
     }
 
@@ -127,341 +52,157 @@ def 单期测试(
 
 
 
-    # 波色
-
-
-    波色预测=predict_wave(
-
-        历史训练
-
-    )
-
-
-
-    结果["波色"]=波色预测
-
-
-
-
-
-    # 大小
-
-
-    大小预测=predict_size(
-
-        历史训练
-
-    )
-
-
-
-    结果["大小"]=大小预测
-
-
-
-
-
-    # 单双
-
-
-    单双预测=predict_parity(
-
-        历史训练
-
-    )
-
-
-
-    结果["单双"]=单双预测
-
-
-
-
-
-    # 生肖
-
-
-    生肖预测=predict_zodiac(
-
-        历史训练
-
-    )
-
-
-
-    结果["生肖"]=生肖预测
-
-
-
-
-
-    return 结果
-
-
-
-
-
-# =====================================================
-# 命中统计
-# =====================================================
-
-
-def 统计命中(
-
-        回测结果
-
+def add_result(
+        metric,
+        hit
 ):
 
 
-    总期数=len(
+    metric["total"]+=1
 
-        回测结果
+
+    if hit:
+
+        metric["hit"]+=1
+
+
+
+    metric["rate"]=round(
+
+        metric["hit"]
+
+        /
+
+        metric["total"],
+
+        4
 
     )
 
 
-    if 总期数==0:
+
+
+
+
+
+# =====================================================
+# 回测预测接口
+# =====================================================
+
+
+def simple_predict(history):
+
+
+    """
+    调用预测模块
+
+    防止循环导入
+
+    """
+
+
+    try:
+
+
+        from .predictor import predict_next
+
+
+        result=predict_next(
+            history
+        )
+
+
+        return result
+
+
+
+    except Exception:
 
 
         return {}
 
 
 
-    特码命中=0
-
-
-    总号码=0
-
-
-
-    for item in 回测结果:
-
-
-        数量=item["特码10码"]["数量"]
-
-
-
-        if 数量>0:
-
-
-            特码命中+=1
-
-
-
-        总号码+=数量
-
-
-
-
-
-    return {
-
-
-        "测试期数":
-
-        总期数,
-
-
-        "特码命中期数":
-
-        特码命中,
-
-
-        "期命中率":
-
-        round(
-
-            特码命中
-
-            /
-
-            总期数,
-
-            4
-
-        ),
-
-
-        "平均命中号码":
-
-        round(
-
-            总号码
-
-            /
-
-            总期数,
-
-            4
-
-        )
-
-    }
 
 
 
 
 
 # =====================================================
-# Walk Forward 回测
+# 提取号码
+# =====================================================
+
+
+def get_top10(pred):
+
+
+    try:
+
+        return pred.get(
+            "特码10码",
+            []
+        )
+
+
+    except:
+
+        return []
+
+
+
+
+
+
+
+
+# =====================================================
+# Walk Forward
 # =====================================================
 
 
 def walk_forward(
 
-        历史数据,
+        history:List[int],
 
-        开始位置=100
+        test_size:int=20
 
-):
+)->Dict[str,Any]:
 
 
-    结果=[]
+    result={
 
 
+        "测试期数":
 
-    总长度=len(
+        test_size,
 
-        历史数据
 
-    )
+        "有效测试":
 
+        0,
 
 
-    for i in range(
+        "特码10码":
 
-        开始位置,
+        empty_metric(),
 
-        总长度
 
-    ):
 
+        "大小":
 
-        训练数据=历史数据[:i]
+        empty_metric(),
 
 
 
-        测试数据=历史数据[i]
+        "单双":
 
+        empty_metric(),
 
 
-        单期结果=单期测试(
 
-            训练数据,
+        "波色":
 
-            测试数据
-
-        )
-
-
-
-        单期结果["期号"]=测试数据.get(
-
-            "期号",
-
-            i
-
-        )
-
-
-
-        结果.append(
-
-            单期结果
-
-        )
-
-
-
-    return 结果
-
-
-
-
-
-# =====================================================
-# 中文报告
-# =====================================================
-
-
-def 生成报告(
-
-        回测结果
-
-):
-
-
-    统计=统计命中(
-
-        回测结果
-
-    )
-
-
-
-    return {
-
-
-        "系统":
-
-        "六合彩AI V5.0",
-
-
-        "模式":
-
-        "Walk-Forward",
-
-
-        "报告":
-
-        {
-
-
-            "测试期数":
-
-            统计.get(
-
-                "测试期数",
-
-                0
-
-            ),
-
-
-            "特码命中率":
-
-            str(
-
-                round(
-
-                    统计.get(
-
-                        "期命中率",
-
-                        0
-
-                    )*100,
-
-                    2
-
-                )
-
-            )
-
-            +"%",
-
-
-            "平均每期命中":
-
-            统计.get(
-
-                "平均命中号码",
-
-                0
-
-            )
-
-        }
+        empty_metric()
 
     }
 
@@ -469,38 +210,30 @@ def 生成报告(
 
 
 
-# =====================================================
-# 快速测试
-# =====================================================
+    if len(history)<30:
 
 
-def 快速回测(
-
-        历史数据,
-
-        最近=50
-
-):
+        result["错误"]=(
+            "历史数据不足"
+        )
 
 
-    if len(历史数据)>最近+100:
-
-
-        历史数据=历史数据[-(最近+100):]
+        return result
 
 
 
-    结果=walk_forward(
-
-        历史数据
-
-    )
 
 
+    # history:
 
-    return 生成报告(
+    # 新 -> 旧
 
-        结果
+
+    max_test=min(
+
+        test_size,
+
+        len(history)-20
 
     )
 
@@ -508,11 +241,207 @@ def 快速回测(
 
 
 
-if __name__=="__main__":
+
+    for i in range(max_test):
 
 
-    print(
 
-        "V5回测模块启动"
+        # 当前目标期
 
-    )
+        actual=history[i]
+
+
+
+        # 只使用更旧数据
+
+        train=history[i+1:]
+
+
+
+        if len(train)<20:
+
+            continue
+
+
+
+
+        prediction=simple_predict(
+            train
+        )
+
+
+
+        if not prediction:
+
+            continue
+
+
+
+        result["有效测试"]+=1
+
+
+
+
+        # -----------------------
+        # 特码10码
+        # -----------------------
+
+
+        top10=get_top10(
+            prediction
+        )
+
+
+        add_result(
+
+            result["特码10码"],
+
+            actual in top10
+
+        )
+
+
+
+
+
+        # -----------------------
+        # 大小
+        # -----------------------
+
+
+        size=prediction.get(
+            "大小"
+        )
+
+
+        if size:
+
+
+            hit=(
+
+                size
+
+                ==
+
+                ("大" if actual>=25 else "小")
+
+            )
+
+
+            add_result(
+
+                result["大小"],
+
+                hit
+
+            )
+
+
+
+
+
+        # -----------------------
+        # 单双
+        # -----------------------
+
+
+        parity=prediction.get(
+            "单双"
+        )
+
+
+        if parity:
+
+
+            hit=(
+
+                parity
+
+                ==
+
+                ("单" if actual%2 else "双")
+
+            )
+
+
+            add_result(
+
+                result["单双"],
+
+                hit
+
+            )
+
+
+
+
+
+
+        # -----------------------
+        # 波色
+        # -----------------------
+
+
+        wave=prediction.get(
+            "波色",
+            {}
+        )
+
+
+        if isinstance(wave,dict):
+
+
+            single=wave.get(
+                "single"
+            )
+
+
+            try:
+
+
+                from .wave_model import get_wave
+
+
+                hit=(
+
+                    get_wave(actual)
+
+                    ==
+
+                    single
+
+                )
+
+
+                add_result(
+
+                    result["波色"],
+
+                    hit
+
+                )
+
+
+            except:
+
+                pass
+
+
+
+
+
+
+
+    return result
+
+
+
+
+
+
+
+__all__=[
+
+    "walk_forward"
+
+]
