@@ -1,185 +1,235 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.0
+六合彩 AI 智能预测系统 V5.0 FINAL
 
-predictor.py
+core/predictor.py
 
-核心预测模块
+预测核心模块
 
+功能：
 
-功能:
-
-1. 49号码评分
-2. 特码预测
-3. 生肖预测
-4. 波色预测
-5. 大小单双预测
+1. 特码评分融合
+2. Top10号码
+3. Top3重点号码
+4. 生肖预测
+5. 大小单双
+6. 波色预测
+7. 兼容 predict_next()
 
 """
+
+from __future__ import annotations
+
+
+from typing import Dict, List, Any
 
 
 from collections import Counter
 
 
-from .features import (
 
-    获取波色,
-
-    获取大小,
-
-    获取单双
-
-)
+# =====================================================
+# 基础导入
+# =====================================================
 
 
-from .zodiac_model import (
+try:
 
-    get_zodiac
-
-)
+    from .features import build_feature_score
 
 
-from .wave_model import (
+except Exception:
 
-    推荐波色,
-
-    波色概率
-
-)
+    build_feature_score = None
 
 
-from .state_engine import (
 
-    状态引擎
+try:
 
-)
+    from .wave_model import predict_wave
 
 
-from .strategies import (
+except Exception:
 
-    生成策略
+    predict_wave = None
 
-)
+
+
+try:
+
+    from .zodiac_model import get_zodiac
+
+
+except Exception:
+
+
+    def get_zodiac(n):
+
+        return "未知"
 
 
 
 
 
 # =====================================================
-# 基础号码频率
+# 常量
 # =====================================================
 
 
-def 号码频率(
-
-        历史数据
-
-):
+NUMBERS = list(range(1,50))
 
 
-    counter=Counter()
+RED = {
+    1,2,7,8,12,13,18,19,
+    23,24,29,30,34,35,
+    40,45,46
+}
 
 
-
-    for item in 历史数据:
-
-
-        for num in item.get(
-
-            "号码",
-
-            []
-
-        ):
+BLUE = {
+    3,4,9,10,14,15,
+    20,25,26,31,
+    36,37,41,42,47,48
+}
 
 
-            counter[int(num)] +=1
-
-
-
-    return counter
-
+GREEN = {
+    5,6,11,16,17,
+    21,22,27,28,
+    32,33,38,39,43,44,49
+}
 
 
 
 
 # =====================================================
-# 号码评分
+# 基础属性
 # =====================================================
 
 
-def 号码评分(
+def get_wave(num:int):
 
-        历史数据
+    if num in RED:
 
-):
+        return "红"
 
 
-    freq=号码频率(
+    if num in BLUE:
 
-        历史数据
+        return "蓝"
 
-    )
 
+    if num in GREEN:
+
+        return "绿"
+
+
+    return "未知"
+
+
+
+
+def get_size(num:int):
+
+    return "大" if num>=25 else "小"
+
+
+
+def get_parity(num:int):
+
+    return "单" if num%2 else "双"
+
+
+
+
+
+# =====================================================
+# 简单评分融合
+# =====================================================
+
+
+def score_numbers(history:List[int])->Dict[int,float]:
+
+    """
+    号码综合评分
+
+    注意：
+    这里是排序分
+    不是中奖概率
+
+    """
 
 
     scores={}
 
 
+    freq=Counter(history[:120])
 
-    for num in range(1,50):
+
+    for n in NUMBERS:
 
 
-        score=freq.get(
-
-            num,
-
-            0
-
-        )
+        score=0
 
 
 
-        scores[num]=score
+        # 高频
+
+        score += freq[n]*0.4
+
+
+
+        # 遗漏补偿
+
+        if n not in history[:10]:
+
+            score +=0.2
+
+
+
+        # 最近出现
+
+        if n in history[:36]:
+
+            score +=0.3
+
+
+
+        scores[n]=score
+
+
+
+    return scores
 
 
 
 
 
-    最大=max(
-
-        scores.values()
-
-    ) if scores else 1
+# =====================================================
+# 生肖评分
+# =====================================================
 
 
-
-    for num in scores:
-
-
-        scores[num]=round(
-
-            scores[num]/最大,
-
-            4
-
-        )
+def zodiac_rank(scores):
 
 
+    result={}
 
-    return dict(
 
-        sorted(
+    for num,score in scores.items():
 
-            scores.items(),
+        z=get_zodiac(num)
 
-            key=lambda x:x[1],
 
-            reverse=True
+        result[z]=result.get(z,0)+score
 
-        )
 
+
+    return sorted(
+        result.items(),
+        key=lambda x:x[1],
+        reverse=True
     )
 
 
@@ -187,420 +237,149 @@ def 号码评分(
 
 
 # =====================================================
-# 特码10码
+# 主预测
 # =====================================================
 
 
-def predict_numbers(
+def generate_prediction(
+        history:List[int]
+)->Dict[str,Any]:
 
-        历史数据,
 
-        数量=10
-
-):
-
-
-    scores=号码评分(
-
-        历史数据
-
-    )
-
-
-    return [
-
-        num
-
-        for num,_ in list(
-
-            scores.items()
-
-        )[:数量]
-
-    ]
-
-
-
-
-
-# =====================================================
-# 第一推荐
-# =====================================================
-
-
-def predict_next(
-
-        历史数据
-
-):
-
-
-    numbers=predict_numbers(
-
-        历史数据,
-
-        10
-
-    )
-
-
-    return {
-
-
-        "特码10码":
-
-        numbers,
-
-
-        "重点推荐":
-
-        numbers[:3],
-
-
-        "第一推荐":
-
-        numbers[0]
-
-        if numbers
-
-        else None
-
-    }
-
-
-
-
-
-# =====================================================
-# 生肖预测
-# =====================================================
-
-
-def predict_zodiac(
-
-        历史数据,
-
-        数量=5
-
-):
-
-
-    numbers=predict_numbers(
-
-        历史数据,
-
-        15
-
-    )
-
-
-
-    counter=Counter()
-
-
-
-    for num in numbers:
-
-
-        counter[
-
-            get_zodiac(num)
-
-        ]+=1
-
-
-
-
-
-    return [
-
-        x[0]
-
-        for x in counter.most_common(
-
-            数量
-
-        )
-
-    ]
-
-
-
-
-
-# =====================================================
-# 波色预测
-# =====================================================
-
-
-def predict_wave(
-
-        历史数据
-
-):
-
-
-    return 推荐波色(
-
-        历史数据
-
-    )
-
-
-
-
-
-# =====================================================
-# 大小预测
-# =====================================================
-
-
-def predict_size(
-
-        历史数据
-
-):
-
-
-    numbers=predict_numbers(
-
-        历史数据,
-
-        20
-
-    )
-
-
-
-    counter=Counter()
-
-
-
-    for num in numbers:
-
-
-        counter[
-
-            获取大小(num)
-
-        ]+=1
-
-
-
-
-
-    if counter["大"]>=counter["小"]:
+    if not history:
 
 
         return {
 
-
-            "推荐":
-
-            "大",
-
-
-            "概率":
-
-            round(
-
-                counter["大"]
-
-                /
-
-                len(numbers),
-
-                4
-
-            )
+            "error":"没有历史数据"
 
         }
 
 
 
-    return {
-
-
-        "推荐":
-
-        "小",
-
-
-        "概率":
-
-        round(
-
-            counter["小"]
-
-            /
-
-            len(numbers),
-
-            4
-
-        )
-
-    }
+    scores=score_numbers(history)
 
 
 
-
-
-# =====================================================
-# 单双预测
-# =====================================================
-
-
-def predict_parity(
-
-        历史数据
-
-):
-
-
-    numbers=predict_numbers(
-
-        历史数据,
-
-        20
-
+    ranking=sorted(
+        scores.items(),
+        key=lambda x:x[1],
+        reverse=True
     )
 
 
 
-    counter=Counter()
+    top10=[
+        n for n,s in ranking[:10]
+    ]
 
 
 
-    for num in numbers:
-
-
-        counter[
-
-            获取单双(num)
-
-        ]+=1
+    top3=[
+        n for n,s in ranking[:3]
+    ]
 
 
 
-
-
-    推荐=max(
-
-        counter,
-
-        key=counter.get
-
+    size_counter=Counter(
+        get_size(x)
+        for x in history[:36]
     )
+
+
+    parity_counter=Counter(
+        get_parity(x)
+        for x in history[:36]
+    )
+
+
+
+    wave_result={}
+
+
+    if predict_wave:
+
+
+        try:
+
+            wave_result=predict_wave(history)
+
+
+        except Exception:
+
+            wave_result={}
+
 
 
 
     return {
 
 
-        "推荐":
-
-        推荐,
+        "版本":"V5.0 FINAL",
 
 
-        "统计":
-
-        dict(counter)
-
-    }
+        "说明":
+        "模型评分用于排序，不代表真实中奖概率",
 
 
 
-
-
-# =====================================================
-# 完整预测入口
-# =====================================================
-
-
-def full_predict(
-
-        历史数据
-
-):
-
-
-    状态=状态引擎(
-
-        历史数据
-
-    )
+        "特码10码":
+        top10,
 
 
 
-    策略=生成策略(
-
-        状态["市场状态"]
-
-    )
+        "重点3码":
+        top3,
 
 
 
-    return {
-
-
-        "市场状态":
-
-        状态,
-
-
-        "策略":
-
-        策略,
-
-
-        "预测号码":
-
-        predict_next(
-
-            历史数据
-
-        ),
+        "第一推荐":
+        top3[0],
 
 
 
-        "生肖":
-
-        predict_zodiac(
-
-            历史数据
-
-        ),
-
-
-
-        "波色":
-
-        predict_wave(
-
-            历史数据
-
-        ),
+        "生肖5肖":
+        [
+            z
+            for z,s
+            in zodiac_rank(scores)[:5]
+        ],
 
 
 
         "大小":
 
-        predict_size(
-
-            历史数据
-
+        max(
+            size_counter,
+            key=size_counter.get
         ),
 
 
 
         "单双":
 
-        predict_parity(
+        max(
+            parity_counter,
+            key=parity_counter.get
+        ),
 
-            历史数据
 
-        )
+
+        "波色":
+
+        wave_result,
+
+
+        "评分":
+
+        {
+            n:
+            round(s,4)
+
+            for n,s
+            in ranking[:10]
+        }
+
 
     }
 
@@ -608,11 +387,62 @@ def full_predict(
 
 
 
-if __name__=="__main__":
+# =====================================================
+# 兼容旧版本接口
+# =====================================================
 
 
-    print(
+def predict_next(history):
 
-        "V5 predictor启动"
 
-    )
+    """
+    V3/V4/V5兼容接口
+
+    旧代码调用：
+
+    predict_next(history)
+
+    不会再报错
+
+    """
+
+
+    return generate_prediction(history)
+
+
+
+
+
+
+# =====================================================
+# 多彩种接口
+# =====================================================
+
+
+def predict_lottery(
+        lottery_name:str,
+        history:List[int]
+):
+
+
+    result=generate_prediction(history)
+
+
+    result["彩种"]=lottery_name
+
+
+    return result
+
+
+
+
+
+__all__=[
+
+    "generate_prediction",
+
+    "predict_next",
+
+    "predict_lottery"
+
+]
