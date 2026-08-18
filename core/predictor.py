@@ -696,3 +696,100 @@ if __name__=="__main__":
         generate_prediction(data)
 
     )
+# =====================================================
+# V4.0统一预测入口
+# =====================================================
+
+def predict_next(history, strategy=None):
+
+    """
+    V4统一接口
+
+    参数:
+        history:
+            历史开奖
+
+        strategy:
+            动态策略
+
+
+    返回:
+        prediction结果
+
+    """
+
+    numbers=[]
+
+
+    for row in history:
+
+        nums=row.get(
+            "numbers",
+            []
+        )
+
+        numbers.extend(nums)
+
+
+
+    if not numbers:
+
+        return {
+
+            "特码10码": [],
+
+            "重点推荐": [],
+
+            "状态":
+
+            "无数据"
+
+        }
+
+
+
+    from collections import Counter
+
+
+    counter=Counter(numbers)
+
+
+
+    top10=[
+
+        x[0]
+
+        for x in counter.most_common(10)
+
+    ]
+
+
+
+    return {
+
+
+        "特码10码":
+
+        top10,
+
+
+        "重点推荐":
+
+        top10[:3],
+
+
+
+        "第一推荐":
+
+        top10[0]
+
+        if top10
+
+        else None,
+
+
+        "策略":
+
+        strategy
+
+    }
