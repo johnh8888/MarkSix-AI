@@ -1,116 +1,191 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-markov_model.py
-
-马尔可夫链预测模块
+core/markov_model.py
 
 
-功能:
+马尔可夫预测模型
 
-1. 状态转移统计
-2. 一阶马尔可夫
-3. 二阶马尔可夫
-4. 概率预测
 
+功能：
+
+1. 一阶马尔可夫
+2. 二阶马尔可夫
+3. 状态转移统计
+4. 输出号码评分
+
+
+说明：
+
+彩票不存在确定规律，
+该模块只用于历史统计研究。
 
 """
 
 
-from collections import defaultdict
+from __future__ import annotations
 
-from collections import Counter
+
+from collections import defaultdict, Counter
+
+
+from typing import Dict, List
+
+
+
+
+
+NUMBERS=list(range(1,50))
 
 
 
 
 
 # =====================================================
-# 状态转移矩阵
+# 一阶马尔可夫
 # =====================================================
 
 
 class MarkovModel:
 
 
-    def __init__(self):
 
-
-        self.transitions=defaultdict(
-
-            Counter
-
-        )
-
-
-
-    # -------------------------------------------------
-
-    # 训练
-
-    # -------------------------------------------------
-
-
-    def train(
+    def __init__(
 
             self,
 
-            sequence
+            order:int=1
 
     ):
 
 
-        if len(sequence)<2:
+        self.order=order
 
+
+        self.transition=defaultdict(
+            Counter
+        )
+
+
+
+
+
+    # ---------------------------------
+    # 训练
+    # ---------------------------------
+
+
+    def fit(
+
+            self,
+
+            history:List[int]
+
+    ):
+
+
+        if len(history)<=self.order:
 
             return
 
 
 
+        data=list(
+            reversed(history)
+        )
+
+
         for i in range(
 
-            len(sequence)-1
+            len(data)-self.order
 
         ):
 
 
-            current=sequence[i]
+            state=tuple(
+
+                data[i:i+self.order]
+
+            )
 
 
-            next_state=sequence[i+1]
+            next_value=data[
+
+                i+self.order
+
+            ]
 
 
 
-            self.transitions[current][next_state]+=1
+            self.transition[state][
+
+                next_value
+
+            ]+=1
 
 
 
 
 
 
-    # -------------------------------------------------
 
+    # ---------------------------------
     # 转移概率
+    # ---------------------------------
 
-    # -------------------------------------------------
 
-
-    def probability(
+    def predict_proba(
 
             self,
 
-            state
+            history:List[int]
 
-    ):
-
-
-        result={}
+    )->Dict[int,float]:
 
 
+        result={
 
-        data=self.transitions.get(
+            n:0
+
+            for n in NUMBERS
+
+        }
+
+
+
+
+        if len(history)<self.order:
+
+            return {
+
+                n:
+
+                1/49
+
+                for n in NUMBERS
+
+            }
+
+
+
+
+
+        state=tuple(
+
+            reversed(
+
+                history[:self.order]
+
+            )
+
+        )
+
+
+
+
+        counter=self.transition.get(
 
             state,
 
@@ -119,10 +194,9 @@ class MarkovModel:
         )
 
 
+
         total=sum(
-
-            data.values()
-
+            counter.values()
         )
 
 
@@ -130,81 +204,36 @@ class MarkovModel:
         if total==0:
 
 
-            return {}
+            return {
+
+                n:
+
+                1/49
+
+                for n in NUMBERS
+
+            }
 
 
 
 
-
-        for k,v in data.items():
-
-
-            result[k]=round(
-
-                v/total,
-
-                4
-
-            )
+        for n,c in counter.items():
 
 
+            result[n]=(
 
-        return dict(
+                c+1
 
-            sorted(
+            )/(
 
-                result.items(),
-
-                key=lambda x:x[1],
-
-                reverse=True
+                total+49
 
             )
 
-        )
 
 
+        return result
 
-
-
-    # -------------------------------------------------
-
-    # 下一状态预测
-
-    # -------------------------------------------------
-
-
-    def predict(
-
-            self,
-
-            current
-
-    ):
-
-
-        prob=self.probability(
-
-            current
-
-        )
-
-
-
-        if not prob:
-
-
-            return None
-
-
-
-        return max(
-
-            prob,
-
-            key=prob.get
-
-        )
 
 
 
@@ -215,198 +244,120 @@ class MarkovModel:
 # =====================================================
 
 
-class MarkovOrder2:
-
+class MarkovN(MarkovModel):
 
 
     def __init__(self):
 
 
-        self.transitions=defaultdict(
-
-            Counter
-
+        super().__init__(
+            order=2
         )
 
-
-
-
-    def train(
-
-            self,
-
-            sequence
-
-    ):
-
-
-        if len(sequence)<3:
-
-
-            return
-
-
-
-        for i in range(
-
-            len(sequence)-2
-
-        ):
-
-
-            state=(
-
-                sequence[i],
-
-                sequence[i+1]
-
-            )
-
-
-
-            nxt=sequence[i+2]
-
-
-
-            self.transitions[state][nxt]+=1
-
-
-
-
-
-
-    def predict(
-
-            self,
-
-            last_two
-
-    ):
-
-
-        data=self.transitions.get(
-
-            tuple(last_two),
-
-            {}
-
-        )
-
-
-
-        if not data:
-
-
-            return None
-
-
-
-        return max(
-
-            data,
-
-            key=data.get
-
-        )
 
 
 
 
 
 # =====================================================
-# 波色马尔可夫
+# 简易评分接口
 # =====================================================
 
 
-def 波色序列(
+def markov_score(
 
-        历史数据
+        history:List[int]
 
-):
-
-
-    seq=[]
+)->Dict[int,float]:
 
 
-    for item in 历史数据:
+    """
+    外部调用接口
 
 
-        if "波色" in item:
+    返回：
+
+    {
+       号码:评分
+    }
+
+    """
 
 
-            seq.append(
-
-                item["波色"]
-
-            )
+    if not history:
 
 
-
-    return seq
-
+        return {}
 
 
 
 
-def 训练波色模型(
 
-        历史数据
+    model1=MarkovModel(
+        order=1
+    )
 
-):
 
-
-    seq=波色序列(
-
-        历史数据
-
+    model2=MarkovModel(
+        order=2
     )
 
 
 
-    model=MarkovModel()
-
-
-
-    model.train(
-
-        seq
-
+    model1.fit(
+        history
     )
 
 
-    return model
+    model2.fit(
+        history
+    )
+
+
+
+    p1=model1.predict_proba(
+        history
+    )
+
+
+    p2=model2.predict_proba(
+        history
+    )
 
 
 
 
-
-# =====================================================
-# 大小序列
-# =====================================================
-
-
-def 大小序列(
-
-        历史数据
-
-):
-
-
-    result=[]
+    result={}
 
 
 
-    for item in 历史数据:
+    for n in NUMBERS:
 
 
-        if "大小" in item:
+        result[n]=(
 
 
-            result.append(
-
-                item["大小"]
-
+            p1.get(
+                n,
+                0
             )
+            *
+
+            0.6
+
+
+            +
+
+            p2.get(
+                n,
+                0
+            )
+            *
+
+            0.4
+
+
+        )
 
 
 
@@ -416,206 +367,93 @@ def 大小序列(
 
 
 
-def 训练大小模型(
 
-        历史数据
+# =====================================================
+# 属性马尔可夫
+# =====================================================
+
+
+def attribute_markov(
+
+        values:List[str]
 
 ):
 
 
-    model=MarkovModel()
+    transition=defaultdict(
+        Counter
+    )
 
 
 
-    model.train(
+    for i in range(
 
-        大小序列(
+        len(values)-1
 
-            历史数据
+    ):
 
-        )
+
+        transition[
+
+            values[i]
+
+        ][
+
+            values[i+1]
+
+        ]+=1
+
+
+
+
+    if not values:
+
+        return {}
+
+
+
+    current=values[0]
+
+
+
+    counter=transition.get(
+
+        current,
+
+        {}
 
     )
 
 
-    return model
 
+    total=sum(
 
-
-
-
-# =====================================================
-# 单双序列
-# =====================================================
-
-
-def 单双序列(
-
-        历史数据
-
-):
-
-
-    result=[]
-
-
-
-    for item in 历史数据:
-
-
-        if "单双" in item:
-
-
-            result.append(
-
-                item["单双"]
-
-            )
-
-
-
-    return result
-
-
-
-
-
-def 训练单双模型(
-
-        历史数据
-
-):
-
-
-    model=MarkovModel()
-
-
-
-    model.train(
-
-        单双序列(
-
-            历史数据
-
-        )
+        counter.values()
 
     )
 
 
-    return model
+    if total==0:
 
+        return {}
 
-
-
-
-# =====================================================
-# 号码转移
-# =====================================================
-
-
-def 号码转移模型(
-
-        历史数据
-
-):
-
-
-    model=MarkovModel()
-
-
-
-    seq=[]
-
-
-
-    for item in 历史数据:
-
-
-        nums=item.get(
-
-            "号码",
-
-            []
-
-        )
-
-
-        if nums:
-
-
-            seq.append(
-
-                nums[0]
-
-            )
-
-
-
-    model.train(
-
-        seq
-
-    )
-
-
-    return model
-
-
-
-
-
-# =====================================================
-# 综合接口
-# =====================================================
-
-
-def 创建马尔可夫模型(
-
-        历史数据
-
-):
 
 
     return {
 
+        k:
 
-        "波色":
+        round(
 
-        训练波色模型(
+            v/total,
 
-            历史数据
-
-        ),
-
-
-
-        "大小":
-
-        训练大小模型(
-
-            历史数据
-
-        ),
-
-
-
-        "单双":
-
-        训练单双模型(
-
-            历史数据
-
-        ),
-
-
-
-        "号码":
-
-        号码转移模型(
-
-            历史数据
+            4
 
         )
+
+        for k,v
+
+        in counter.items()
 
     }
 
@@ -623,11 +461,15 @@ def 创建马尔可夫模型(
 
 
 
-if __name__=="__main__":
 
+__all__=[
 
-    print(
+"MarkovModel",
 
-        "V5.1 马尔可夫模型启动"
+"MarkovN",
 
-    )
+"markov_score",
+
+"attribute_markov"
+
+]
