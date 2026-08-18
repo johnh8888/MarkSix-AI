@@ -1,11 +1,19 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
 
 strategies.py
 
-10模型融合策略
+动态策略模块
+
+负责:
+
+1. 状态策略
+2. 权重调整
+3. 特征增强
+4. 属性预测
+
 
 """
 
@@ -15,52 +23,146 @@ from collections import Counter
 
 from .features import (
 
-    get_special,
-
     get_wave,
+
+    get_size,
+
+    get_parity
 
 )
 
 
-from .state_engine import get_weights
+
+
+
+# =====================================================
+# 基础策略权重
+# =====================================================
+
+
+BASE_WEIGHTS = {
+
+
+    "frequency":0.20,
+
+
+    "trend":0.15,
+
+
+    "momentum":0.12,
+
+
+    "omission":0.10,
+
+
+    "wave":0.10,
+
+
+    "size":0.08,
+
+
+    "parity":0.08,
+
+
+    "zodiac":0.07,
+
+
+    "zone":0.05,
+
+
+    "tail":0.05
+
+}
 
 
 
 
 
 # =====================================================
-# 通用归一化
+# 状态策略
 # =====================================================
 
 
-def normalize(scores):
+def state_strategy(state):
 
 
-    if not scores:
-
-        return {
-            i:0.5
-            for i in range(1,50)
-        }
+    weights=BASE_WEIGHTS.copy()
 
 
-    values=list(
-        scores.values()
+
+    if state=="连续波状态":
+
+
+        weights["wave"] += 0.08
+
+        weights["trend"] += 0.05
+
+
+
+    elif state=="波色反转状态":
+
+
+        weights["momentum"] += 0.08
+
+        weights["wave"] += 0.03
+
+
+
+    elif state=="集中趋势状态":
+
+
+        weights["frequency"] += 0.08
+
+        weights["trend"] += 0.06
+
+
+
+    elif state=="趋势变化状态":
+
+
+        weights["trend"] += 0.10
+
+        weights["momentum"] += 0.05
+
+
+
+    elif state=="混沌状态":
+
+
+        weights["frequency"] -= 0.05
+
+        weights["trend"] -= 0.05
+
+        weights["omission"] += 0.10
+
+
+
+    return normalize(weights)
+
+
+
+
+
+# =====================================================
+# 权重归一化
+# =====================================================
+
+
+def normalize(data):
+
+
+    total=sum(
+
+        data.values()
+
     )
 
 
-    low=min(values)
 
-    high=max(values)
+    if total<=0:
 
+        return data
 
-
-    if high==low:
-
-        return {
-            k:0.5
-            for k in scores
-        }
 
 
     return {
@@ -68,10 +170,15 @@ def normalize(scores):
 
         k:
 
-        (v-low)/(high-low)
+        round(
 
+            v/total,
 
-        for k,v in scores.items()
+            4
+
+        )
+
+        for k,v in data.items()
 
     }
 
@@ -80,354 +187,67 @@ def normalize(scores):
 
 
 # =====================================================
-# 1 频率模型
+# 热冷号码策略
 # =====================================================
 
 
-def model_frequency(rows):
+def hot_cold_strategy(numbers):
 
 
-    counter=Counter()
+    recent=numbers[:50]
 
 
+    counter=Counter(
 
-    for row in rows[:100]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-            counter[n]+=1
-
-
-
-    return normalize(
-
-        {
-
-        n:
-
-        counter.get(n,0)
-
-        for n in range(1,50)
-
-        }
+        recent
 
     )
 
 
 
+    hot=[]
 
-
-# =====================================================
-# 2 趋势模型
-# =====================================================
-
-
-def model_trend(rows):
-
-
-    score={}
-
-
-
-    for n in range(1,50):
-
-        s=0
-
-
-        for i,row in enumerate(rows[:50]):
-
-
-            if get_special(row)==n:
-
-
-                s+=50-i
-
-
-
-        score[n]=s
-
-
-
-    return normalize(score)
-
-
-
-
-
-# =====================================================
-# 3 动量模型
-# =====================================================
-
-
-def model_momentum(rows):
-
-
-    score={}
-
-
-
-    recent=[]
-
-
-    for row in rows[:20]:
-
-        n=get_special(row)
-
-        if n:
-
-            recent.append(n)
+    cold=[]
 
 
 
     for n in range(1,50):
 
 
-        score[n]=recent.count(n)*2
+        c=counter.get(
 
+            n,
 
+            0
 
-    return normalize(score)
+        )
 
 
 
+        if c>=3:
 
 
-# =====================================================
-# 4 遗漏模型
-# =====================================================
+            hot.append(n)
 
 
-def model_omission(rows):
+        elif c==0:
 
 
-    score={}
-
-
-
-    for n in range(1,50):
-
-
-        miss=0
-
-
-        for row in rows:
-
-
-            if get_special(row)==n:
-
-                break
-
-
-            miss+=1
-
-
-
-        score[n]=miss
-
-
-
-    return normalize(score)
-
-
-
-
-
-# =====================================================
-# 5 邻号模型
-# =====================================================
-
-
-def model_adjacency(rows):
-
-
-    score={
-
-        n:0
-
-        for n in range(1,50)
-
-    }
-
-
-
-    for row in rows[:100]:
-
-
-        n=get_special(row)
-
-
-        if not n:
-
-            continue
-
-
-
-        for x in (
-
-            n-1,
-
-            n+1
-
-        ):
-
-
-            if 1<=x<=49:
-
-                score[x]+=1
-
-
-
-    return normalize(score)
-
-
-
-
-
-# =====================================================
-# 6 尾数模型
-# =====================================================
-
-
-def model_tail(rows):
-
-
-    tails=Counter()
-
-
-
-    for row in rows[:100]:
-
-        n=get_special(row)
-
-        if n:
-
-            tails[n%10]+=1
-
-
-
-    score={}
-
-
-
-    for n in range(1,50):
-
-
-        score[n]=tails[n%10]
-
-
-
-    return normalize(score)
-
-
-
-
-
-# =====================================================
-# 7 分区模型
-# =====================================================
-
-
-def model_zone(rows):
-
-
-    zones=Counter()
-
-
-
-    for row in rows[:100]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-
-            zones[
-                (n-1)//10
-            ]+=1
-
-
-
-    score={}
-
-
-
-    for n in range(1,50):
-
-
-        score[n]=zones[
-            (n-1)//10
-        ]
-
-
-
-    return normalize(score)
-
-
-
-
-
-# =====================================================
-# 8 大小
-# =====================================================
-
-
-def model_size(rows):
-
-
-    big=0
-
-    small=0
-
-
-
-    for row in rows[:100]:
-
-
-        n=get_special(row)
-
-
-        if n>=25:
-
-            big+=1
-
-        elif n:
-
-            small+=1
-
-
-
-    total=big+small
-
-
-    if total==0:
-
-        return {
-            n:0.5
-            for n in range(1,50)
-        }
+            cold.append(n)
 
 
 
     return {
 
 
-        n:
+        "hot":
 
-        (
-            big/total
-            if n>=25
-            else
-            small/total
-        )
+        hot,
 
 
-        for n in range(1,50)
+        "cold":
+
+        cold
 
     }
 
@@ -436,224 +256,332 @@ def model_size(rows):
 
 
 # =====================================================
-# 9 单双
+# 波色策略
 # =====================================================
 
 
-def model_parity(rows):
-
-
-    odd=0
-
-    even=0
-
-
-
-    for row in rows[:100]:
-
-
-        n=get_special(row)
-
-
-        if n:
-
-
-            if n%2:
-
-                odd+=1
-
-            else:
-
-                even+=1
-
-
-
-    total=odd+even
-
-
-    if total==0:
-
-        return {
-            n:0.5
-            for n in range(1,50)
-        }
-
-
-
-    return {
-
-
-        n:
-
-        (
-            odd/total
-            if n%2
-            else even/total
-        )
-
-
-        for n in range(1,50)
-
-    }
-
-
-
-
-
-# =====================================================
-# 10 波色
-# =====================================================
-
-
-def model_wave(rows):
+def wave_strategy(numbers):
 
 
     counter=Counter()
 
 
 
-    for row in rows[:100]:
+    for n in numbers[:50]:
 
 
-        n=get_special(row)
+        counter[
+
+            get_wave(n)
+
+        ]+=1
 
 
-        if n:
 
-            counter[
-                get_wave(n)
-            ]+=1
+    ranking=counter.most_common()
+
+
+
+    return {
+
+
+        "single":
+
+        ranking[0][0]
+
+        if ranking
+
+        else None,
+
+
+        "double":
+
+        [
+
+            x[0]
+
+            for x in ranking[:2]
+
+        ]
+
+    }
+
+
+
+
+
+# =====================================================
+# 大小策略
+# =====================================================
+
+
+def size_strategy(numbers):
+
+
+    counter=Counter()
+
+
+
+    for n in numbers[:50]:
+
+
+        counter[
+
+            get_size(n)
+
+        ]+=1
 
 
 
     total=sum(
+
         counter.values()
+
     )
 
 
-    score={}
+
+    if total==0:
+
+        return {}
 
 
 
-    for n in range(1,50):
+    return {
 
 
-        if total:
+        k:
 
+        round(
 
-            score[n]=counter[
-                get_wave(n)
-            ]/total
+            v/total,
 
+            4
 
-        else:
+        )
 
-            score[n]=0.5
+        for k,v in counter.items()
 
-
-
-    return score
+    }
 
 
 
 
 
 # =====================================================
-# 主融合
+# 单双策略
 # =====================================================
 
 
-def combine_models(rows):
+def parity_strategy(numbers):
 
 
-    models={
+    counter=Counter()
 
 
-        "frequency":
 
-            model_frequency(rows),
-
-
-        "trend":
-
-            model_trend(rows),
+    for n in numbers[:50]:
 
 
-        "momentum":
+        counter[
 
-            model_momentum(rows),
+            get_parity(n)
 
-
-        "omission":
-
-            model_omission(rows),
+        ]+=1
 
 
-        "adjacency":
 
-            model_adjacency(rows),
+    total=sum(
 
+        counter.values()
 
-        "tail":
-
-            model_tail(rows),
+    )
 
 
-        "zone":
 
-            model_zone(rows),
-
-
-        "size":
-
-            model_size(rows),
+    return {
 
 
-        "parity":
+        k:
 
-            model_parity(rows),
+        round(
+
+            v/total,
+
+            4
+
+        )
+
+        for k,v in counter.items()
+
+    }
+
+
+
+
+
+# =====================================================
+# 号码增强
+# =====================================================
+
+
+def enhance_score(
+
+        scores,
+
+        strategy
+
+):
+
+
+    result=scores.copy()
+
+
+
+    hot=strategy.get(
+
+        "hot",
+
+        []
+
+    )
+
+
+
+    cold=strategy.get(
+
+        "cold",
+
+        []
+
+    )
+
+
+
+    for n in hot:
+
+
+        if n in result:
+
+
+            result[n]*=1.08
+
+
+
+    for n in cold:
+
+
+        if n in result:
+
+
+            result[n]*=0.95
+
+
+
+    return result
+
+
+
+
+
+# =====================================================
+# 完整策略输出
+# =====================================================
+
+
+def build_strategy(
+
+        numbers,
+
+        state="平衡状态"
+
+):
+
+
+    return {
+
+
+        "state":
+
+        state,
+
+
+        "weights":
+
+        state_strategy(
+
+            state
+
+        ),
+
+
+
+        "hot_cold":
+
+        hot_cold_strategy(
+
+            numbers
+
+        ),
+
 
 
         "wave":
 
-            model_wave(rows),
+        wave_strategy(
 
-    }
+            numbers
 
-
-
-    weights=get_weights(rows)
+        ),
 
 
 
-    final={
+        "size":
 
-        n:0
+        size_strategy(
 
-        for n in range(1,50)
+            numbers
 
-    }
-
-
-
-    for name,data in models.items():
+        ),
 
 
-        w=weights.get(
-            name,
-            0
+
+        "parity":
+
+        parity_strategy(
+
+            numbers
+
         )
 
-
-        for n in range(1,50):
-
-
-            final[n]+=data[n]*w
+    }
 
 
 
-    final=normalize(final)
+
+
+# =====================================================
+# 测试
+# =====================================================
+
+
+if __name__=="__main__":
+
+
+    nums=[
+
+        39,41,8,9,7,14,49
+
+    ]*20
 
 
 
-    return final,models,weights
+    print(
+
+        build_strategy(
+
+            nums
+
+        )
+
+    )
