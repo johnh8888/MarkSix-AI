@@ -1,32 +1,35 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 backtest.py
 
-Walk Forward历史回测
+Walk-Forward 回测系统
+
+
+功能:
+
+1. 历史滚动预测
+2. 防止未来数据泄露
+3. 自动统计命中率
+4. 中文报告输出
+
 
 """
 
 
-from .predictor import generate_prediction
+from .predictor import (
 
+    predict_next,
 
-from .features import (
+    predict_wave,
 
-    get_wave,
+    predict_size,
 
-    get_size,
+    predict_parity,
 
-    get_parity
-
-)
-
-
-from .zodiac_model import (
-
-    get_zodiac
+    predict_zodiac
 
 )
 
@@ -35,228 +38,88 @@ from .zodiac_model import (
 
 
 # =====================================================
-# 解析号码
+# 单期回测
 # =====================================================
 
 
-def parse_numbers(text):
+def 单期测试(
 
+        历史训练,
 
-    if isinstance(text,list):
-
-        return [
-
-            int(x)
-
-            for x in text
-
-        ]
-
-
-
-    return [
-
-        int(x)
-
-        for x in str(text)
-
-        .replace(","," ")
-
-        .split()
-
-    ]
-
-
-
-
-
-# =====================================================
-# 获取特码
-# =====================================================
-
-
-def get_special(row):
-
-
-    nums=parse_numbers(
-
-        row.get(
-
-            "numbers",
-
-            ""
-
-        )
-
-    )
-
-
-    if len(nums)==0:
-
-        return None
-
-
-    return nums[-1]
-
-
-
-
-
-# =====================================================
-# 波色判断
-# =====================================================
-
-
-def check_wave(
-
-        prediction,
-
-        actual
+        真实开奖
 
 ):
 
 
-    waves=prediction.get(
+    结果={}
 
-        "波色",
+
+
+    预测=predict_next(
+
+        历史训练
+
+    )
+
+
+
+    实际号码=真实开奖.get(
+
+        "号码",
 
         []
 
     )
 
 
-    real=get_wave(
 
-        actual
+    推荐号码=预测.get(
 
-    )
+        "特码10码",
 
-
-    return real in waves
-
-
-
-
-
-# =====================================================
-# 大小判断
-# =====================================================
-
-
-def check_size(
-
-        prediction,
-
-        actual
-
-):
-
-
-    size=get_size(
-
-        actual
-
-    )
-
-
-    return (
-
-        size==prediction.get(
-
-            "大小"
-
-        )
+        []
 
     )
 
 
 
+    命中=[]
 
 
-# =====================================================
-# 单双判断
-# =====================================================
+
+    for num in 推荐号码:
 
 
-def check_parity(
-
-        prediction,
-
-        actual
-
-):
+        if num in 实际号码:
 
 
-    parity=get_parity(
-
-        actual
-
-    )
-
-
-    return (
-
-        parity==prediction.get(
-
-            "单双"
-
-        )
-
-    )
+            命中.append(num)
 
 
 
 
 
-# =====================================================
-# 生肖判断
-# =====================================================
+    结果["特码10码"]= {
 
 
-def check_zodiac(
+        "预测":
 
-        prediction,
-
-        actual,
-
-        year=2026
-
-):
+        推荐号码,
 
 
-    z=get_zodiac(
+        "实际":
 
-        actual,
-
-        year
-
-    )
+        实际号码,
 
 
-    return {
+        "命中":
+
+        命中,
 
 
-        "5肖":
+        "数量":
 
-        z in prediction.get(
-
-            "生肖5肖",
-
-            []
-
-        ),
-
-
-
-        "2肖":
-
-        z in prediction.get(
-
-            "平特2肖",
-
-            []
-
-        )
+        len(命中)
 
     }
 
@@ -264,348 +127,392 @@ def check_zodiac(
 
 
 
-# =====================================================
-# 单期测试
-# =====================================================
+    # 波色
 
 
-def test_one(
+    波色预测=predict_wave(
 
-        history,
-
-        target
-
-):
-
-
-    prediction=generate_prediction(
-
-        history
-
-    )
-
-
-    actual=get_special(
-
-        target
+        历史训练
 
     )
 
 
 
-    if actual is None:
-
-        return None
+    结果["波色"]=波色预测
 
 
 
 
 
-    zodiac=check_zodiac(
+    # 大小
 
-        prediction,
 
-        actual
+    大小预测=predict_size(
+
+        历史训练
 
     )
 
 
 
-    return {
-
-
-        "特码":
-
-        actual in prediction.get(
-
-            "特码10码",
-
-            []
-
-        ),
+    结果["大小"]=大小预测
 
 
 
-        "生肖5肖":
-
-        zodiac["5肖"],
 
 
-
-        "平特2肖":
-
-        zodiac["2肖"],
+    # 单双
 
 
+    单双预测=predict_parity(
 
-        "波色":
+        历史训练
 
-        check_wave(
-
-            prediction,
-
-            actual
-
-        ),
+    )
 
 
 
-        "大小":
-
-        check_size(
-
-            prediction,
-
-            actual
-
-        ),
+    结果["单双"]=单双预测
 
 
 
-        "单双":
 
-        check_parity(
 
-            prediction,
+    # 生肖
 
-            actual
 
-        )
+    生肖预测=predict_zodiac(
 
-    }
+        历史训练
+
+    )
+
+
+
+    结果["生肖"]=生肖预测
+
+
+
+
+
+    return 结果
 
 
 
 
 
 # =====================================================
-# Walk Forward
+# 命中统计
 # =====================================================
 
 
-def walk_forward(
+def 统计命中(
 
-        rows,
-
-        window=20
+        回测结果
 
 ):
 
 
-    result=[]
+    总期数=len(
+
+        回测结果
+
+    )
 
 
+    if 总期数==0:
 
-    total=len(rows)
-
-
-
-    if total<=window:
-
-        return result
-
-
-
-    for i in range(
-
-        window,
-
-        total
-
-    ):
-
-
-        history=rows[i:]
-
-
-
-        target=rows[i-1]
-
-
-
-        r=test_one(
-
-            history,
-
-            target
-
-        )
-
-
-
-        if r:
-
-            result.append(r)
-
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 统计
-# =====================================================
-
-
-def calculate_result(
-
-        records
-
-):
-
-
-    total=len(records)
-
-
-
-    if total==0:
 
         return {}
 
 
 
-    keys=[
+    特码命中=0
 
-        "特码",
 
-        "生肖5肖",
-
-        "平特2肖",
-
-        "波色",
-
-        "大小",
-
-        "单双"
-
-    ]
+    总号码=0
 
 
 
-    result={}
+    for item in 回测结果:
+
+
+        数量=item["特码10码"]["数量"]
 
 
 
-    for k in keys:
+        if 数量>0:
 
 
-        hit=sum(
+            特码命中+=1
 
-            1
 
-            for x in records
 
-            if x[k]
+        总号码+=数量
+
+
+
+
+
+    return {
+
+
+        "测试期数":
+
+        总期数,
+
+
+        "特码命中期数":
+
+        特码命中,
+
+
+        "期命中率":
+
+        round(
+
+            特码命中
+
+            /
+
+            总期数,
+
+            4
+
+        ),
+
+
+        "平均命中号码":
+
+        round(
+
+            总号码
+
+            /
+
+            总期数,
+
+            4
+
+        )
+
+    }
+
+
+
+
+
+# =====================================================
+# Walk Forward 回测
+# =====================================================
+
+
+def walk_forward(
+
+        历史数据,
+
+        开始位置=100
+
+):
+
+
+    结果=[]
+
+
+
+    总长度=len(
+
+        历史数据
+
+    )
+
+
+
+    for i in range(
+
+        开始位置,
+
+        总长度
+
+    ):
+
+
+        训练数据=历史数据[:i]
+
+
+
+        测试数据=历史数据[i]
+
+
+
+        单期结果=单期测试(
+
+            训练数据,
+
+            测试数据
 
         )
 
 
-        result[k]={
+
+        单期结果["期号"]=测试数据.get(
+
+            "期号",
+
+            i
+
+        )
 
 
-            "命中":
 
-            hit,
+        结果.append(
 
+            单期结果
 
-            "总数":
-
-            total,
+        )
 
 
-            "命中率":
 
-            round(
+    return 结果
 
-                hit/total*100,
 
-                2
+
+
+
+# =====================================================
+# 中文报告
+# =====================================================
+
+
+def 生成报告(
+
+        回测结果
+
+):
+
+
+    统计=统计命中(
+
+        回测结果
+
+    )
+
+
+
+    return {
+
+
+        "系统":
+
+        "六合彩AI V5.0",
+
+
+        "模式":
+
+        "Walk-Forward",
+
+
+        "报告":
+
+        {
+
+
+            "测试期数":
+
+            统计.get(
+
+                "测试期数",
+
+                0
+
+            ),
+
+
+            "特码命中率":
+
+            str(
+
+                round(
+
+                    统计.get(
+
+                        "期命中率",
+
+                        0
+
+                    )*100,
+
+                    2
+
+                )
+
+            )
+
+            +"%",
+
+
+            "平均每期命中":
+
+            统计.get(
+
+                "平均命中号码",
+
+                0
 
             )
 
         }
 
-
-
-    return result
+    }
 
 
 
 
 
 # =====================================================
-# 完整回测
+# 快速测试
 # =====================================================
 
 
-def run_backtest(
+def 快速回测(
 
-        rows
+        历史数据,
+
+        最近=50
 
 ):
 
 
-    outputs={}
+    if len(历史数据)>最近+100:
+
+
+        历史数据=历史数据[-(最近+100):]
 
 
 
-    for window in [10,20]:
+    结果=walk_forward(
 
+        历史数据
 
-        records=walk_forward(
-
-            rows,
-
-            window
-
-        )
-
-
-        outputs[
-
-            f"最近{window}期"
-
-        ]=calculate_result(
-
-            records
-
-        )
+    )
 
 
 
-    return outputs
+    return 生成报告(
+
+        结果
+
+    )
 
 
 
-
-
-# =====================================================
-# 测试
-# =====================================================
 
 
 if __name__=="__main__":
 
 
-    test=[
-
-        {
-
-        "numbers":
-
-        "39 41 08 09 07 14 49"
-
-        }
-
-    ]*50
-
-
-
     print(
 
-        run_backtest(test)
+        "V5回测模块启动"
 
     )
