@@ -1,16 +1,18 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.1 FINAL
+六合彩 AI 智能预测系统 V5.2 FINAL
 
 core/api_sync.py
 
-在线数据同步模块
+API数据同步模块
 
-修复：
-1. marksix6.net SSL证书过期
-2. 受控SSL fallback
-3. 保留原sync_all接口
+修复:
+1. 使用 api3.marksix6.net 新接口
+2. 正确解析 numbers
+3. 正确读取 expect期号
+4. 修复号码污染问题
+5. 保留 sync_all 接口
 """
 
 
@@ -20,14 +22,13 @@ from __future__ import annotations
 import json
 import ssl
 import urllib.request
-import re
 
 from datetime import datetime
 
 
-from .sqlite_manager import (
-    save_draw
-)
+from .sqlite_manager import save_draw
+
+
 
 
 
@@ -36,13 +37,8 @@ from .sqlite_manager import (
 # =====================================================
 
 
-API_HISTORY = (
-    "https://marksix6.net/index.php?api=1"
-)
-
-
 API_REALTIME = (
-    "https://marksix6.net/api/lottery_api.php"
+    "https://api3.marksix6.net/lottery_api.php"
 )
 
 
@@ -52,13 +48,17 @@ LOTTERIES = {
     "hk":
     "香港六合彩",
 
+
     "newMacau":
     "新澳门六合彩",
+
 
     "oldMacau":
     "老澳门六合彩"
 
 }
+
+
 
 
 
@@ -77,29 +77,30 @@ def ssl_context(verify=True):
 
 
 
+
+
+
 # =====================================================
-# HTTP JSON 请求
+# 请求JSON
 # =====================================================
 
 
 def request_json(url):
 
 
-    headers={
+    headers = {
 
         "User-Agent":
-        "Mozilla/5.0 MarkSix-AI-V5",
+        "Mozilla/5.0",
 
         "Accept":
-        "application/json,text/plain,*/*",
-
-        "Cache-Control":
-        "no-cache"
+        "application/json"
 
     }
 
 
-    req=urllib.request.Request(
+
+    req = urllib.request.Request(
 
         url,
 
@@ -108,18 +109,8 @@ def request_json(url):
     )
 
 
-    # -----------------------------
-    # 第一次：正常SSL
-    # -----------------------------
 
     try:
-
-
-        print(
-            "正在请求API:"
-        )
-
-        print(url)
 
 
         with urllib.request.urlopen(
@@ -133,15 +124,10 @@ def request_json(url):
         ) as r:
 
 
-            text=r.read().decode(
+            text = r.read().decode(
 
                 "utf-8-sig"
 
-            )
-
-
-            print(
-                "✅ SSL正常验证成功"
             )
 
 
@@ -149,69 +135,25 @@ def request_json(url):
 
 
 
-    except ssl.SSLCertVerificationError as e:
-
-
-        print(
-            "⚠️ SSL证书验证失败:"
-        )
-
-        print(e)
-
-
-
-    except urllib.error.URLError as e:
-
-
-        print(
-            "网络错误:"
-        )
-
-        print(e)
-
-
-        raise
-
-
-
     except Exception as e:
 
 
         print(
-            "API请求异常:"
-        )
 
-        print(e)
+            "SSL正常请求失败:",
 
-
-        raise
-
-
-
-
-    # -----------------------------
-    # 第二次：受控fallback
-    # -----------------------------
-
-
-    if "marksix6.net" not in url:
-
-
-        raise RuntimeError(
-
-            "非指定网站禁止SSL fallback"
+            e
 
         )
 
 
 
-    print(
-        "⚠️ 启用 marksix6.net 受控SSL fallback"
-    )
+        print(
 
+            "启用备用SSL模式"
 
+        )
 
-    try:
 
 
         with urllib.request.urlopen(
@@ -225,15 +167,10 @@ def request_json(url):
         ) as r:
 
 
-            text=r.read().decode(
+            text = r.read().decode(
 
                 "utf-8-sig"
 
-            )
-
-
-            print(
-                "✅ SSL fallback成功"
             )
 
 
@@ -241,268 +178,40 @@ def request_json(url):
 
 
 
-    except Exception as e:
-
-
-        print(
-            "❌ fallback失败:"
-        )
-
-        print(e)
-
-
-        raise
-
 
 
 
 
 # =====================================================
-# 数字解析
+# 号码解析
 # =====================================================
 
 
-def parse_numbers(value):
+def parse_numbers(numbers):
 
 
-    if isinstance(value,list):
+    result=[]
 
-        result=[]
 
+    for n in numbers:
 
-        for x in value:
 
+        try:
 
-            nums=re.findall(
 
-                r"\d+",
+            value=int(n)
 
-                str(x)
 
-            )
+            if 1 <= value <= 49:
 
+                result.append(value)
 
-            if nums:
 
-                n=int(nums[0])
 
+        except:
 
-                if 1<=n<=49:
-
-                    result.append(n)
-
-
-        return result
-
-
-
-    nums=re.findall(
-
-        r"\d+",
-
-        str(value)
-
-    )
-
-
-    return [
-
-        int(x)
-
-        for x in nums
-
-        if 1<=int(x)<=49
-
-    ]
-
-
-
-
-
-# =====================================================
-# 彩种识别
-# =====================================================
-
-
-def identify(item):
-
-
-    text=(
-
-        str(item.get("name",""))
-
-        +
-
-        str(item.get("type",""))
-
-    )
-
-
-    if "香港" in text:
-
-        return "hk"
-
-
-
-    if "新澳门" in text:
-
-        return "newMacau"
-
-
-
-    if "老澳门" in text:
-
-        return "oldMacau"
-
-
-
-    return None
-
-
-
-
-
-
-# =====================================================
-# 历史同步
-# =====================================================
-
-
-def sync_history():
-
-
-    print(
-        "正在获取历史数据"
-    )
-
-
-    data=request_json(
-
-        API_HISTORY
-
-    )
-
-
-    result={}
-
-
-
-    items=data.get(
-
-        "lottery_data",
-
-        []
-
-    )
-
-
-
-    for item in items:
-
-
-        if not isinstance(item,dict):
 
             continue
-
-
-
-        key=identify(item)
-
-
-
-        if not key:
-
-            continue
-
-
-
-        history=item.get(
-
-            "history",
-
-            []
-
-        )
-
-
-        count=0
-
-
-
-        for row in history:
-
-
-            m=re.search(
-
-                r"(\d+)期.*?([\d, ]+)",
-
-                str(row)
-
-            )
-
-
-
-            if not m:
-
-                continue
-
-
-
-            issue=m.group(1)
-
-
-
-            nums=parse_numbers(
-
-                m.group(2)
-
-            )
-
-
-
-            if len(nums)<7:
-
-                continue
-
-
-
-            status=save_draw(
-
-                key,
-
-                issue,
-
-                nums[:6],
-
-                nums[6],
-
-                "history_api"
-
-            )
-
-
-
-            if status:
-
-                count+=1
-
-
-
-        result[key]=count
-
-
-
-        print(
-
-            LOTTERIES[key],
-
-            "同步",
-
-            count,
-
-            "期"
-
-        )
 
 
 
@@ -513,12 +222,188 @@ def sync_history():
 
 
 
+
 # =====================================================
-# 实时同步
+# 单彩种同步
 # =====================================================
 
 
-def sync_realtime():
+def sync_one(key):
+
+
+    url = (
+
+        API_REALTIME
+
+        +
+
+        "?type="
+
+        +
+
+        key
+
+    )
+
+
+
+    print()
+
+    print(
+
+        "请求:",
+
+        url
+
+    )
+
+
+
+    data=request_json(url)
+
+
+
+    nums=parse_numbers(
+
+        data.get(
+
+            "numbers",
+
+            []
+
+        )
+
+    )
+
+
+
+    if len(nums)!=7:
+
+
+        print(
+
+            "号码数量异常:",
+
+            nums
+
+        )
+
+
+        return False
+
+
+
+    issue=str(
+
+        data.get(
+
+            "expect",
+
+            ""
+
+        )
+
+    )
+
+
+
+    if not issue:
+
+
+        issue=datetime.now().strftime(
+
+            "%Y%m%d"
+
+        )
+
+
+
+    # 前6个正码
+
+    main_numbers=nums[:6]
+
+
+    # 第7个特码
+
+    special=nums[6]
+
+
+
+    ok=save_draw(
+
+        key,
+
+        issue,
+
+        main_numbers,
+
+        special,
+
+        "api3"
+
+    )
+
+
+
+    if ok:
+
+
+        print(
+
+            LOTTERIES[key],
+
+            "保存成功",
+
+            "期号:",
+
+            issue,
+
+            "特码:",
+
+            special
+
+        )
+
+
+    else:
+
+
+        print(
+
+            LOTTERIES[key],
+
+            "保存失败"
+
+        )
+
+
+
+    return ok
+
+
+
+
+
+
+
+# =====================================================
+# 总同步
+# =====================================================
+
+
+def sync_all():
+
+
+    print("="*70)
+
+    print(
+
+        "开始API同步"
+
+    )
+
+    print("="*70)
+
 
 
     result={}
@@ -531,72 +416,7 @@ def sync_realtime():
         try:
 
 
-            url=(
-
-                API_REALTIME
-
-                +
-
-                "?type="
-
-                +
-
-                key
-
-            )
-
-
-            data=request_json(url)
-
-
-
-            nums=parse_numbers(
-
-                json.dumps(
-
-                    data,
-
-                    ensure_ascii=False
-
-                )
-
-            )
-
-
-
-            if len(nums)<7:
-
-
-                result[key]=False
-
-                continue
-
-
-
-            issue=datetime.now().strftime(
-
-                "%Y%m%d"
-
-            )
-
-
-
-            ok=save_draw(
-
-                key,
-
-                issue,
-
-                nums[:6],
-
-                nums[6],
-
-                "realtime_api"
-
-            )
-
-
-            result[key]=ok
+            result[key]=sync_one(key)
 
 
 
@@ -607,6 +427,8 @@ def sync_realtime():
 
                 key,
 
+                "异常:",
+
                 e
 
             )
@@ -616,86 +438,14 @@ def sync_realtime():
 
 
 
-    return result
-
-
-
-
-
-# =====================================================
-# 总入口
-# =====================================================
-
-
-def sync_all():
-
-
-    print("="*70)
-
-    print(
-        "开始API同步"
-    )
-
-    print("="*70)
-
-
-
-    history={}
-
-
-    try:
-
-        history=sync_history()
-
-
-    except Exception as e:
-
-
-        print(
-
-            "历史同步失败:",
-
-            e
-
-        )
-
-
-
-    realtime={}
-
-
-
-    try:
-
-
-        realtime=sync_realtime()
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "实时同步失败:",
-
-            e
-
-        )
-
 
 
     return {
 
 
-        "history":
-
-        history,
-
-
         "realtime":
 
-        realtime,
+        result,
 
 
         "time":
@@ -703,6 +453,7 @@ def sync_all():
         datetime.now().isoformat()
 
     }
+
 
 
 
