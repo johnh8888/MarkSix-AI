@@ -1,724 +1,660 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V4.0
+六合彩AI智能预测系统 V5.0
 
 state.py
 
-市场状态识别模块
+市场状态基础模型
 
 
-功能:
+功能：
 
-1. 熵值计算
-2. 热度检测
-3. 趋势检测
-4. 连续模式检测
-5. 市场状态分类
-6. 动态策略建议
+1. 状态枚举
+2. 状态评分
+3. 状态检测基础函数
+
 
 """
 
 
+from enum import Enum
+
 from collections import Counter
 
-import math
 
 
-from .features import (
 
-    get_wave,
 
-    get_size,
+# =====================================================
+# 市场状态定义
+# =====================================================
 
-    get_parity
 
-)
+class MarketState(Enum):
+
+
+    平衡状态 = "平衡"
+
+
+    热态 = "热态"
+
+
+    冷态 = "冷态"
+
+
+    连续状态 = "连续"
+
+
+    反转状态 = "反转"
+
+
+    混沌状态 = "混沌"
 
 
 
 
 
 # =====================================================
-# 号码解析
+# 状态中文
 # =====================================================
 
 
-def parse_numbers(rows):
+def 状态名称(state):
 
 
-    result=[]
+    if isinstance(
+
+        state,
+
+        MarketState
+
+    ):
 
 
-    for row in rows:
+        return state.value
 
 
-        nums=row.get(
 
-            "numbers",
+    return str(state)
 
-            ""
+
+
+
+
+# =====================================================
+# 波色连续检测
+# =====================================================
+
+
+def 检测连续波色(
+
+        历史数据,
+
+        周期=5
+
+):
+
+
+    if len(历史数据)<周期:
+
+
+        return False
+
+
+
+    最近=[]
+
+
+
+    for item in 历史数据[-周期:]:
+
+
+        波色=item.get(
+
+            "波色",
+
+            []
 
         )
 
 
-        if isinstance(nums,str):
+        if 波色:
 
 
-            nums=nums.replace(
+            最近.append(
 
-                ",",
+                波色[-1]
 
-                " "
-
-            ).split()
-
-
-
-        for n in nums:
-
-
-            try:
-
-                result.append(
-
-                    int(n)
-
-                )
-
-            except:
-
-                pass
+            )
 
 
 
-    return result
+    if len(最近)<周期:
+
+
+        return False
+
+
+
+    return len(
+
+        set(最近)
+
+    )==1
 
 
 
 
 
 # =====================================================
-# 熵计算
+# 热号检测
 # =====================================================
 
 
-def entropy(values):
+def 检测热态(
 
+        历史数据,
 
-    counter=Counter(values)
+        周期=20
 
+):
 
-    total=len(values)
 
+    if len(历史数据)<周期:
 
 
-    if total==0:
+        return False
 
-        return 0
 
 
+    counter=Counter()
 
-    result=0
 
 
+    for item in 历史数据[-周期:]:
 
-    for count in counter.values():
 
+        for num in item.get(
 
-        p=count/total
+            "号码",
 
+            []
 
-        result -= p * math.log(
+        ):
 
-            p,
 
-            2
+            counter[num]+=1
 
-        )
-
-
-
-    return round(
-
-        result,
-
-        4
-
-    )
-
-
-
-
-
-# =====================================================
-# 波色熵
-# =====================================================
-
-
-def wave_entropy(numbers):
-
-
-    waves=[
-
-        get_wave(n)
-
-        for n in numbers
-
-    ]
-
-
-    return entropy(
-
-        waves
-
-    )
-
-
-
-
-
-# =====================================================
-# 大小熵
-# =====================================================
-
-
-def size_entropy(numbers):
-
-
-    values=[
-
-        get_size(n)
-
-        for n in numbers
-
-    ]
-
-
-    return entropy(
-
-        values
-
-    )
-
-
-
-
-
-# =====================================================
-# 单双熵
-# =====================================================
-
-
-def parity_entropy(numbers):
-
-
-    values=[
-
-        get_parity(n)
-
-        for n in numbers
-
-    ]
-
-
-    return entropy(
-
-        values
-
-    )
-
-
-
-
-
-# =====================================================
-# 热号比例
-# =====================================================
-
-
-def hot_ratio(numbers,limit=20):
-
-
-    recent=numbers[:limit]
-
-
-    counter=Counter(
-
-        recent
-
-    )
 
 
     if not counter:
 
-        return 0
+
+        return False
 
 
 
-    max_value=max(
+    最大次数=max(
 
         counter.values()
 
     )
 
 
-    return round(
 
-        max_value/limit,
+    平均=sum(
 
-        4
+        counter.values()
 
-    )
+    ) / len(counter)
+
+
+
+    return 最大次数 > 平均 * 2
 
 
 
 
 
 # =====================================================
-# 连续波检测
+# 冷号检测
 # =====================================================
 
 
-def detect_wave_streak(numbers):
+def 检测冷态(
+
+        历史数据,
+
+        周期=30
+
+):
 
 
-    if len(numbers)<3:
+    if len(历史数据)<周期:
+
 
         return False
 
 
 
-    waves=[
+    出现=set()
 
-        get_wave(n)
 
-        for n in numbers[:3]
 
-    ]
+    for item in 历史数据[-周期:]:
 
 
+        出现.update(
 
-    return len(set(waves))==1
+            item.get(
 
+                "号码",
 
+                []
 
-
-
-# =====================================================
-# 反转检测
-# =====================================================
-
-
-def detect_flip(numbers):
-
-
-    if len(numbers)<6:
-
-        return False
-
-
-
-    first=[
-
-        get_wave(n)
-
-        for n in numbers[:3]
-
-    ]
-
-
-    second=[
-
-        get_wave(n)
-
-        for n in numbers[3:6]
-
-    ]
-
-
-
-    return (
-
-        len(set(first))==1
-
-        and
-
-        len(set(second))==1
-
-        and
-
-        first[0]!=second[0]
-
-    )
-
-
-
-
-
-# =====================================================
-# 趋势强度
-# =====================================================
-
-
-def trend_strength(numbers):
-
-
-    recent=numbers[:20]
-
-
-    old=numbers[20:40]
-
-
-
-    if len(old)==0:
-
-        return 0
-
-
-
-    r=Counter(recent)
-
-    o=Counter(old)
-
-
-
-    score=0
-
-
-
-    for n in range(1,50):
-
-
-        score += abs(
-
-            r[n]-o[n]
+            )
 
         )
 
 
 
-    return round(
+    遗漏数量=49-len(
 
-        score/20,
-
-        4
+        出现
 
     )
+
+
+
+    return 遗漏数量>=15
 
 
 
 
 
 # =====================================================
-# 市场状态判断
+# 大小趋势检测
 # =====================================================
 
 
-def analyze_state(rows):
+def 大小趋势(
+
+        历史数据,
+
+        周期=10
+
+):
 
 
-    numbers=parse_numbers(
+    结果=[]
 
-        rows
+
+
+    for item in 历史数据[-周期:]:
+
+
+        numbers=item.get(
+
+            "号码",
+
+            []
+
+        )
+
+
+        if not numbers:
+
+            continue
+
+
+
+        特码=numbers[-1]
+
+
+
+        if 特码>=25:
+
+
+            结果.append(
+
+                "大"
+
+            )
+
+        else:
+
+
+            结果.append(
+
+                "小"
+
+            )
+
+
+
+    return {
+
+        "大":
+
+        结果.count("大"),
+
+
+        "小":
+
+        结果.count("小")
+
+    }
+
+
+
+
+
+# =====================================================
+# 单双趋势检测
+# =====================================================
+
+
+def 单双趋势(
+
+        历史数据,
+
+        周期=10
+
+):
+
+
+    结果=[]
+
+
+
+    for item in 历史数据[-周期:]:
+
+
+        numbers=item.get(
+
+            "号码",
+
+            []
+
+        )
+
+
+        if not numbers:
+
+            continue
+
+
+
+        特码=numbers[-1]
+
+
+
+        if 特码 % 2:
+
+
+            结果.append(
+
+                "单"
+
+            )
+
+        else:
+
+
+            结果.append(
+
+                "双"
+
+            )
+
+
+
+    return {
+
+        "单":
+
+        结果.count("单"),
+
+
+        "双":
+
+        结果.count("双")
+
+    }
+
+
+
+
+
+# =====================================================
+# 状态综合评分
+# =====================================================
+
+
+def 状态评分(
+
+        历史数据
+
+):
+
+
+    score={
+
+        "连续":
+
+        0,
+
+        "热":
+
+        0,
+
+        "冷":
+
+        0,
+
+        "反转":
+
+        0
+
+    }
+
+
+
+    if 检测连续波色(
+
+        历史数据
+
+    ):
+
+
+        score["连续"]+=2
+
+
+
+    if 检测热态(
+
+        历史数据
+
+    ):
+
+
+        score["热"]+=2
+
+
+
+    if 检测冷态(
+
+        历史数据
+
+    ):
+
+
+        score["冷"]+=2
+
+
+
+
+
+    return score
+
+
+
+
+
+# =====================================================
+# 主状态判断
+# =====================================================
+
+
+def 分析市场状态(
+
+        历史数据
+
+):
+
+
+    score=状态评分(
+
+        历史数据
 
     )
 
 
 
-    if len(numbers)<20:
+    最大=max(
 
-
-        return {
-
-
-            "state":
-
-            "数据不足",
-
-
-            "entropy":
-
-            None
-
-        }
-
-
-
-    e=wave_entropy(
-
-        numbers[:50]
-
-    )
-
-
-    hot=hot_ratio(
-
-        numbers
-
-    )
-
-
-    trend=trend_strength(
-
-        numbers
-
-    )
-
-
-    streak=detect_wave_streak(
-
-        numbers
-
-    )
-
-
-    flip=detect_flip(
-
-        numbers
+        score.values()
 
     )
 
 
 
-
-    # -------------------------
-    # 状态判断
-    # -------------------------
+    if 最大==0:
 
 
-    if streak:
-
-
-        state="连续波状态"
+        return MarketState.平衡状态
 
 
 
-    elif flip:
 
 
-        state="波色反转状态"
+    状态=max(
 
+        score,
 
+        key=score.get
 
-    elif e < 1.2:
-
-
-        state="集中趋势状态"
-
-
-
-    elif e > 1.55:
-
-
-        state="混沌状态"
+    )
 
 
 
-    elif trend>2:
+    if 状态=="连续":
 
 
-        state="趋势变化状态"
+        return MarketState.连续状态
 
 
 
-    else:
+    if 状态=="热":
 
 
-        state="平衡状态"
+        return MarketState.热态
 
 
+
+    if 状态=="冷":
+
+
+        return MarketState.冷态
+
+
+
+    if 状态=="反转":
+
+
+        return MarketState.反转状态
+
+
+
+    return MarketState.平衡状态
+
+
+
+
+
+# =====================================================
+# 状态报告
+# =====================================================
+
+
+def 状态报告(
+
+        历史数据
+
+):
+
+
+    state=分析市场状态(
+
+        历史数据
+
+    )
 
 
 
     return {
 
 
-        "state":
+        "当前状态":
 
-        state,
+        状态名称(
 
+            state
 
-        "entropy":
+        ),
 
-        e,
 
 
-        "hot_ratio":
+        "状态评分":
 
-        hot,
+        状态评分(
 
+            历史数据
 
-        "trend":
+        ),
 
-        trend,
 
 
-        "wave_streak":
+        "大小趋势":
 
-        streak,
+        大小趋势(
 
+            历史数据
 
-        "flip":
+        ),
 
-        flip
 
-    }
 
+        "单双趋势":
 
+        单双趋势(
 
-
-
-# =====================================================
-# 动态权重建议
-# =====================================================
-
-
-def dynamic_weight(state):
-
-
-    weights={
-
-
-        "frequency":0.20,
-
-
-        "trend":0.15,
-
-
-        "momentum":0.12,
-
-
-        "omission":0.10,
-
-
-        "wave":0.10,
-
-
-        "size":0.08,
-
-
-        "parity":0.08,
-
-
-        "zodiac":0.07,
-
-
-        "zone":0.05,
-
-
-        "tail":0.05
-
-    }
-
-
-
-    mode=state.get(
-
-        "state",
-
-        ""
-
-    )
-
-
-
-    if mode=="连续波状态":
-
-
-        weights["wave"]+=0.08
-
-        weights["trend"]+=0.05
-
-
-
-    elif mode=="波色反转状态":
-
-
-        weights["wave"]+=0.05
-
-        weights["momentum"]+=0.05
-
-
-
-    elif mode=="集中趋势状态":
-
-
-        weights["frequency"]+=0.08
-
-        weights["trend"]+=0.08
-
-
-
-    elif mode=="混沌状态":
-
-
-        weights["frequency"]-=0.05
-
-        weights["trend"]-=0.05
-
-        weights["omission"]+=0.08
-
-
-
-    total=sum(
-
-        weights.values()
-
-    )
-
-
-    return {
-
-
-        k:
-
-        round(
-
-            v/total,
-
-            4
+            历史数据
 
         )
 
-        for k,v in weights.items()
-
     }
 
 
 
-
-
-# =====================================================
-# 测试
-# =====================================================
 
 
 if __name__=="__main__":
 
 
-    data=[
-
-        {
-
-        "numbers":
-
-        "39 41 08 09 07 14 49"
-
-        }
-
-    ]*10
-
-
-
-    s=analyze_state(data)
-
-
-    print(s)
-
-
     print(
 
-        dynamic_weight(s)
+        "V5状态模块启动"
 
     )
