@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
 六合彩AI智能预测系统 V4.0
@@ -10,15 +10,16 @@ data_quality.py
 
 功能:
 
-1. 数据合法性检测
-2. 数据去重
-3. 异常数据过滤
-4. 数据质量评分
+1. 开奖数据验证
+2. 异常过滤
+3. 完整性评分
+4. 数据清洗
+
 
 """
 
 
-from collections import Counter
+from datetime import datetime
 
 
 
@@ -33,67 +34,7 @@ MIN_NUMBER = 1
 
 MAX_NUMBER = 49
 
-REQUIRED_COUNT = 7
-
-
-
-
-
-# =====================================================
-# 获取号码
-# =====================================================
-
-
-def extract_numbers(row):
-
-
-    if not row:
-
-        return []
-
-
-
-    value = (
-        row.get("numbers")
-        or
-        row.get("openCode")
-        or
-        ""
-    )
-
-
-
-    if isinstance(
-        value,
-        list
-    ):
-
-        nums=value
-
-
-    else:
-
-        nums=[]
-
-
-        for x in str(value).replace(
-            "|",
-            ","
-        ).split(","):
-
-
-            x=x.strip()
-
-
-            if x.isdigit():
-
-                nums.append(
-                    int(x)
-                )
-
-
-
-    return nums
+VALID_COUNT = 7
 
 
 
@@ -104,115 +45,95 @@ def extract_numbers(row):
 # =====================================================
 
 
-def check_numbers(row):
+def check_numbers(numbers):
 
 
-    nums=extract_numbers(
-        row
-    )
+    result = {
 
 
-    # 数量
-
-    if len(nums)<REQUIRED_COUNT:
-
-        return False
+        "valid":True,
 
 
+        "errors":[]
 
-    # 范围
-
-    for n in nums:
-
-
-        if n<MIN_NUMBER or n>MAX_NUMBER:
-
-            return False
-
-
-
-    return True
-
-
-
-
-
-# =====================================================
-# 期号获取
-# =====================================================
-
-
-def get_issue(row):
-
-
-    if not row:
-
-        return None
-
-
-
-    return (
-
-        row.get("issue")
-
-        or
-
-        row.get("expect")
-
-        or
-
-        row.get("period")
-
-    )
-
-
-
-
-
-# =====================================================
-# 单条质量检测
-# =====================================================
-
-
-def validate_row(row):
-
-
-    result={
-
-        "valid":
-
-        True,
-
-
-        "reason":
-
-        []
 
     }
 
 
 
-    if not check_numbers(row):
+    if not isinstance(numbers,list):
 
 
         result["valid"]=False
 
 
-        result["reason"].append(
-            "号码异常"
+        result["errors"].append(
+
+            "号码格式错误"
+
         )
 
 
+        return result
 
-    if not get_issue(row):
+
+
+
+
+    if len(numbers)!=VALID_COUNT:
 
 
         result["valid"]=False
 
 
-        result["reason"].append(
-            "缺少期号"
+        result["errors"].append(
+
+            f"号码数量错误:{len(numbers)}"
+
         )
+
+
+
+
+
+    for n in numbers:
+
+
+        try:
+
+
+            n=int(n)
+
+
+        except:
+
+
+            result["valid"]=False
+
+
+            result["errors"].append(
+
+                "存在非数字号码"
+
+            )
+
+            continue
+
+
+
+
+
+        if n<MIN_NUMBER or n>MAX_NUMBER:
+
+
+            result["valid"]=False
+
+
+            result["errors"].append(
+
+                f"号码越界:{n}"
+
+            )
 
 
 
@@ -223,139 +144,284 @@ def validate_row(row):
 
 
 # =====================================================
-# 去重
+# 重复号码检查
 # =====================================================
 
 
-def remove_duplicate(rows):
+def check_duplicate(numbers):
 
 
-    seen=set()
+    return len(numbers)==len(set(numbers))
+
+
+
+
+
+# =====================================================
+# 期号检查
+# =====================================================
+
+
+def check_issue(issue):
+
+
+    if issue is None:
+
+
+        return False
+
+
+
+    try:
+
+
+        int(issue)
+
+
+        return True
+
+
+    except:
+
+
+        return False
+
+
+
+
+
+# =====================================================
+# 时间检查
+# =====================================================
+
+
+def check_time(open_time):
+
+
+    if not open_time:
+
+
+        return False
+
+
+
+    try:
+
+
+        datetime.fromisoformat(
+
+            str(open_time)
+
+            .replace(
+
+                "Z",
+
+                ""
+
+            )
+
+        )
+
+
+        return True
+
+
+    except:
+
+
+        return False
+
+
+
+
+
+# =====================================================
+# 单条数据检测
+# =====================================================
+
+
+def validate_draw(draw):
+
+
+    errors=[]
+
+
+
+    numbers=draw.get(
+
+        "numbers",
+
+        []
+
+    )
+
+
+
+    # 号码
+
+    check=check_numbers(
+
+        numbers
+
+    )
+
+
+
+    if not check["valid"]:
+
+
+        errors.extend(
+
+            check["errors"]
+
+        )
+
+
+
+
+
+    # 重复
+
+
+    if not check_duplicate(numbers):
+
+
+        errors.append(
+
+            "号码重复"
+
+        )
+
+
+
+
+
+    # 期号
+
+
+    if not check_issue(
+
+        draw.get(
+
+            "issue"
+
+        )
+
+    ):
+
+
+        errors.append(
+
+            "期号错误"
+
+        )
+
+
+
+
+
+    return {
+
+
+        "valid":
+
+        len(errors)==0,
+
+
+        "errors":
+
+        errors
+
+    }
+
+
+
+
+
+# =====================================================
+# 批量检测
+# =====================================================
+
+
+def validate_history(rows):
 
 
     clean=[]
 
-
-
-    for row in rows:
-
-
-        issue=get_issue(
-            row
-        )
-
-
-        if issue in seen:
-
-            continue
-
-
-
-        if not validate_row(row)["valid"]:
-
-            continue
-
-
-
-        seen.add(issue)
-
-
-        clean.append(
-            row
-        )
-
-
-
-    return clean
-
-
-
-
-
-# =====================================================
-# 号码重复检测
-# =====================================================
-
-
-def remove_same_numbers(rows):
-
-
-    seen=set()
-
-
-    result=[]
+    bad=[]
 
 
 
     for row in rows:
 
 
-        nums=extract_numbers(
+        result=validate_draw(
+
             row
+
         )
 
 
-        key=tuple(
-            sorted(nums)
-        )
+        if result["valid"]:
+
+
+            clean.append(row)
+
+
+        else:
+
+
+            bad.append(
+
+                {
+
+                    "data":row,
+
+                    "errors":
+
+                    result["errors"]
+
+                }
+
+            )
 
 
 
-        if key in seen:
-
-            continue
+    return {
 
 
+        "total":
 
-        seen.add(
-            key
-        )
-
-
-        result.append(
-            row
-        )
+        len(rows),
 
 
+        "valid":
 
-    return result
+        len(clean),
+
+
+        "invalid":
+
+        len(bad),
+
+
+        "clean_data":
+
+        clean,
+
+
+        "bad_data":
+
+        bad
+
+    }
 
 
 
 
 
 # =====================================================
-# 综合清洗
-# =====================================================
-
-
-def clean_history(rows):
-
-
-    if not rows:
-
-        return []
-
-
-
-    rows=remove_duplicate(
-        rows
-    )
-
-
-    rows=remove_same_numbers(
-        rows
-    )
-
-
-    return rows
-
-
-
-
-
-# =====================================================
-# 数据质量评分
+# 数据评分
 # =====================================================
 
 
@@ -364,36 +430,37 @@ def quality_score(rows):
 
     if not rows:
 
+
         return 0
 
 
 
-    valid=0
+    result=validate_history(
 
+        rows
 
-
-    for row in rows:
-
-
-        if validate_row(row)["valid"]:
-
-            valid+=1
+    )
 
 
 
     score=(
 
-        valid /
+        result["valid"]
 
-        len(rows)
+        /
+
+        result["total"]
 
     )
 
 
 
     return round(
-        score,
-        4
+
+        score*100,
+
+        2
+
     )
 
 
@@ -408,36 +475,38 @@ def quality_score(rows):
 def quality_report(rows):
 
 
-    clean=clean_history(
+    result=validate_history(
+
         rows
+
     )
+
 
 
     return {
 
 
-        "original":
+        "数据总量":
 
-        len(rows),
-
-
-
-        "clean":
-
-        len(clean),
+        result["total"],
 
 
+        "有效":
 
-        "removed":
-
-        len(rows)-len(clean),
-
+        result["valid"],
 
 
-        "quality":
+        "异常":
+
+        result["invalid"],
+
+
+        "质量评分":
 
         quality_score(
-            clean
+
+            rows
+
         )
 
     }
@@ -459,40 +528,43 @@ if __name__=="__main__":
 
         {
 
-        "issue":"001",
+        "issue":
+
+        "2026090",
+
 
         "numbers":
-        "01,02,03,04,05,06,07"
 
-        },
+        [
 
+            39,
 
-        {
+            41,
 
-        "issue":"001",
+            8,
 
-        "numbers":
-        "01,02,03,04,05,06,07"
+            9,
 
-        },
+            7,
 
+            14,
 
-        {
+            49
 
-        "issue":"002",
-
-        "numbers":
-        "60,02,03"
+        ]
 
         }
-
 
     ]
 
 
 
     print(
+
         quality_report(
+
             data
+
         )
+
     )
