@@ -1,191 +1,120 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩AI智能预测系统 V5.1
+六合彩 AI 智能预测系统 V5.1 FINAL
 
-sqlite_manager.py
+core/sqlite_manager.py
 
-SQLite数据库管理模块
+SQLite统一管理
 
+接口:
 
-功能:
-
-1. 创建数据库
-2. 保存开奖
-3. 查询历史
-4. 自动去重
-
+init_database()
+load_history()
+get_connection()
 
 """
 
+from __future__ import annotations
 
 import sqlite3
-
-import os
-
 import json
-
-from datetime import datetime
-
-
-
+from pathlib import Path
+from typing import List, Dict, Any
 
 
 # =====================================================
-# 数据目录
+# 路径
 # =====================================================
 
-
-DATA_DIR="data"
-
-
-os.makedirs(
-
-    DATA_DIR,
-
-    exist_ok=True
-
-)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+DB_FILES = {
+
+    "hk":
+    BASE_DIR / "hk_macau.db",
 
 
-
-# =====================================================
-# 数据库映射
-# =====================================================
+    "newMacau":
+    BASE_DIR / "new_macau.db",
 
 
-DB_FILES={
-
-
-    "香港六合彩":
-
-    "hk_macau.db",
-
-
-
-    "老澳门彩":
-
-    "old_macau.db",
-
-
-
-    "新澳门彩":
-
-    "xin_macau.db"
+    "oldMacau":
+    BASE_DIR / "old_macau.db"
 
 }
 
 
 
-
-
 # =====================================================
-# 获取数据库
+# 连接
 # =====================================================
 
 
-def 获取数据库(
+def get_connection(key:str):
 
-        彩种
+    if key not in DB_FILES:
 
-):
-
-
-    filename=DB_FILES.get(
-
-        彩种
-
-    )
-
-
-
-    if not filename:
-
-
-        raise Exception(
-
-            "未知彩种:"+彩种
-
+        raise ValueError(
+            f"未知彩种:{key}"
         )
-
-
-
-    return os.path.join(
-
-        DATA_DIR,
-
-        filename
-
-    )
-
-
-
-
-
-# =====================================================
-# 初始化数据库
-# =====================================================
-
-
-def 初始化数据库(
-
-        彩种
-
-):
-
-
-    db=获取数据库(
-
-        彩种
-
-    )
-
 
 
     conn=sqlite3.connect(
-
-        db
-
+        str(DB_FILES[key])
     )
 
+    conn.row_factory=sqlite3.Row
 
-    cur=conn.cursor()
+    return conn
 
 
 
-    cur.execute(
 
-        """
 
-        CREATE TABLE IF NOT EXISTS history(
+# =====================================================
+# 初始化
+# =====================================================
+
+
+def init_database():
+
+    for key in DB_FILES:
+
+
+        conn=get_connection(key)
+
+
+        conn.execute("""
+
+        CREATE TABLE IF NOT EXISTS draws(
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            issue TEXT UNIQUE,
+            issue_no TEXT UNIQUE,
 
-            numbers TEXT,
+            draw_date TEXT,
 
-            open_time TEXT,
+            numbers_json TEXT,
 
-            update_time TEXT
+            special INTEGER,
+
+            source TEXT,
+
+            created_at TEXT
 
         )
 
-        """
-
-    )
+        """)
 
 
-    conn.commit()
+        conn.commit()
+
+        conn.close()
 
 
-    conn.close()
-
-
-
-    return db
+    return True
 
 
 
@@ -196,153 +125,59 @@ def 初始化数据库(
 # =====================================================
 
 
-def 保存开奖(
-
-        彩种,
-
-        数据
-
+def save_draw(
+    key:str,
+    issue_no:str,
+    date:str,
+    numbers:list,
+    special:int,
+    source="api"
 ):
 
 
-    db=初始化数据库(
+    conn=get_connection(key)
 
-        彩种
+
+    conn.execute(
+    """
+
+    INSERT OR REPLACE INTO draws
+
+    (
+    issue_no,
+    draw_date,
+    numbers_json,
+    special,
+    source,
+    created_at
+    )
+
+    VALUES(?,?,?,?,?,datetime('now'))
+
+    """,
+
+    (
+
+    str(issue_no),
+
+    date,
+
+    json.dumps(numbers),
+
+    int(special),
+
+    source
 
     )
 
 
-
-    conn=sqlite3.connect(
-
-        db
-
     )
-
-
-    cur=conn.cursor()
-
-
-
-    新增=0
-
-
-
-    for item in 数据:
-
-
-        issue=str(
-
-            item.get(
-
-                "期号",
-
-                ""
-
-            )
-
-        )
-
-
-
-        numbers=item.get(
-
-            "号码",
-
-            []
-
-        )
-
-
-
-        if not issue:
-
-
-            continue
-
-
-
-
-
-        try:
-
-
-            cur.execute(
-
-                """
-
-                INSERT INTO history
-
-                (
-
-                issue,
-
-                numbers,
-
-                open_time,
-
-                update_time
-
-                )
-
-                VALUES(?,?,?,?)
-
-                """,
-
-                (
-
-                    issue,
-
-                    json.dumps(
-
-                        numbers,
-
-                        ensure_ascii=False
-
-                    ),
-
-                    item.get(
-
-                        "开奖时间",
-
-                        ""
-
-                    ),
-
-                    str(
-
-                        datetime.now()
-
-                    )
-
-                )
-
-            )
-
-
-            新增+=1
-
-
-
-        except sqlite3.IntegrityError:
-
-
-            # 已存在
-
-            pass
-
-
-
 
 
     conn.commit()
 
-
     conn.close()
 
-
-
-    return 新增
 
 
 
@@ -353,70 +188,25 @@ def 保存开奖(
 # =====================================================
 
 
-def 读取历史(
-
-        彩种,
-
-        数量=None
-
-):
+def load_history(
+        key:str
+)->List[Dict[str,Any]]:
 
 
-    db=初始化数据库(
-
-        彩种
-
-    )
+    conn=get_connection(key)
 
 
-    conn=sqlite3.connect(
-
-        db
-
-    )
-
-
-    cur=conn.cursor()
-
-
-
-    sql="""
-
-    SELECT
-
-    issue,
-
-    numbers,
-
-    open_time
-
-    FROM history
-
-    ORDER BY id ASC
-
+    rows=conn.execute(
     """
 
+    SELECT *
 
+    FROM draws
 
-    if 数量:
+    ORDER BY id DESC
 
-
-        sql += f"""
-
-        LIMIT {数量}
-
-        """
-
-
-
-
-
-    rows=cur.execute(
-
-        sql
-
+    """
     ).fetchall()
-
 
 
     conn.close()
@@ -426,38 +216,46 @@ def 读取历史(
     result=[]
 
 
+    for r in rows:
 
-    for row in rows:
+
+        try:
 
 
-        result.append(
+            numbers=json.loads(
+                r["numbers_json"]
+            )
+
+
+            result.append(
 
             {
 
-
-                "期号":
-
-                row[0],
+            "issue":
+            r["issue_no"],
 
 
-
-                "号码":
-
-                json.loads(
-
-                    row[1]
-
-                ),
+            "date":
+            r["draw_date"],
 
 
+            "numbers":
+            numbers,
 
-                "开奖时间":
 
-                row[2]
+            "special":
+            int(r["special"])
+
 
             }
 
-        )
+            )
+
+
+        except Exception:
+
+
+            continue
 
 
 
@@ -468,122 +266,22 @@ def 读取历史(
 
 
 # =====================================================
-# 获取最新一期
+# 兼容旧名称
 # =====================================================
 
 
-def 最新一期(
+load_data=load_history
 
-        彩种
 
-):
 
+__all__=[
 
-    data=读取历史(
+"init_database",
 
-        彩种,
+"load_history",
 
-        1
+"save_draw",
 
-    )
+"get_connection"
 
-
-    if data:
-
-
-        return data[-1]
-
-
-
-    return None
-
-
-
-
-
-# =====================================================
-# 数据统计
-# =====================================================
-
-
-def 数据统计(
-
-        彩种
-
-):
-
-
-    db=初始化数据库(
-
-        彩种
-
-    )
-
-
-    conn=sqlite3.connect(
-
-        db
-
-    )
-
-
-    cur=conn.cursor()
-
-
-
-    count=cur.execute(
-
-        """
-
-        SELECT COUNT(*)
-
-        FROM history
-
-        """
-
-    ).fetchone()[0]
-
-
-
-    conn.close()
-
-
-
-    return {
-
-
-        "彩种":
-
-        彩种,
-
-
-        "总期数":
-
-        count,
-
-
-        "数据库":
-
-        db
-
-    }
-
-
-
-
-
-if __name__=="__main__":
-
-
-    for name in DB_FILES:
-
-
-        print(
-
-            数据统计(
-
-                name
-
-            )
-
-        )
+]
