@@ -5,62 +5,74 @@
 
 真实数据
 SQLite
-历史数据
-Walk-Forward
 特别号码预测
-生肖5推
+生肖 TOP5
 单双单推
 大小单推
-波色主推/次推/双色
-命中率
+波色主推 / 次推 / 双色
+Walk-Forward 历史命中率
 
 重要规则：
 
-号码：
-    只针对第7个特别号码
-
-生肖：
-    只针对第7个特别号码
-    推荐5个生肖
-
-单双：
-    只推荐1个
-
-大小：
-    只推荐1个
-
-波色：
-    主推1个
-    次推1个
-    双色2个
+1. 号码预测只针对第7个号码（特别号码）
+2. 每期实际特别号码只有1个，因此号码最多只能命中1个
+3. 生肖针对特别号码推荐5个生肖
+4. 单双只推荐1个
+5. 大小只推荐1个
+6. 波色：
+   - 主推1个
+   - 次推1个
+   - 双色2个
+7. Walk-Forward 完全按照上述规则计算
 """
 
 from __future__ import annotations
 
 import json
 import os
-
+from collections import Counter
 from datetime import datetime
 from typing import Any
 
-from .api_sync import fetch_lottery
 
-from .database import (
-    init_db,
-    save_records,
-    load_records,
-)
+# ============================================================
+# 兼容两种启动方式
+#
+# 1. python main.py
+# 2. python -m package.main
+# ============================================================
 
-from .metrics import (
-    get_special_number,
-    predict_attributes,
-    calculate_performance,
-    evaluate_prediction,
-)
+try:
+
+    from .api_sync import fetch_lottery
+    from .database import (
+        save_records,
+        load_records,
+    )
+    from .metrics import (
+        get_wave,
+        get_size,
+        get_odd_even,
+        get_zodiac,
+    )
+
+except ImportError:
+
+    from api_sync import fetch_lottery
+    from database import (
+        save_records,
+        load_records,
+    )
+    from metrics import (
+        get_wave,
+        get_size,
+        get_odd_even,
+        get_zodiac,
+    )
 
 
 # ============================================================
-# 彩种
+# 三彩种
 # ============================================================
 
 LOTTERIES = [
@@ -71,14 +83,24 @@ LOTTERIES = [
 
 
 # ============================================================
-# 数据库
-#
-# 注意：
-# 这里必须使用你现在 database.py 的 lottery_name 接口。
-# 不再把数据库路径传给 save_records/load_records。
+# 输出目录
 # ============================================================
 
 OUTPUT_DIR = "output"
+
+
+# ============================================================
+# 配置
+# ============================================================
+
+# 号码特别号预测数量
+SPECIAL_NUMBER_TOP_N = 10
+
+# 生肖推荐数量
+ZODIAC_TOP_N = 5
+
+# Walk-Forward 最少训练期数
+MINIMUM_TRAIN = 30
 
 
 # ============================================================
@@ -99,12 +121,10 @@ def ensure_dirs() -> None:
 
 
 # ============================================================
-# 下一期
+# 下一期期号
 # ============================================================
 
-def next_issue(
-    issue: str,
-) -> str:
+def next_issue(issue: str) -> str:
 
     try:
 
@@ -118,34 +138,137 @@ def next_issue(
 
 
 # ============================================================
-# 特别号码频率
-#
-# 只统计第7个号码
+# 安全排序
 # ============================================================
 
-def count_special_numbers(
+def sort_history(
     history: list[dict[str, Any]],
-    window: int = 100,
-) -> dict[int, int]:
+) -> list[dict[str, Any]]:
 
-    counter: dict[int, int] = {}
+    def sort_key(row):
 
-    for row in history[-window:]:
+        try:
 
-        special = get_special_number(
+            return int(
+                str(
+                    row.get(
+                        "issue",
+                        "0",
+                    )
+                )
+            )
+
+        except Exception:
+
+            return 0
+
+    return sorted(
+        history,
+        key=sort_key,
+    )
+
+
+# ============================================================
+# 获取特别号码
+#
+# 第7个号码 = 特别号码
+# ============================================================
+
+def get_special_number(
+    record: dict[str, Any],
+) -> int | None:
+
+    numbers = record.get(
+        "numbers",
+        [],
+    )
+
+    if not isinstance(
+        numbers,
+        (list, tuple),
+    ):
+
+        return None
+
+    if len(numbers) < 7:
+
+        return None
+
+    try:
+
+        number = int(
+            numbers[6]
+        )
+
+    except Exception:
+
+        return None
+
+    if not 1 <= number <= 49:
+
+        return None
+
+    return number
+
+
+# ============================================================
+# 特别号码历史
+# ============================================================
+
+def special_history(
+    history: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+
+    result = []
+
+    for row in history:
+
+        number = get_special_number(
             row
         )
 
-        if special is None:
+        if number is None:
+
             continue
 
-        counter[special] = (
-            counter.get(
-                special,
-                0,
-            )
-            + 1
+        result.append(
+            {
+                "issue":
+                    str(
+                        row.get(
+                            "issue",
+                            "",
+                        )
+                    ),
+
+                "number":
+                    number,
+            }
         )
+
+    return result
+
+
+# ============================================================
+# 特别号码频率
+# ============================================================
+
+def special_number_counter(
+    history: list[dict[str, Any]],
+    window: int = 100,
+) -> Counter:
+
+    counter = Counter()
+
+    rows = special_history(
+        history
+    )
+
+    for row in rows[-window:]:
+
+        counter[
+            row["number"]
+        ] += 1
 
     return counter
 
@@ -153,14 +276,19 @@ def count_special_numbers(
 # ============================================================
 # 特别号码预测
 #
-# 只针对第7个特别号码
+# 只针对第7个号码
+#
+# 注意：
+# 这里虽然推荐多个号码，
+# 但每期开奖只有一个特别号码，
+# 因此一期开奖结果最多命中1个。
 # ============================================================
 
-def predict_numbers(
+def predict_special_numbers(
     history: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
-    counter = count_special_numbers(
+    counter = special_number_counter(
         history,
         100,
     )
@@ -172,20 +300,19 @@ def predict_numbers(
         50,
     ):
 
-        scores[number] = counter.get(
-            number,
-            0,
+        scores[number] = (
+            counter.get(
+                number,
+                0,
+            )
         )
 
     ranking = sorted(
-
         range(1, 50),
-
-        key=lambda number: (
-            -scores[number],
-            number,
+        key=lambda x: (
+            -scores[x],
+            x,
         ),
-
     )
 
     return {
@@ -199,9 +326,6 @@ def predict_numbers(
         "top12":
             ranking[:12],
 
-        "candidates":
-            ranking[:12],
-
         "scores":
             scores,
 
@@ -209,38 +333,377 @@ def predict_numbers(
 
 
 # ============================================================
-# 单期预测
+# 生肖特别号统计
 # ============================================================
 
-def build_prediction(
+def special_zodiac_counter(
+    history: list[dict[str, Any]],
+    window: int = 100,
+) -> Counter:
+
+    counter = Counter()
+
+    rows = special_history(
+        history
+    )
+
+    for row in rows[-window:]:
+
+        zodiac = get_zodiac(
+            row["number"],
+            row["issue"],
+        )
+
+        if zodiac:
+
+            counter[zodiac] += 1
+
+    return counter
+
+
+# ============================================================
+# 生肖预测 TOP5
+# ============================================================
+
+def predict_zodiac(
     history: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
-    number_prediction = (
-        predict_numbers(
-            history
-        )
+    counter = special_zodiac_counter(
+        history,
+        100,
     )
 
-    attributes = (
-        predict_attributes(
-            history
+    all_zodiacs = [
+        "鼠",
+        "牛",
+        "虎",
+        "兔",
+        "龙",
+        "蛇",
+        "马",
+        "羊",
+        "猴",
+        "鸡",
+        "狗",
+        "猪",
+    ]
+
+    ranking = sorted(
+        all_zodiacs,
+        key=lambda x: (
+            -counter.get(
+                x,
+                0,
+            ),
+            x,
+        ),
+    )
+
+    top5 = ranking[:ZODIAC_TOP_N]
+
+    return {
+
+        "top5":
+            top5,
+
+        "main":
+            top5[0]
+            if top5
+            else "",
+
+        "secondary":
+            top5[1]
+            if len(top5) > 1
+            else "",
+
+        "double":
+            top5[:2],
+
+        "counts":
+            {
+                x:
+                    counter.get(
+                        x,
+                        0,
+                    )
+                for x in all_zodiacs
+            },
+
+    }
+
+
+# ============================================================
+# 特别号属性统计
+# ============================================================
+
+def special_attribute_counter(
+    history: list[dict[str, Any]],
+    field: str,
+    window: int = 100,
+) -> Counter:
+
+    counter = Counter()
+
+    rows = special_history(
+        history
+    )
+
+    for row in rows[-window:]:
+
+        number = row[
+            "number"
+        ]
+
+        issue = row[
+            "issue"
+        ]
+
+        if field == "wave":
+
+            value = get_wave(
+                number
+            )
+
+        elif field == "size":
+
+            value = get_size(
+                number
+            )
+
+        elif field == "odd_even":
+
+            value = get_odd_even(
+                number
+            )
+
+        elif field == "zodiac":
+
+            value = get_zodiac(
+                number,
+                issue,
+            )
+
+        else:
+
+            continue
+
+        if value:
+
+            counter[value] += 1
+
+    return counter
+
+
+# ============================================================
+# 单属性单推
+#
+# 单双、大小：
+# 只推荐一个
+# ============================================================
+
+def predict_single_attribute(
+    history: list[dict[str, Any]],
+    field: str,
+) -> dict[str, Any]:
+
+    counter = special_attribute_counter(
+        history,
+        field,
+        100,
+    )
+
+    if not counter:
+
+        return {
+
+            "main":
+                "",
+
+            "secondary":
+                "",
+
+            "double":
+                [],
+
+            "counts":
+                {},
+
+        }
+
+    ranking = [
+        item[0]
+        for item in counter.most_common()
+    ]
+
+    main = ranking[0]
+
+    return {
+
+        "main":
+            main,
+
+        "secondary":
+            ranking[1]
+            if len(ranking) > 1
+            else "",
+
+        # 这里单双/大小不再作为双推输出
+        "double":
+            [main],
+
+        "counts":
+            dict(counter),
+
+    }
+
+
+# ============================================================
+# 波色预测
+#
+# 主推1
+# 次推1
+# 双色2
+# ============================================================
+
+def predict_wave(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = special_attribute_counter(
+        history,
+        "wave",
+        100,
+    )
+
+    all_waves = [
+        "红",
+        "蓝",
+        "绿",
+    ]
+
+    ranking = sorted(
+        all_waves,
+        key=lambda x: (
+            -counter.get(
+                x,
+                0,
+            ),
+            x,
+        ),
+    )
+
+    main = (
+        ranking[0]
+        if ranking
+        else ""
+    )
+
+    secondary = (
+        ranking[1]
+        if len(ranking) > 1
+        else ""
+    )
+
+    double = [
+        x
+        for x in (
+            main,
+            secondary,
         )
+        if x
+    ]
+
+    return {
+
+        "main":
+            main,
+
+        "secondary":
+            secondary,
+
+        "double":
+            double,
+
+        "counts":
+            {
+                x:
+                    counter.get(
+                        x,
+                        0,
+                    )
+                for x in all_waves
+            },
+
+    }
+
+
+# ============================================================
+# 预测全部属性
+# ============================================================
+
+def predict_attributes(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    return {
+
+        "zodiac":
+            predict_zodiac(
+                history
+            ),
+
+        "odd_even":
+            predict_single_attribute(
+                history,
+                "odd_even",
+            ),
+
+        "size":
+            predict_single_attribute(
+                history,
+                "size",
+            ),
+
+        "wave":
+            predict_wave(
+                history
+            ),
+
+    }
+
+
+# ============================================================
+# 单次预测
+# ============================================================
+
+def make_prediction(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    numbers = predict_special_numbers(
+        history
+    )
+
+    attributes = predict_attributes(
+        history
     )
 
     return {
 
         "top5":
-            number_prediction["top5"],
+            numbers["top5"],
 
         "top10":
-            number_prediction["top10"],
+            numbers["top10"],
 
         "top12":
-            number_prediction["top12"],
+            numbers["top12"],
 
-        "candidates":
-            number_prediction["candidates"],
+        "zodiac_top5":
+            attributes[
+                "zodiac"
+            ]["top5"],
 
         "attributes":
             attributes,
@@ -249,22 +712,333 @@ def build_prediction(
 
 
 # ============================================================
+# 评估单期预测
+#
+# 注意：
+# actual 只取第7个特别号码。
+# ============================================================
+
+def evaluate_prediction(
+    prediction: dict[str, Any],
+    actual: dict[str, Any],
+) -> dict[str, Any]:
+
+    actual_special = get_special_number(
+        actual
+    )
+
+    if actual_special is None:
+
+        return {}
+
+    issue = str(
+        actual.get(
+            "issue",
+            "",
+        )
+    )
+
+    result = {}
+
+    # ========================================================
+    # 特别号码命中
+    # 每期开奖最多命中1个
+    # ========================================================
+
+    result[
+        "number_top5"
+    ] = (
+        actual_special
+        in prediction.get(
+            "top5",
+            [],
+        )
+    )
+
+    result[
+        "number_top10"
+    ] = (
+        actual_special
+        in prediction.get(
+            "top10",
+            [],
+        )
+    )
+
+    result[
+        "number_top12"
+    ] = (
+        actual_special
+        in prediction.get(
+            "top12",
+            [],
+        )
+    )
+
+    # ========================================================
+    # 实际生肖
+    # ========================================================
+
+    actual_zodiac = get_zodiac(
+        actual_special,
+        issue,
+    )
+
+    zodiac_prediction = (
+        prediction[
+            "attributes"
+        ][
+            "zodiac"
+        ]
+    )
+
+    zodiac_top5 = (
+        zodiac_prediction.get(
+            "top5",
+            [],
+        )
+    )
+
+    result[
+        "zodiac_main"
+    ] = (
+        actual_zodiac
+        == zodiac_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    result[
+        "zodiac_top5"
+    ] = (
+        actual_zodiac
+        in zodiac_top5
+    )
+
+    # ========================================================
+    # 实际单双
+    # ========================================================
+
+    actual_odd_even = get_odd_even(
+        actual_special
+    )
+
+    odd_even_prediction = (
+        prediction[
+            "attributes"
+        ][
+            "odd_even"
+        ]
+    )
+
+    result[
+        "odd_even_main"
+    ] = (
+        actual_odd_even
+        == odd_even_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    # ========================================================
+    # 实际大小
+    # ========================================================
+
+    actual_size = get_size(
+        actual_special
+    )
+
+    size_prediction = (
+        prediction[
+            "attributes"
+        ][
+            "size"
+        ]
+    )
+
+    result[
+        "size_main"
+    ] = (
+        actual_size
+        == size_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    # ========================================================
+    # 实际波色
+    # ========================================================
+
+    actual_wave = get_wave(
+        actual_special
+    )
+
+    wave_prediction = (
+        prediction[
+            "attributes"
+        ][
+            "wave"
+        ]
+    )
+
+    result[
+        "wave_main"
+    ] = (
+        actual_wave
+        == wave_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    result[
+        "wave_secondary"
+    ] = (
+        actual_wave
+        == wave_prediction.get(
+            "secondary",
+            "",
+        )
+    )
+
+    result[
+        "wave_double"
+    ] = (
+        actual_wave
+        in wave_prediction.get(
+            "double",
+            [],
+        )
+    )
+
+    return result
+
+
+# ============================================================
+# 命中数量统计
+# ============================================================
+
+def calculate_average_hits(
+    history: list[dict[str, Any]],
+    predictions: list[dict[str, Any]],
+) -> dict[str, float]:
+
+    if not predictions:
+
+        return {
+            "top5": 0.0,
+            "top10": 0.0,
+            "top12": 0.0,
+        }
+
+    total_top5 = 0
+    total_top10 = 0
+    total_top12 = 0
+
+    total = 0
+
+    for prediction, actual in predictions:
+
+        special = get_special_number(
+            actual
+        )
+
+        if special is None:
+            continue
+
+        total += 1
+
+        if special in prediction.get(
+            "top5",
+            [],
+        ):
+            total_top5 += 1
+
+        if special in prediction.get(
+            "top10",
+            [],
+        ):
+            total_top10 += 1
+
+        if special in prediction.get(
+            "top12",
+            [],
+        ):
+            total_top12 += 1
+
+    if total == 0:
+
+        return {
+            "top5": 0.0,
+            "top10": 0.0,
+            "top12": 0.0,
+        }
+
+    return {
+
+        "top5":
+            round(
+                total_top5 / total,
+                4,
+            ),
+
+        "top10":
+            round(
+                total_top10 / total,
+                4,
+            ),
+
+        "top12":
+            round(
+                total_top12 / total,
+                4,
+            ),
+
+    }
+
+
+# ============================================================
+# 百分比
+# ============================================================
+
+def percentage(
+    hits: int,
+    total: int,
+) -> float:
+
+    if total <= 0:
+
+        return 0.0
+
+    return round(
+        hits / total * 100,
+        2,
+    )
+
+
+# ============================================================
 # Walk-Forward
 #
-# 核心：
+# 每一次：
 #
-# index之前 = 训练数据
-# index      = 真实开奖
+# train = 之前所有历史
+# actual = 当前一期
+# prediction = train 预测
 #
 # 绝不使用未来数据
 # ============================================================
 
 def walk_forward(
     history: list[dict[str, Any]],
-    minimum_train: int = 30,
+    minimum_train: int = MINIMUM_TRAIN,
 ) -> dict[str, Any]:
 
-    evaluations = []
+    history = sort_history(
+        history
+    )
 
     if len(history) <= minimum_train:
 
@@ -284,6 +1058,10 @@ def walk_forward(
 
         }
 
+    evaluations = []
+
+    prediction_actual_pairs = []
+
     for index in range(
         minimum_train,
         len(history),
@@ -297,15 +1075,13 @@ def walk_forward(
             index
         ]
 
-        prediction = build_prediction(
+        prediction = make_prediction(
             train
         )
 
-        evaluation = (
-            evaluate_prediction(
-                prediction,
-                actual,
-            )
+        evaluation = evaluate_prediction(
+            prediction,
+            actual,
         )
 
         if evaluation:
@@ -314,11 +1090,185 @@ def walk_forward(
                 evaluation
             )
 
-    performance = (
-        calculate_performance(
-            evaluations
+            prediction_actual_pairs.append(
+                (
+                    prediction,
+                    actual,
+                )
+            )
+
+    total = len(
+        evaluations
+    )
+
+    if total == 0:
+
+        return {
+
+            "method":
+                "Walk-Forward",
+
+            "samples":
+                0,
+
+            "status":
+                "没有有效验证数据",
+
+            "performance":
+                {},
+
+        }
+
+    def count(key: str) -> int:
+
+        return sum(
+            1
+            for item in evaluations
+            if item.get(key)
+        )
+
+    # ========================================================
+    # 号码平均命中
+    #
+    # 因为特别号码只有1个，
+    # 所以平均命中数 = 命中率
+    # ========================================================
+
+    number_avg = (
+        calculate_average_hits(
+            history,
+            prediction_actual_pairs,
         )
     )
+
+    performance = {
+
+        "samples":
+            total,
+
+        "numbers": {
+
+            "top5":
+                percentage(
+                    count(
+                        "number_top5"
+                    ),
+                    total,
+                ),
+
+            "top10":
+                percentage(
+                    count(
+                        "number_top10"
+                    ),
+                    total,
+                ),
+
+            "top12":
+                percentage(
+                    count(
+                        "number_top12"
+                    ),
+                    total,
+                ),
+
+            "average_hit": {
+
+                "top5":
+                    number_avg[
+                        "top5"
+                    ],
+
+                "top10":
+                    number_avg[
+                        "top10"
+                    ],
+
+                "top12":
+                    number_avg[
+                        "top12"
+                    ],
+
+            },
+
+        },
+
+        "zodiac": {
+
+            "main":
+                percentage(
+                    count(
+                        "zodiac_main"
+                    ),
+                    total,
+                ),
+
+            "top5":
+                percentage(
+                    count(
+                        "zodiac_top5"
+                    ),
+                    total,
+                ),
+
+        },
+
+        "odd_even": {
+
+            "main":
+                percentage(
+                    count(
+                        "odd_even_main"
+                    ),
+                    total,
+                ),
+
+        },
+
+        "size": {
+
+            "main":
+                percentage(
+                    count(
+                        "size_main"
+                    ),
+                    total,
+                ),
+
+        },
+
+        "wave": {
+
+            "main":
+                percentage(
+                    count(
+                        "wave_main"
+                    ),
+                    total,
+                ),
+
+            "secondary":
+                percentage(
+                    count(
+                        "wave_secondary"
+                    ),
+                    total,
+                ),
+
+            "double":
+                percentage(
+                    count(
+                        "wave_double"
+                    ),
+                    total,
+                ),
+
+        },
+
+        "status":
+            "正常",
+
+    }
 
     return {
 
@@ -326,19 +1276,19 @@ def walk_forward(
             "Walk-Forward",
 
         "samples":
-            len(evaluations),
-
-        "performance":
-            performance,
+            total,
 
         "status":
             "正常",
+
+        "performance":
+            performance,
 
     }
 
 
 # ============================================================
-# 分析一个彩种
+# 分析单个彩种
 # ============================================================
 
 def analyze(
@@ -346,24 +1296,29 @@ def analyze(
     history: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
-    history = sorted(
-
-        history,
-
-        key=lambda row: int(
-            row.get(
-                "issue",
-                0,
-            )
-        ),
-
+    history = sort_history(
+        history
     )
 
-    latest = (
-        history[-1]
-        if history
-        else {}
-    )
+    if not history:
+
+        return {
+
+            "lottery":
+                lottery_name,
+
+            "success":
+                False,
+
+            "error":
+                "没有历史数据",
+
+            "candidates":
+                [],
+
+        }
+
+    latest = history[-1]
 
     latest_issue = str(
         latest.get(
@@ -372,38 +1327,25 @@ def analyze(
         )
     )
 
-    prediction_issue = (
-        next_issue(
-            latest_issue
-        )
-        if latest_issue
-        else ""
+    prediction_issue = next_issue(
+        latest_issue
     )
 
-    # ========================================================
-    # 下一期预测
-    # ========================================================
-
-    prediction = build_prediction(
+    prediction = make_prediction(
         history
     )
 
-    # ========================================================
-    # Walk-Forward
-    # ========================================================
+    attributes = prediction[
+        "attributes"
+    ]
 
     walk = walk_forward(
         history
     )
 
-    # ========================================================
-    # 特别号码历史命中说明
-    # ========================================================
-
-    latest_special = (
-        get_special_number(
-            latest
-        )
+    performance = walk.get(
+        "performance",
+        {},
     )
 
     return {
@@ -412,7 +1354,7 @@ def analyze(
             lottery_name,
 
         "success":
-            bool(history),
+            True,
 
         "latest_issue":
             latest_issue,
@@ -427,7 +1369,9 @@ def analyze(
             ),
 
         "latest_special":
-            latest_special,
+            get_special_number(
+                latest
+            ),
 
         "prediction_issue":
             prediction_issue,
@@ -439,30 +1383,53 @@ def analyze(
             len(history),
 
         # ====================================================
-        # 非常重要：
-        # candidates 必须存在
+        # 保留 CI 检查需要的 candidates
         # ====================================================
 
         "candidates":
-            prediction["candidates"],
+            prediction[
+                "top12"
+            ],
 
         "top5":
-            prediction["top5"],
+            prediction[
+                "top5"
+            ],
 
         "top10":
-            prediction["top10"],
+            prediction[
+                "top10"
+            ],
 
         "top12":
-            prediction["top12"],
+            prediction[
+                "top12"
+            ],
+
+        # ====================================================
+        # 生肖
+        # ====================================================
+
+        "zodiac_top5":
+            attributes[
+                "zodiac"
+            ][
+                "top5"
+            ],
+
+        # ====================================================
+        # 属性
+        # ====================================================
 
         "attributes":
-            prediction["attributes"],
+            attributes,
+
+        # ====================================================
+        # 回测
+        # ====================================================
 
         "performance":
-            walk.get(
-                "performance",
-                {},
-            ),
+            performance,
 
         "backtest":
             walk,
@@ -518,21 +1485,19 @@ def print_result(
         )
     )
 
-    latest_special = result.get(
-        "latest_special"
+    print(
+        f"特别号码："
+        f"{result.get('latest_special', ''):02d}"
+        if result.get(
+            "latest_special"
+        ) is not None
+        else "特别号码："
     )
-
-    if latest_special is not None:
-
-        print(
-            f"特别号码："
-            f"{latest_special:02d}"
-        )
 
     print()
 
     # ========================================================
-    # 特别号码
+    # 特别号码预测
     # ========================================================
 
     print(
@@ -543,7 +1508,9 @@ def print_result(
         "Top5："
         + " ".join(
             f"{x:02d}"
-            for x in result["top5"]
+            for x in result[
+                "top5"
+            ]
         )
     )
 
@@ -551,7 +1518,9 @@ def print_result(
         "Top10："
         + " ".join(
             f"{x:02d}"
-            for x in result["top10"]
+            for x in result[
+                "top10"
+            ]
         )
     )
 
@@ -559,8 +1528,15 @@ def print_result(
         "Top12："
         + " ".join(
             f"{x:02d}"
-            for x in result["top12"]
+            for x in result[
+                "top12"
+            ]
         )
+    )
+
+    print(
+        "说明：以上号码只针对第7个特别号码，"
+        "每期开奖最多命中1个。"
     )
 
     print()
@@ -573,82 +1549,74 @@ def print_result(
         "attributes"
     ]
 
-    print(
-        "【下一期特别号属性预测】"
-    )
-
-    # 生肖
     zodiac = attrs[
         "zodiac"
     ]
 
     print(
-        "生肖5推："
+        "【下一期特别生肖预测】"
+    )
+
+    print(
+        "推荐5个："
         + " ".join(
-            zodiac.get(
-                "top5",
-                [],
-            )
+            zodiac[
+                "top5"
+            ]
         )
     )
 
     print(
-        "生肖主推："
-        + zodiac.get(
-            "main",
-            "",
-        )
+        f"主推："
+        f"{zodiac.get('main', '')}"
     )
 
-    # 单双
     odd_even = attrs[
         "odd_even"
     ]
 
     print(
-        "单双："
-        + odd_even.get(
-            "main",
-            "",
-        )
+        "【下一期单双】"
     )
 
-    # 大小
+    print(
+        f"单推："
+        f"{odd_even.get('main', '')}"
+    )
+
     size = attrs[
         "size"
     ]
 
     print(
-        "大小："
-        + size.get(
-            "main",
-            "",
-        )
+        "【下一期大小】"
     )
 
-    # 波色
+    print(
+        f"单推："
+        f"{size.get('main', '')}"
+    )
+
     wave = attrs[
         "wave"
     ]
 
     print(
-        "波色主推："
-        + wave.get(
-            "main",
-            "",
-        )
+        "【下一期波色】"
     )
 
     print(
-        "波色次推："
-        + wave.get(
-            "secondary",
-            "",
-        )
+        f"主推："
+        f"{wave.get('main', '')}"
     )
 
     print(
-        "波色双色："
+        f"次推："
+        f"{wave.get('secondary', '')}"
+    )
+
+    print(
+        "双色："
         + " + ".join(
             wave.get(
                 "double",
@@ -660,7 +1628,7 @@ def print_result(
     print()
 
     # ========================================================
-    # Walk-Forward
+    # Walk Forward
     # ========================================================
 
     performance = result.get(
@@ -678,10 +1646,6 @@ def print_result(
             f"验证期数："
             f"{performance.get('samples', 0)}"
         )
-
-        # ----------------------------------------------------
-        # 号码
-        # ----------------------------------------------------
 
         numbers = performance.get(
             "numbers",
@@ -707,9 +1671,25 @@ def print_result(
             f"{numbers.get('top12', 0)}%"
         )
 
-        # ----------------------------------------------------
-        # 生肖
-        # ----------------------------------------------------
+        average_hit = numbers.get(
+            "average_hit",
+            {},
+        )
+
+        print(
+            f"Top5平均命中数："
+            f"{average_hit.get('top5', 0):.2f}"
+        )
+
+        print(
+            f"Top10平均命中数："
+            f"{average_hit.get('top10', 0):.2f}"
+        )
+
+        print(
+            f"Top12平均命中数："
+            f"{average_hit.get('top12', 0):.2f}"
+        )
 
         zodiac_perf = performance.get(
             "zodiac",
@@ -726,13 +1706,9 @@ def print_result(
         )
 
         print(
-            f"5推："
+            f"5生肖："
             f"{zodiac_perf.get('top5', 0)}%"
         )
-
-        # ----------------------------------------------------
-        # 单双
-        # ----------------------------------------------------
 
         odd_perf = performance.get(
             "odd_even",
@@ -748,10 +1724,6 @@ def print_result(
             f"{odd_perf.get('main', 0)}%"
         )
 
-        # ----------------------------------------------------
-        # 大小
-        # ----------------------------------------------------
-
         size_perf = performance.get(
             "size",
             {},
@@ -765,10 +1737,6 @@ def print_result(
             f"单推："
             f"{size_perf.get('main', 0)}%"
         )
-
-        # ----------------------------------------------------
-        # 波色
-        # ----------------------------------------------------
 
         wave_perf = performance.get(
             "wave",
@@ -821,58 +1789,49 @@ def save_json(
 
 
 # ============================================================
-# 生成 backtest
+# 生成 backtest.json
 # ============================================================
 
 def build_backtest(
-    results: dict[str, Any],
+    all_results: dict[str, Any],
 ) -> dict[str, Any]:
 
-    output = {}
-
-    for lottery, result in results.items():
-
-        output[lottery] = (
-            result.get(
-                "backtest",
-                {},
-            )
-        )
-
-    return {
+    result = {
 
         "version":
-            "V7.2",
+            "V7.2 SPECIAL NUMBER WALK-FORWARD",
 
         "generated_at":
             datetime.now().isoformat(),
 
         "lotteries":
-            output,
+            {},
 
     }
 
+    for lottery, item in (
+        all_results.items()
+    ):
+
+        result[
+            "lotteries"
+        ][lottery] = item.get(
+            "backtest",
+            {},
+        )
+
+    return result
+
 
 # ============================================================
-# 模块表现
+# 生成 module_performance.json
 # ============================================================
 
 def build_module_performance(
-    results: dict[str, Any],
+    all_results: dict[str, Any],
 ) -> dict[str, Any]:
 
-    output = {}
-
-    for lottery, result in results.items():
-
-        output[lottery] = (
-            result.get(
-                "performance",
-                {},
-            )
-        )
-
-    return {
+    result = {
 
         "version":
             "V7.2",
@@ -881,24 +1840,57 @@ def build_module_performance(
             datetime.now().isoformat(),
 
         "lotteries":
-            output,
+            {},
 
     }
 
+    for lottery, item in (
+        all_results.items()
+    ):
+
+        result[
+            "lotteries"
+        ][lottery] = item.get(
+            "performance",
+            {},
+        )
+
+    return result
+
 
 # ============================================================
-# 主程序
+# 主系统
 # ============================================================
 
 def run_system() -> None:
 
     ensure_dirs()
 
-    # --------------------------------------------------------
-    # 初始化数据库
-    # --------------------------------------------------------
+    print(
+        "=" * 70
+    )
 
-    init_db()
+    print(
+        "六合彩综合预测系统"
+    )
+
+    print(
+        "真实数据 + SQLite + "
+        "Walk-Forward + 命中率"
+    )
+
+    print(
+        "版本：V7.2 SPECIAL NUMBER FINAL"
+    )
+
+    print(
+        f"启动时间："
+        f"{datetime.now().isoformat()}"
+    )
+
+    print(
+        "=" * 70
+    )
 
     all_results = {}
 
@@ -922,28 +1914,42 @@ def run_system() -> None:
 
         try:
 
-            # ------------------------------------------------
-            # 获取历史
-            # ------------------------------------------------
+            # =================================================
+            # API 获取
+            # =================================================
 
             records = fetch_lottery(
                 lottery
             )
 
-            # ------------------------------------------------
-            # 保存数据库
-            # ------------------------------------------------
+            print(
+                f"[{lottery}] API获取："
+                f"{len(records)} 期"
+            )
+
+            # =================================================
+            # SQLite 保存
+            #
+            # 注意：
+            # database.py 接收的是彩种名称，
+            # 不是 db 文件路径。
+            # =================================================
 
             if records:
 
-                save_records(
+                added = save_records(
                     lottery,
                     records,
                 )
 
-            # ------------------------------------------------
-            # 读取数据库
-            # ------------------------------------------------
+                print(
+                    f"[{lottery}] "
+                    f"本次新增：{added} 期"
+                )
+
+            # =================================================
+            # 从数据库重新加载
+            # =================================================
 
             history = load_records(
                 lottery
@@ -951,13 +1957,13 @@ def run_system() -> None:
 
             print(
                 f"[{lottery}] "
-                f"当前数据库历史："
+                f"当前数据库："
                 f"{len(history)} 期"
             )
 
-            # ------------------------------------------------
+            # =================================================
             # 分析
-            # ------------------------------------------------
+            # =================================================
 
             result = analyze(
                 lottery,
@@ -1019,22 +2025,19 @@ def run_system() -> None:
         "rules": {
 
             "number":
-                "只针对第7个特别号码",
-
-            "number_hit":
-                "每期最多命中1个",
+                "只预测第7个特别号码，每期开奖最多命中1个",
 
             "zodiac":
-                "特别号码生肖推荐5个",
+                "特别生肖推荐5个",
 
             "odd_even":
-                "特别号码单双只推荐1个",
+                "特别号码单双只推1个",
 
             "size":
-                "特别号码大小只推荐1个",
+                "特别号码大小只推1个",
 
             "wave":
-                "特别号码波色主推/次推/双色",
+                "特别号码波色主推1个、次推1个、双色2个",
 
         },
 
@@ -1061,8 +2064,12 @@ def run_system() -> None:
     )
 
     print(
-        "预测结果已保存："
+        f"预测结果已保存："
         f"{prediction_path}"
+    )
+
+    print(
+        "=" * 70
     )
 
     # ========================================================
@@ -1084,7 +2091,7 @@ def run_system() -> None:
     )
 
     print(
-        "回测结果已保存："
+        f"回测结果已保存："
         f"{backtest_path}"
     )
 
@@ -1109,12 +2116,12 @@ def run_system() -> None:
     )
 
     print(
-        "模块表现已保存："
+        f"模块表现已保存："
         f"{module_path}"
     )
 
     # ========================================================
-    # 最终摘要
+    # 汇总
     # ========================================================
 
     print(
@@ -1125,41 +2132,60 @@ def run_system() -> None:
         "三彩种分析完成"
     )
 
-    for lottery, result in (
+    for name, result in (
         all_results.items()
     ):
 
         if not result.get(
-            "success"
+            "success",
+            False,
         ):
+
+            print(
+                f"{name}：分析失败"
+            )
 
             continue
 
         print(
-            f"{lottery}："
-            f"最新第 "
+            f"{name}："
+            f"最新开奖第 "
             f"{result.get('latest_issue', '')} "
             f"期"
         )
 
         print(
-            f"{lottery}："
-            f"预测特别号第 "
+            f"{name}："
+            f"预测下一期第 "
             f"{result.get('prediction_issue', '')} "
             f"期"
         )
 
-        candidates = result.get(
-            "candidates",
-            [],
+        print(
+            f"{name}："
+            "特别号码候选 "
+            + " ".join(
+                f"{x:02d}"
+                for x in result.get(
+                    "top12",
+                    [],
+                )
+            )
+        )
+
+        zodiac = (
+            result
+            .get(
+                "zodiac_top5",
+                [],
+            )
         )
 
         print(
-            f"{lottery}："
-            "特别号候选 "
+            f"{name}："
+            "特别生肖5个 "
             + " ".join(
-                f"{x:02d}"
-                for x in candidates
+                zodiac
             )
         )
 
@@ -1168,48 +2194,16 @@ def run_system() -> None:
             {},
         )
 
-        zodiac = attrs.get(
-            "zodiac",
-            {},
+        print(
+            f"{name}："
+            f"单双单推 "
+            f"{attrs.get('odd_even', {}).get('main', '')}"
         )
 
         print(
-            f"{lottery}："
-            "生肖5推 "
-            + " ".join(
-                zodiac.get(
-                    "top5",
-                    [],
-                )
-            )
-        )
-
-        odd_even = attrs.get(
-            "odd_even",
-            {},
-        )
-
-        print(
-            f"{lottery}："
-            "单双 "
-            + odd_even.get(
-                "main",
-                "",
-            )
-        )
-
-        size = attrs.get(
-            "size",
-            {},
-        )
-
-        print(
-            f"{lottery}："
-            "大小 "
-            + size.get(
-                "main",
-                "",
-            )
+            f"{name}："
+            f"大小单推 "
+            f"{attrs.get('size', {}).get('main', '')}"
         )
 
         wave = attrs.get(
@@ -1218,24 +2212,13 @@ def run_system() -> None:
         )
 
         print(
-            f"{lottery}："
-            "波色主推 "
-            + wave.get(
-                "main",
-                "",
-            )
-            + " / 次推 "
-            + wave.get(
-                "secondary",
-                "",
-            )
-            + " / 双色 "
-            + " + ".join(
-                wave.get(
-                    "double",
-                    [],
-                )
-            )
+            f"{name}："
+            f"波色主推 "
+            f"{wave.get('main', '')} / "
+            f"次推 "
+            f"{wave.get('secondary', '')} / "
+            f"双色 "
+            f"{' + '.join(wave.get('double', []))}"
         )
 
     print(
@@ -1246,13 +2229,8 @@ def run_system() -> None:
         "说明："
         "号码仅针对第7个特别号码；"
         "生肖仅针对特别号码；"
-        "单双、大小仅推荐一个；"
-        "波色提供主推、次推及双色。"
-    )
-
-    print(
-        "以上命中率为历史Walk-Forward统计，"
-        "不等于未来实际中奖概率。"
+        "单双、大小仅针对特别号码；"
+        "命中率采用严格Walk-Forward历史验证。"
     )
 
     print(
