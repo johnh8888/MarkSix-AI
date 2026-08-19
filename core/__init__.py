@@ -1,2 +1,10 @@
-# -*- coding: utf-8 -*-
-"""MarkSix AI V3.2 core package."""
+# -*- coding:utf-8 -*-
+
+"""
+ AI V3.0 FINAL
+
+核心模块包
+"""
+
+
+__version__ = "3.0.0"
