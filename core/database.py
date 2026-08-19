@@ -1,142 +1,67 @@
 # -*- coding: utf-8 -*-
 
-"""
-六合彩综合预测系统
-V7.1 数据库模块
-
-功能：
-
-1. SQLite 自动创建
-2. 三彩种独立数据库
-3. 保存历史开奖记录
-4. 防止重复期号
-5. 自动更新已有记录
-6. 按期号排序读取
-7. 兼容旧数据库
-"""
-
 from __future__ import annotations
 
+import os
 import sqlite3
-from pathlib import Path
+import json
 from typing import Any
 
 
-# ============================================================
-# 路径
-# ============================================================
-
-BASE_DIR = Path(
-    __file__
-).resolve().parent.parent
-
-DATA_DIR = BASE_DIR / "data"
-
-DATA_DIR.mkdir(
-    parents=True,
-    exist_ok=True,
-)
-
-
-# ============================================================
-# 三彩种数据库
-# ============================================================
-
-DB_FILES = {
-
-    "新澳门彩":
-        DATA_DIR / "new_macau.db",
-
-    "老澳门彩":
-        DATA_DIR / "old_macau.db",
-
-    "香港彩":
-        DATA_DIR / "hk.db",
-
-}
-
-
-# ============================================================
-# 初始化单个数据库
-# ============================================================
-
-def get_connection(
-    lottery_name: str,
-) -> sqlite3.Connection:
-
-    if lottery_name not in DB_FILES:
-
-        raise ValueError(
-            f"未知彩种：{lottery_name}"
-        )
-
-    db_path = DB_FILES[
-        lottery_name
-    ]
-
-    conn = sqlite3.connect(
-        str(db_path)
-    )
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS draws (
-            issue TEXT PRIMARY KEY,
-            numbers TEXT NOT NULL
-        )
-        """
-    )
-
-    conn.commit()
-
-    return conn
-
-
-# ============================================================
-# 初始化全部数据库
-# ============================================================
-
 def init_db() -> None:
 
-    for lottery_name in DB_FILES:
+    os.makedirs(
+        "data",
+        exist_ok=True,
+    )
 
-        conn = get_connection(
-            lottery_name
-        )
-
-        conn.close()
-
-
-# ============================================================
-# 保存开奖记录
-# ============================================================
 
 def save_records(
-    lottery_name: str,
+    db_path: str,
     records: list[dict[str, Any]],
 ) -> int:
 
     if not records:
         return 0
 
-    conn = get_connection(
-        lottery_name
+    os.makedirs(
+        os.path.dirname(db_path),
+        exist_ok=True,
     )
 
-    added = 0
+    connection = sqlite3.connect(
+        db_path
+    )
 
     try:
 
-        for record in records:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS draws (
+                issue TEXT PRIMARY KEY,
+                numbers TEXT NOT NULL,
+                special_number INTEGER,
+                open_time TEXT,
+                lottery TEXT,
+                source TEXT
+            )
+            """
+        )
+
+        inserted = 0
+
+        for row in records:
 
             issue = str(
-                record.get(
+                row.get(
                     "issue",
                     "",
                 )
-            ).strip()
+            )
 
-            numbers = record.get(
+            numbers = row.get(
                 "numbers",
                 [],
             )
@@ -144,331 +69,154 @@ def save_records(
             if not issue:
                 continue
 
-            if not isinstance(
-                numbers,
-                (list, tuple),
-            ):
+            if len(numbers) != 7:
                 continue
+
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO draws
+                (
+                    issue,
+                    numbers,
+                    special_number,
+                    open_time,
+                    lottery,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    issue,
+                    json.dumps(
+                        numbers,
+                        ensure_ascii=False,
+                    ),
+                    int(
+                        numbers[6]
+                    ),
+                    row.get(
+                        "open_time",
+                        "",
+                    ),
+                    row.get(
+                        "lottery",
+                        "",
+                    ),
+                    row.get(
+                        "source",
+                        "",
+                    ),
+                ),
+            )
+
+            inserted += 1
+
+        connection.commit()
+
+        return inserted
+
+    finally:
+
+        connection.close()
+
+
+def load_records(
+    db_path: str,
+) -> list[dict[str, Any]]:
+
+    if not os.path.isfile(
+        db_path
+    ):
+        return []
+
+    connection = sqlite3.connect(
+        db_path
+    )
+
+    try:
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS draws (
+                issue TEXT PRIMARY KEY,
+                numbers TEXT NOT NULL,
+                special_number INTEGER,
+                open_time TEXT,
+                lottery TEXT,
+                source TEXT
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            SELECT
+                issue,
+                numbers,
+                special_number,
+                open_time,
+                lottery,
+                source
+            FROM draws
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        result = []
+
+        for row in rows:
 
             try:
 
-                numbers = [
-                    int(x)
-                    for x in numbers
-                ]
+                numbers = json.loads(
+                    row[1]
+                )
 
             except Exception:
 
                 continue
 
-            if len(numbers) != 7:
-                continue
-
-            if len(
-                set(numbers)
-            ) != 7:
-                continue
-
-            if not all(
-                1 <= x <= 49
-                for x in numbers
+            if not isinstance(
+                numbers,
+                list,
             ):
                 continue
 
-            numbers_text = ",".join(
-                str(x)
-                for x in numbers
+            if len(numbers) != 7:
+                continue
+
+            result.append(
+                {
+                    "issue": row[0],
+                    "numbers": [
+                        int(x)
+                        for x in numbers
+                    ],
+                    "special_number":
+                        int(
+                            row[2]
+                            or numbers[6]
+                        ),
+                    "open_time":
+                        row[3] or "",
+                    "lottery":
+                        row[4] or "",
+                    "source":
+                        row[5] or "",
+                }
             )
 
-            # ------------------------------------------------
-            # 先检查是否存在
-            # ------------------------------------------------
-
-            exists = conn.execute(
-                """
-                SELECT numbers
-                FROM draws
-                WHERE issue = ?
-                """,
-                (issue,),
-            ).fetchone()
-
-            # ------------------------------------------------
-            # 新记录
-            # ------------------------------------------------
-
-            if exists is None:
-
-                conn.execute(
-                    """
-                    INSERT INTO draws
-                    (
-                        issue,
-                        numbers
-                    )
-                    VALUES (?, ?)
-                    """,
-                    (
-                        issue,
-                        numbers_text,
-                    ),
-                )
-
-                added += 1
-
-            # ------------------------------------------------
-            # 已有记录
-            #
-            # 如果号码发生变化，则更新
-            # ------------------------------------------------
-
-            else:
-
-                old_numbers = str(
-                    exists[0]
-                )
-
-                if old_numbers != numbers_text:
-
-                    conn.execute(
-                        """
-                        UPDATE draws
-                        SET numbers = ?
-                        WHERE issue = ?
-                        """,
-                        (
-                            numbers_text,
-                            issue,
-                        ),
-                    )
-
-        conn.commit()
-
-    finally:
-
-        conn.close()
-
-    return added
-
-
-# ============================================================
-# 读取全部开奖记录
-# ============================================================
-
-def load_records(
-    lottery_name: str,
-) -> list[dict[str, Any]]:
-
-    conn = get_connection(
-        lottery_name
-    )
-
-    try:
-
-        rows = conn.execute(
-            """
-            SELECT
-                issue,
-                numbers
-            FROM draws
-            ORDER BY
-                CAST(issue AS INTEGER) ASC
-            """
-        ).fetchall()
-
-    finally:
-
-        conn.close()
-
-    result = []
-
-    for issue, numbers in rows:
-
-        try:
-
-            nums = [
-                int(x.strip())
-                for x in str(
-                    numbers
-                ).split(",")
-            ]
-
-        except Exception:
-
-            continue
-
-        if len(nums) != 7:
-            continue
-
-        if len(
-            set(nums)
-        ) != 7:
-            continue
-
-        if not all(
-            1 <= x <= 49
-            for x in nums
-        ):
-            continue
-
-        result.append(
-            {
-                "issue":
-                    str(issue),
-
-                "numbers":
-                    nums,
-            }
+        result.sort(
+            key=lambda x: int(
+                x["issue"]
+            )
         )
 
-    return result
-
-
-# ============================================================
-# 查询历史数量
-# ============================================================
-
-def count_records(
-    lottery_name: str,
-) -> int:
-
-    conn = get_connection(
-        lottery_name
-    )
-
-    try:
-
-        row = conn.execute(
-            """
-            SELECT COUNT(*)
-            FROM draws
-            """
-        ).fetchone()
-
-        return int(
-            row[0]
-        )
+        return result
 
     finally:
 
-        conn.close()
-
-
-# ============================================================
-# 查询最新一期
-# ============================================================
-
-def get_latest_record(
-    lottery_name: str,
-) -> dict[str, Any] | None:
-
-    conn = get_connection(
-        lottery_name
-    )
-
-    try:
-
-        row = conn.execute(
-            """
-            SELECT
-                issue,
-                numbers
-            FROM draws
-            ORDER BY
-                CAST(issue AS INTEGER) DESC
-            LIMIT 1
-            """
-        ).fetchone()
-
-    finally:
-
-        conn.close()
-
-    if not row:
-        return None
-
-    issue, numbers = row
-
-    try:
-
-        nums = [
-            int(x.strip())
-            for x in str(
-                numbers
-            ).split(",")
-        ]
-
-    except Exception:
-
-        return None
-
-    if len(nums) != 7:
-        return None
-
-    return {
-        "issue":
-            str(issue),
-
-        "numbers":
-            nums,
-    }
-
-
-# ============================================================
-# 查询指定期号
-# ============================================================
-
-def get_record(
-    lottery_name: str,
-    issue: str,
-) -> dict[str, Any] | None:
-
-    conn = get_connection(
-        lottery_name
-    )
-
-    try:
-
-        row = conn.execute(
-            """
-            SELECT
-                issue,
-                numbers
-            FROM draws
-            WHERE issue = ?
-            """,
-            (
-                str(issue),
-            ),
-        ).fetchone()
-
-    finally:
-
-        conn.close()
-
-    if not row:
-        return None
-
-    try:
-
-        nums = [
-            int(x.strip())
-            for x in str(
-                row[1]
-            ).split(",")
-        ]
-
-    except Exception:
-
-        return None
-
-    if len(nums) != 7:
-        return None
-
-    return {
-        "issue":
-            str(row[0]),
-
-        "numbers":
-            nums,
-    }
+        connection.close()
