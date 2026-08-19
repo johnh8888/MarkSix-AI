@@ -1,15 +1,14 @@
-name: 六合AI V3.3 FINAL
+name: 六合AI V4.0 FINAL
 
 
 on:
 
   workflow_dispatch:
 
+
   schedule:
 
     - cron: "0 */6 * * *"
-
-
 
 
 
@@ -26,25 +25,14 @@ jobs:
     steps:
 
 
-
-      # ==================================================
-      # 1. 拉取代码
-      # ==================================================
-
-      - name: 拉取项目代码
-
+      -
+        name: 拉取代码
         uses: actions/checkout@v4
 
 
 
-
-
-      # ==================================================
-      # 2. Python环境
-      # ==================================================
-
-      - name: 设置Python 3.11
-
+      -
+        name: 设置Python
         uses: actions/setup-python@v5
 
         with:
@@ -53,13 +41,8 @@ jobs:
 
 
 
-
-
-      # ==================================================
-      # 3. 安装依赖
-      # ==================================================
-
-      - name: 安装依赖
+      -
+        name: 安装依赖
 
         run: |
 
@@ -73,63 +56,47 @@ jobs:
 
 
 
-
-
-      # ==================================================
-      # 4. 设置路径
-      # ==================================================
-
-      - name: 设置PYTHONPATH
+      -
+        name: 设置环境
 
         run: |
 
           echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
 
-          python --version
-
-          pwd
 
 
-
-
-
-      # ==================================================
-      # 5. 项目检查
-      # ==================================================
-
-      - name: 检查项目结构
+      -
+        name: 检查Python
 
         run: |
 
+          python --version
+
+
+
+      -
+        name: 检查目录
+
+        run: |
 
           test -f main.py
 
           test -f config.py
 
-
-          test -f core/api_sync.py
-
-          test -f core/database.py
-
           test -f core/engine.py
 
           test -f core/predictor.py
 
+          test -f core/report.py
 
-          echo "项目结构正常"
-
-
-
+          echo "目录正常"
 
 
-      # ==================================================
-      # 6. Python语法
-      # ==================================================
 
-      - name: Python语法检查
+      -
+        name: Python语法检查
 
         run: |
-
 
           python -m compileall -q .
 
@@ -137,213 +104,52 @@ jobs:
 
 
 
-
-
-      # ==================================================
-      # 7. 模块检查
-      # ==================================================
-
-      - name: 核心模块检查
+      -
+        name: 模块测试
 
         run: |
 
-
           python - <<'PY'
 
-
           import core
-
-          import core.api_sync
-
-          import core.database
 
           import core.engine
 
           import core.predictor
 
+          import core.report
 
-          print("所有模块导入成功")
-
-
-          PY
-
-
-
-
-
-      # ==================================================
-      # 8. 数据库初始化
-      # ==================================================
-
-      - name: 初始化数据库
-
-        run: |
-
-
-          python - <<'PY'
-
-
-          from core.database import init_database
-
-
-          init_database()
-
-
-          print("数据库完成")
-
+          print("模块加载成功")
 
           PY
 
 
 
-
-
-      # ==================================================
-      # 9. 调试历史API
-      # ==================================================
-
-      - name: 调试历史API返回
+      -
+        name: 初始化运行AI
 
         run: |
-
-
-          python - <<'PY'
-
-
-          import requests
-
-          import urllib3
-
-
-
-          urllib3.disable_warnings()
-
-
-
-          url = "https://marksix6.net/index.php?api=1"
-
-
-
-          r=requests.get(
-
-              url,
-
-              verify=False,
-
-              timeout=20,
-
-              headers={
-
-                  "User-Agent":
-
-                  "Mozilla/5.0"
-
-              }
-
-          )
-
-
-
-          print("==============================")
-
-          print(
-
-              "状态:",
-
-              r.status_code
-
-          )
-
-          print("==============================")
-
-
-          print(
-
-              r.text[:5000]
-
-          )
-
-
-          PY
-
-
-
-
-
-      # ==================================================
-      # 10. API同步
-      # ==================================================
-
-      - name: 同步在线数据
-
-        run: |
-
-
-          echo "================================"
-
-          echo "开始API同步"
-
-          echo "================================"
-
-
-
-          python - <<'PY'
-
-
-          from core.api_sync import sync_all
-
-
-
-          result=sync_all()
-
-
-
-          print()
-
-          print("同步结果:")
-
-          print(result)
-
-
-
-          PY
-
-
-
-
-
-      # ==================================================
-      # 11. 运行AI
-      # ==================================================
-
-      - name: 运行六合AI V3.3 FINAL
-
-        run: |
-
-
-          echo "================================"
-
-          echo "运行六合AI V3.3 FINAL"
-
-          echo "================================"
-
 
           python -u main.py
 
 
 
-
-
-      # ==================================================
-      # 12. 检查预测文件
-      # ==================================================
-
-      - name: 检查预测结果
+      -
+        name: 检查输出
 
         run: |
 
 
+          echo "=============================="
+
+          echo "检查预测结果"
+
+          echo "=============================="
+
+
           test -f output/prediction.json
+
+          test -f output/report.txt
 
 
 
@@ -353,46 +159,55 @@ jobs:
           import json
 
 
-          with open(
-
-              "output/prediction.json",
-
-              encoding="utf-8"
-
-          ) as f:
-
-
-              data=json.load(f)
+          from pathlib import Path
 
 
 
-          print("==============================")
+          file=Path(
 
-          print("版本:")
+              "output/prediction.json"
 
-          print(data.get("版本"))
-
-
-          print("==============================")
-
-          print("预测彩种:")
-
-
-          for x in data.get(
-
-              "预测",
-
-              {}
-
-          ):
-
-              print(x)
+          )
 
 
 
-          print("==============================")
+          data=json.loads(
 
-          print("预测文件正常")
+              file.read_text(
+
+                  encoding="utf-8"
+
+              )
+
+          )
+
+
+
+          print(
+
+              "版本:",
+
+              data.get("版本")
+
+          )
+
+
+          print(
+
+              "系统:",
+
+              data.get("系统")
+
+          )
+
+
+
+          assert "预测" in data
+
+
+
+          print("JSON正常")
+
 
 
           PY
@@ -400,19 +215,16 @@ jobs:
 
 
 
-
-      # ==================================================
-      # 13. 上传结果
-      # ==================================================
-
-      - name: 保存预测结果
+      -
+        name: 上传AI结果
 
         uses: actions/upload-artifact@v4
+
 
         with:
 
 
-          name: marksix-ai-v3-result
+          name: marksix-ai-v4-result
 
 
           path: |
@@ -420,17 +232,20 @@ jobs:
 
             output/prediction.json
 
-            data/marksix_v3.db
+            output/report.txt
+
+            data/*.db
+
+
+          if-no-files-found: warn
 
 
 
 
 
-      # ==================================================
-      # 14. 完成
-      # ==================================================
+      -
+        name: 完成
 
-      - name: 完成
 
         run: |
 
@@ -439,6 +254,20 @@ jobs:
 
           echo "================================"
 
-          echo "六合AI V3.3 FINAL完成"
+          echo " 六合AI V4.0 FINAL "
 
           echo "================================"
+
+          echo ""
+
+          echo "✅ API同步"
+
+          echo "✅ 数据库"
+
+          echo "✅ AI预测"
+
+          echo "✅ 报告生成"
+
+          echo "✅ 输出完成"
+
+          echo ""
