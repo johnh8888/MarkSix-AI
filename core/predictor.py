@@ -1,20 +1,20 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.6 FINAL
+六合彩 AI V3.7 FINAL PRO
 
 智能预测核心
 
-功能:
+融合:
 
-🔥 热号评分
-❄ 冷号补偿
-📈 趋势分析
+历史频率
+🔥热号
+❄冷号
+遗漏
 Markov
-HMM
-波色
-生肖
-AI推荐理由
+趋势
+概率评分
+
 
 """
 
@@ -39,9 +39,25 @@ from .wave import predict_wave
 
 from .zodiac import get_zodiac
 
-from .markov import markov_predict
 
-from .hmm import detect_state
+try:
+
+    from .markov import markov_predict
+
+except:
+
+    markov_predict=lambda x:[]
+
+
+
+try:
+
+    from .hmm import detect_state
+
+except:
+
+    detect_state=lambda x:{"状态":"未启用"}
+
 
 
 
@@ -91,7 +107,6 @@ def data_quality(history):
 
         level
 
-
     }
 
 
@@ -99,11 +114,11 @@ def data_quality(history):
 
 
 # =====================================================
-# AI评分模型
+# 概率融合评分
 # =====================================================
 
 
-def score_numbers(history):
+def fusion_score(history):
 
 
     scores={}
@@ -118,18 +133,33 @@ def score_numbers(history):
     ]
 
 
-
     freq=Counter(nums)
 
 
-    hot=hot_numbers(history)
+
+    hot=set(
+
+        hot_numbers(history)
+
+    )
 
 
-    cold=cold_numbers(history)
+    cold=set(
+
+        cold_numbers(history)
+
+    )
 
 
-    missing=missing_count(history)
+    miss=missing_count(history)
 
+
+
+    recent=set(
+
+        nums[-20:]
+
+    )
 
 
 
@@ -141,45 +171,60 @@ def score_numbers(history):
 
 
 
-        # 历史频率
+        # -----------------
+        # 历史概率
+        # -----------------
 
-        score += freq[n]*1.2
+        score += freq[n] * 1.5
 
 
 
-        # 热号奖励
+
+        # -----------------
+        # 热号
+        # -----------------
 
         if n in hot:
 
-            score += 8
+            score += 10
 
 
 
-        # 冷号遗漏补偿
+
+        # -----------------
+        # 冷号补偿
+        # -----------------
 
         if n in cold:
 
-            score += 3
+            score += 5
 
 
 
+
+        # -----------------
         # 遗漏周期
+        # -----------------
 
         score += min(
 
-            missing.get(n,0)/20,
+            miss[n] / 10,
 
-            5
+            8
 
         )
 
 
 
-        # 最近出现降低
 
-        if nums[-5:].count(n):
 
-            score-=2
+        # -----------------
+        # 最近活跃
+        # -----------------
+
+        if n in recent:
+
+            score += 3
 
 
 
@@ -200,142 +245,136 @@ def score_numbers(history):
 
 
 
+
+
+# =====================================================
+# 百分比转换
+# =====================================================
+
+
+def percent_score(
+
+        ranking
+
+):
+
+
+    total=sum(
+
+        x[1]
+
+        for x in ranking
+
+    )
+
+
+
+    result={}
+
+
+
+    for n,s in ranking:
+
+
+        if total:
+
+
+            result[n]=round(
+
+                s /
+
+                total *
+
+                100,
+
+                2
+
+            )
+
+
+        else:
+
+            result[n]=0
+
+
+
+    return result
+
+
+
+
+
+
 # =====================================================
 # 推荐理由
 # =====================================================
 
 
-def build_reason(
+def reason(
 
-        number,
+        n,
 
         history
 
 ):
 
 
-    reasons=[]
+    result=[]
 
 
-
-    hot=hot_numbers(history)
-
-
-    cold=cold_numbers(history)
+    if n in hot_numbers(history):
 
 
-    missing=missing_count(history)
+        result.append(
 
-
-
-    if number in hot:
-
-
-        reasons.append(
-
-            "🔥近期热度提升"
+            "🔥近期热号"
 
         )
 
 
 
-    if number in cold:
+    if n in cold_numbers(history):
 
 
-        reasons.append(
+        result.append(
 
-            "❄遗漏周期补偿"
-
-        )
-
-
-
-    if missing.get(number,0)>20:
-
-
-        reasons.append(
-
-            "遗漏超过平均周期"
+            "❄遗漏补偿"
 
         )
 
 
 
-    if not reasons:
+    miss=missing_count(history).get(
+
+        n,
+
+        0
+
+    )
 
 
-        reasons.append(
+    if miss>20:
 
-            "综合评分最高"
+
+        result.append(
+
+            "遗漏周期偏高"
 
         )
 
 
 
-    return reasons
+    if not result:
 
 
+        result.append(
+
+            "综合模型评分"
+
+        )
 
 
-
-
-
-# =====================================================
-# 模型状态
-# =====================================================
-
-
-def model_status(history):
-
-
-    size=len(history)
-
-
-
-    return {
-
-
-        "历史数据":
-
-        size,
-
-
-        "Markov":
-
-        "启用"
-
-        if size>=20
-
-        else
-
-        "等待",
-
-
-
-        "HMM":
-
-        "启用"
-
-        if size>=50
-
-        else
-
-        "等待",
-
-
-
-        "高级模型":
-
-        "启用"
-
-        if size>=100
-
-        else
-
-        "等待"
-
-
-    }
+    return result
 
 
 
@@ -366,17 +405,9 @@ def predict(history):
 
 
 
-    scores=score_numbers(
-
-        history
-
-    )
-
-
-
     ranking=sorted(
 
-        scores.items(),
+        fusion_score(history).items(),
 
         key=lambda x:x[1],
 
@@ -386,12 +417,11 @@ def predict(history):
 
 
 
-
     top10=[
 
-        x[0]
+        n
 
-        for x in ranking[:10]
+        for n,s in ranking[:10]
 
     ]
 
@@ -399,89 +429,59 @@ def predict(history):
 
     top3=[
 
-        x[0]
+        n
 
-        for x in ranking[:3]
+        for n,s in ranking[:3]
 
     ]
 
 
 
 
+    percent=percent_score(
 
-    if len(history)>=20:
+        ranking
 
-
-        markov=markov_predict(
-
-            history
-
-        )
-
-
-    else:
-
-
-        markov=[]
+    )
 
 
 
 
-
-    if len(history)>=50:
-
-
-        state=detect_state(
-
-            history
-
-        )
-
-
-    else:
-
-
-        state={
-
-            "状态":
-
-            "数据不足"
-
-        }
-
-
-
-
-
-    reasons=[]
-
+    confidence=[]
 
 
     for n in top3:
 
 
-        reasons.append(
+        confidence.append(
 
             {
 
-                "号码":
+
+            "号码":
+
+            n,
+
+
+            "概率":
+
+            percent[n],
+
+
+            "理由":
+
+            reason(
 
                 n,
 
+                history
 
-                "理由":
-
-                build_reason(
-
-                    n,
-
-                    history
-
-                )
+            )
 
             }
 
         )
+
 
 
 
@@ -492,33 +492,13 @@ def predict(history):
 
         "模型版本":
 
-        "V3.6 FINAL",
+        "V3.7 FINAL PRO",
 
 
 
         "数据质量":
 
-        data_quality(
-
-            history
-
-        ),
-
-
-
-        "模型状态":
-
-        model_status(
-
-            history
-
-        ),
-
-
-
-        "当前状态":
-
-        state,
+        data_quality(history),
 
 
 
@@ -536,47 +516,41 @@ def predict(history):
 
         "🔥热号":
 
-        hot_numbers(
-
-            history
-
-        ),
+        hot_numbers(history),
 
 
 
         "❄冷号":
 
-        cold_numbers(
+        cold_numbers(history),
 
-            history
 
-        ),
+
+        "AI综合评分":
+
+        confidence,
 
 
 
         "📈趋势":
 
-        feature_statistics(
+        feature_statistics(history)[
 
-            history
+            "📈趋势"
 
-        )["📈趋势"],
+        ],
 
 
 
         "🎯推荐理由":
 
-        reasons,
+        confidence,
 
 
 
         "波色":
 
-        predict_wave(
-
-            history
-
-        ),
+        predict_wave(history),
 
 
 
@@ -594,21 +568,13 @@ def predict(history):
 
         "马尔可夫":
 
-        markov[:5],
+        markov_predict(history)[0:5],
 
 
 
-        "评分":
+        "当前状态":
 
-        {
-
-            str(k):
-
-            v
-
-            for k,v in ranking[:10]
-
-        }
+        detect_state(history)
 
 
     }
