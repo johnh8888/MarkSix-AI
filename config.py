@@ -1,126 +1,280 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.3 FINAL
 
-全局配置
+系统配置文件
+
+功能:
+
+1. 版本管理
+2. 数据库路径
+3. 输出目录
+4. 彩种配置
+5. 系统参数
+
 """
+
 
 from pathlib import Path
 
 
+
+
+
 # =====================================================
-# 项目路径
+# 项目目录
 # =====================================================
 
-BASE_DIR = Path(
-    __file__
-).resolve().parent
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
-CORE_DIR = BASE_DIR / "core"
 
 
-OUTPUT_DIR = BASE_DIR / "output"
+
+
+# =====================================================
+# 版本
+# =====================================================
+
+
+VERSION = "V3.3 FINAL"
+
+
+
+
+
+
+# =====================================================
+# 数据目录
+# =====================================================
 
 
 DATA_DIR = BASE_DIR / "data"
 
 
-OUTPUT_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
-
 
 DATA_DIR.mkdir(
-    parents=True,
+
     exist_ok=True
+
 )
 
 
+
+
+
+
+
 # =====================================================
-# 数据库
+# 输出目录
 # =====================================================
+
+
+OUTPUT_DIR = BASE_DIR / "output"
+
+
+
+OUTPUT_DIR.mkdir(
+
+    exist_ok=True
+
+)
+
+
+
+
+
+
+
+# =====================================================
+# SQLite数据库
+# =====================================================
+
 
 DATABASE_FILE = (
-    DATA_DIR / "marksix_v3.db"
+
+    DATA_DIR /
+
+    "marksix_v3.db"
+
 )
 
 
-# =====================================================
-# 系统版本
-# =====================================================
-
-VERSION = "V3.0 FINAL"
 
 
-# =====================================================
-# 历史数据
-# =====================================================
 
-HISTORY_LIMIT = 500
+
 
 
 # =====================================================
-# 彩种
+# 彩种配置
 # =====================================================
+
 
 LOTTERIES = {
 
+
     "hk":
+
         "香港六合彩",
 
+
+
     "newMacau":
+
         "新澳门六合彩",
 
+
+
     "oldMacau":
+
         "老澳门六合彩"
+
 }
 
 
-# =====================================================
-# API
-# =====================================================
-
-API_HISTORY = (
-    "https://marksix6.net/index.php?api=1"
-)
 
 
-API_REALTIME = (
-    "https://marksix6.net/api/lottery_api.php"
-)
+
+
 
 
 # =====================================================
-# 预测参数
+# API配置
 # =====================================================
 
-TOP10 = 10
 
-TOP3 = 3
+API_CONFIG = {
+
+
+    "history":
+
+        "https://marksix6.net/index.php?api=1",
+
+
+
+    "hk":
+
+        "https://marksix6.net/api/lottery_api.php?type=hk",
+
+
+
+    "newMacau":
+
+        "https://marksix6.net/api/lottery_api.php?type=newMacau",
+
+
+
+    "oldMacau":
+
+        "https://marksix6.net/api/lottery_api.php?type=oldMacau"
+
+}
+
+
+
+
+
+
 
 
 # =====================================================
-# 回测参数
+# 模型参数
 # =====================================================
 
-BACKTEST_MIN_TRAIN = 30
+
+MODEL_CONFIG = {
 
 
-__all__ = [
-    "BASE_DIR",
-    "CORE_DIR",
-    "OUTPUT_DIR",
-    "DATA_DIR",
-    "DATABASE_FILE",
+    # 历史使用数量
+
+    "history_limit":
+
+        500,
+
+
+
+    # Markov最低数据
+
+    "markov_min":
+
+        20,
+
+
+
+    # HMM最低数据
+
+    "hmm_min":
+
+        50,
+
+
+
+    # 高级模型最低数据
+
+    "advanced_min":
+
+        100
+
+}
+
+
+
+
+
+
+
+
+# =====================================================
+# 输出设置
+# =====================================================
+
+
+OUTPUT_CONFIG = {
+
+
+    "save_json":
+
+        True,
+
+
+
+    "json_name":
+
+        "prediction.json"
+
+}
+
+
+
+
+
+
+
+
+__all__=[
+
+
     "VERSION",
-    "HISTORY_LIMIT",
+
+
+    "DATABASE_FILE",
+
+
+    "OUTPUT_DIR",
+
+
     "LOTTERIES",
-    "API_HISTORY",
-    "API_REALTIME",
-    "TOP10",
-    "TOP3",
-    "BACKTEST_MIN_TRAIN"
+
+
+    "API_CONFIG",
+
+
+    "MODEL_CONFIG",
+
+
+    "OUTPUT_CONFIG"
+
 ]
