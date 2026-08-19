@@ -1,35 +1,26 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.4 QUANT FINAL
+六合彩 AI V4.0 FINAL
 
 智能预测核心
 
+升级:
 
-模型:
-
-1. 历史频率
-2. 遗漏补偿
-3. 最近趋势
-4. 热冷平衡
-5. 波色趋势
-6. Markov
-7. HMM状态
-
-
-输出:
-
-第一推荐
-重点3码
-特码10码
-置信度
-AI评分
+1. 综合评分模型
+2. 热冷分析
+3. 波色融合
+4. 大小单双
+5. AI信心
+6. 风险评估
 
 """
 
 
 from collections import Counter
 
+
+from .score import number_score
 
 from .wave import predict_wave
 
@@ -42,7 +33,6 @@ from .hmm import detect_state
 
 
 
-
 # =====================================================
 # 数据质量
 # =====================================================
@@ -51,20 +41,21 @@ from .hmm import detect_state
 def data_quality(history):
 
 
-    count=len(history)
+    total=len(history)
 
 
-    if count>=500:
+
+    if total>=500:
 
         level="优秀"
 
 
-    elif count>=200:
+    elif total>=300:
 
         level="良好"
 
 
-    elif count>=50:
+    elif total>=100:
 
         level="一般"
 
@@ -79,171 +70,16 @@ def data_quality(history):
 
 
         "历史数量":
-            count,
+
+        total,
 
 
         "等级":
-            level
+
+        level
 
 
     }
-
-
-
-
-
-# =====================================================
-# 号码评分
-# =====================================================
-
-
-def score_numbers(history):
-
-
-    scores={}
-
-
-    values=[
-
-        x["special"]
-
-        for x in history
-
-    ]
-
-
-    freq=Counter(values)
-
-
-
-    recent30=set(values[-30:])
-
-
-    recent10=set(values[-10:])
-
-
-
-    for n in range(1,50):
-
-
-        score=0
-
-
-
-        # 历史热度
-
-        score += freq[n]*0.8
-
-
-
-        # 最近出现
-
-        if n in recent10:
-
-            score += 4
-
-
-        elif n in recent30:
-
-            score += 2
-
-
-
-        # 遗漏
-
-        if n not in recent30:
-
-            score += 2
-
-
-
-        # 频率修正
-
-        avg=len(values)/49
-
-
-
-        if freq[n] < avg:
-
-            score += 1
-
-
-
-        scores[n]=round(
-            score,
-            3
-        )
-
-
-
-    return scores
-
-
-
-
-
-
-# =====================================================
-# 置信度计算
-# =====================================================
-
-
-def confidence_score(history,ranking):
-
-
-    size=len(history)
-
-
-    if size<50:
-
-        base=0.15
-
-
-    elif size<200:
-
-        base=0.35
-
-
-    else:
-
-        base=0.5
-
-
-
-    if ranking:
-
-
-        diff=(
-
-            ranking[0][1]
-
-            -
-
-            ranking[1][1]
-
-        )
-
-
-        base += min(
-
-            diff/20,
-
-            0.25
-
-        )
-
-
-
-    if base>0.85:
-
-        base=0.85
-
-
-    return round(
-        base,
-        2
-    )
-
 
 
 
@@ -254,7 +90,7 @@ def confidence_score(history,ranking):
 # =====================================================
 
 
-def predict_size(history):
+def analyze_size(history):
 
 
     big=0
@@ -263,10 +99,10 @@ def predict_size(history):
 
 
 
-    for row in history:
+    for x in history:
 
 
-        n=row["special"]
+        n=x["special"]
 
 
         if n>=25:
@@ -279,19 +115,23 @@ def predict_size(history):
 
 
 
-    total=big+small
+    total=max(
+        big+small,
+        1
+    )
 
 
 
-    if total==0:
+    big_p=round(
+        big/total,
+        3
+    )
 
-        return {}
 
-
-
-    bp=big/total
-
-    sp=small/total
+    small_p=round(
+        small/total,
+        3
+    )
 
 
 
@@ -299,37 +139,34 @@ def predict_size(history):
 
 
         "大概率":
-            round(bp,3),
+
+        big_p,
 
 
         "小概率":
-            round(sp,3),
+
+        small_p,
 
 
         "推荐":
 
-            "大"
+        "大"
+        if big_p>small_p
+        else
+        "小"
 
-            if bp>sp
-
-            else
-
-            "小"
 
     }
 
 
 
 
-
-
-
 # =====================================================
-# 单双分析
+# 单双
 # =====================================================
 
 
-def predict_odd_even(history):
+def analyze_odd_even(history):
 
 
     odd=0
@@ -338,10 +175,10 @@ def predict_odd_even(history):
 
 
 
-    for row in history:
+    for x in history:
 
 
-        if row["special"]%2:
+        if x["special"]%2:
 
             odd+=1
 
@@ -351,19 +188,23 @@ def predict_odd_even(history):
 
 
 
-    total=odd+even
+    total=max(
+        odd+even,
+        1
+    )
 
 
 
-    if total==0:
+    odd_p=round(
+        odd/total,
+        3
+    )
 
-        return {}
 
-
-
-    op=odd/total
-
-    ep=even/total
+    even_p=round(
+        even/total,
+        3
+    )
 
 
 
@@ -371,24 +212,96 @@ def predict_odd_even(history):
 
 
         "单概率":
-            round(op,3),
+
+        odd_p,
 
 
         "双概率":
-            round(ep,3),
+
+        even_p,
 
 
         "推荐":
 
-            "单"
+        "单"
+        if odd_p>even_p
+        else
+        "双"
 
-            if op>ep
-
-            else
-
-            "双"
 
     }
+
+
+
+
+
+# =====================================================
+# AI信心
+# =====================================================
+
+
+def confidence(history,scores):
+
+
+    if len(history)<50:
+
+        return 0.15
+
+
+
+    values=sorted(
+
+        scores.values(),
+
+        reverse=True
+
+    )
+
+
+
+    diff=values[0]-values[9]
+
+
+
+    c=min(
+
+        round(
+            diff/50,
+            2
+        ),
+
+        0.95
+
+    )
+
+
+    return c
+
+
+
+
+
+# =====================================================
+# 风险
+# =====================================================
+
+
+def risk_level(conf):
+
+
+    if conf>=0.7:
+
+        return "低风险"
+
+
+    elif conf>=0.4:
+
+        return "中风险"
+
+
+    else:
+
+        return "高风险"
 
 
 
@@ -407,19 +320,17 @@ def predict(history):
 
         return {
 
-            "error":
 
-            "无历史数据"
+            "错误":
+
+            "没有数据"
+
 
         }
 
 
 
-    quality=data_quality(history)
-
-
-
-    scores=score_numbers(
+    scores=number_score(
         history
     )
 
@@ -434,6 +345,7 @@ def predict(history):
         reverse=True
 
     )
+
 
 
 
@@ -457,175 +369,35 @@ def predict(history):
 
 
 
-    confidence=confidence_score(
-
-        history,
-
-        ranking
-
-    )
-
-
-
-    result={
-
-
-
-        "模型版本":
-
-            "V3.4 QUANT FINAL",
-
-
-
-        "数据质量":
-
-            quality,
-
-
-
-        "模型状态":{
-
-
-            "Markov":
-
-            "启用"
-
-            if len(history)>=20
-
-            else
-
-            "等待",
-
-
-
-            "HMM":
-
-            "启用"
-
-            if len(history)>=50
-
-            else
-
-            "等待"
-
-
-        },
-
-
-
-        "第一推荐":
-
-            top3[0],
-
-
-
-        "重点3码":
-
-            top3,
-
-
-
-        "特码10码":
-
-            top10,
-
-
-
-        "波色":
-
-            predict_wave(history),
-
-
-
-        "大小":
-
-            predict_size(history),
-
-
-
-        "单双":
-
-            predict_odd_even(history),
-
-
-
-        "生肖":
-
-            [
-
-                get_zodiac(x)
-
-                for x in top3
-
-            ],
-
-
-
-        "置信度":
-
-            confidence,
-
-
-
-        "AI评分":
-
-            int(confidence*100),
-
-
-
-        "风险等级":
-
-            "低"
-
-            if confidence>=0.7
-
-            else
-
-            "中"
-
-            if confidence>=0.4
-
-            else
-
-            "高"
-
-    }
-
-
-
-
+    # markov
 
     if len(history)>=20:
 
 
-        result["马尔可夫"]=markov_predict(
-
+        markov=markov_predict(
             history
-
-        )[:5]
-
+        )
 
     else:
 
+        markov=[]
 
-        result["马尔可夫"]=[]
 
 
+    # HMM
 
     if len(history)>=50:
 
 
-        result["状态"]=detect_state(
-
+        state=detect_state(
             history
-
         )
 
 
     else:
 
 
-        result["状态"]={
+        state={
 
             "状态":
 
@@ -635,8 +407,131 @@ def predict(history):
 
 
 
-    return result
 
+
+    conf=confidence(
+
+        history,
+
+        scores
+
+    )
+
+
+
+
+
+    return {
+
+
+        "模型版本":
+
+        "V4.0 FINAL",
+
+
+
+        "数据质量":
+
+        data_quality(
+            history
+        ),
+
+
+
+        "当前状态":
+
+        state,
+
+
+
+        "重点3码":
+
+        top3,
+
+
+
+        "特码10码":
+
+        top10,
+
+
+
+        "第一推荐":
+
+        top3[0],
+
+
+
+        "生肖":
+
+        [
+
+            get_zodiac(n)
+
+            for n in top3
+
+        ],
+
+
+
+        "波色":
+
+        predict_wave(
+            history
+        ),
+
+
+
+        "大小":
+
+        analyze_size(
+            history
+        ),
+
+
+
+        "单双":
+
+        analyze_odd_even(
+            history
+        ),
+
+
+
+        "置信度":
+
+        conf,
+
+
+
+        "风险等级":
+
+        risk_level(
+            conf
+        ),
+
+
+
+        "马尔可夫":
+
+        markov[:5],
+
+
+
+        "评分":
+
+        {
+
+            str(k):
+
+            v
+
+            for k,v in ranking[:10]
+
+        }
+
+
+    }
 
 
 
