@@ -1,34 +1,45 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V4.0 FINAL
+六合彩 AI V4.1 QUANT FINAL
 
 智能预测核心
 
-升级:
+模型:
 
-1. 综合评分模型
-2. 热冷分析
-3. 波色融合
-4. 大小单双
-5. AI信心
-6. 风险评估
+Bayesian Fusion
+Frequency
+Missing
+Recent
+Markov
+HMM
+Wave
+Size
+OddEven
 
 """
 
 
-from collections import Counter
+from .quant import (
 
+    bayesian_fusion,
 
-from .score import number_score
+    model_confidence
+
+)
+
 
 from .wave import predict_wave
 
+
 from .zodiac import get_zodiac
+
 
 from .markov import markov_predict
 
+
 from .hmm import detect_state
+
 
 
 
@@ -41,21 +52,21 @@ from .hmm import detect_state
 def data_quality(history):
 
 
-    total=len(history)
+    count=len(history)
 
 
 
-    if total>=500:
+    if count>=500:
 
         level="优秀"
 
 
-    elif total>=300:
+    elif count>=300:
 
         level="良好"
 
 
-    elif total>=100:
+    elif count>=100:
 
         level="一般"
 
@@ -71,7 +82,7 @@ def data_quality(history):
 
         "历史数量":
 
-        total,
+        count,
 
 
         "等级":
@@ -85,52 +96,54 @@ def data_quality(history):
 
 
 
+
 # =====================================================
-# 大小分析
+# 大小
 # =====================================================
 
 
 def analyze_size(history):
 
 
-    big=0
+    big=sum(
 
-    small=0
+        1
+
+        for x in history
+
+        if x["special"]>=25
+
+    )
 
 
-
-    for x in history:
-
-
-        n=x["special"]
-
-
-        if n>=25:
-
-            big+=1
-
-        else:
-
-            small+=1
+    small=len(history)-big
 
 
 
     total=max(
-        big+small,
+
+        len(history),
+
         1
+
     )
 
 
-
     big_p=round(
+
         big/total,
+
         3
+
     )
 
 
     small_p=round(
+
         small/total,
+
         3
+
     )
 
 
@@ -151,12 +164,17 @@ def analyze_size(history):
         "推荐":
 
         "大"
+
         if big_p>small_p
+
         else
+
         "小"
 
-
     }
+
+
+
 
 
 
@@ -166,44 +184,48 @@ def analyze_size(history):
 # =====================================================
 
 
-def analyze_odd_even(history):
+def analyze_even(history):
 
 
-    odd=0
+    odd=sum(
 
-    even=0
+        1
+
+        for x in history
+
+        if x["special"]%2
+
+    )
 
 
-
-    for x in history:
-
-
-        if x["special"]%2:
-
-            odd+=1
-
-        else:
-
-            even+=1
+    even=len(history)-odd
 
 
 
     total=max(
-        odd+even,
+
+        len(history),
+
         1
+
     )
 
 
-
     odd_p=round(
+
         odd/total,
+
         3
+
     )
 
 
     even_p=round(
+
         even/total,
+
         3
+
     )
 
 
@@ -224,58 +246,17 @@ def analyze_odd_even(history):
         "推荐":
 
         "单"
-        if odd_p>even_p
-        else
-        "双"
 
+        if odd_p>even_p
+
+        else
+
+        "双"
 
     }
 
 
 
-
-
-# =====================================================
-# AI信心
-# =====================================================
-
-
-def confidence(history,scores):
-
-
-    if len(history)<50:
-
-        return 0.15
-
-
-
-    values=sorted(
-
-        scores.values(),
-
-        reverse=True
-
-    )
-
-
-
-    diff=values[0]-values[9]
-
-
-
-    c=min(
-
-        round(
-            diff/50,
-            2
-        ),
-
-        0.95
-
-    )
-
-
-    return c
 
 
 
@@ -286,7 +267,7 @@ def confidence(history,scores):
 # =====================================================
 
 
-def risk_level(conf):
+def risk(conf):
 
 
     if conf>=0.7:
@@ -294,14 +275,14 @@ def risk_level(conf):
         return "低风险"
 
 
-    elif conf>=0.4:
+    if conf>=0.4:
 
         return "中风险"
 
 
-    else:
+    return "高风险"
 
-        return "高风险"
+
 
 
 
@@ -323,15 +304,21 @@ def predict(history):
 
             "错误":
 
-            "没有数据"
-
+            "没有历史数据"
 
         }
 
 
 
-    scores=number_score(
+    # ======================
+    # Bayesian评分
+    # ======================
+
+
+    scores=bayesian_fusion(
+
         history
+
     )
 
 
@@ -369,14 +356,22 @@ def predict(history):
 
 
 
-    # markov
+
+
+    # ======================
+    # Markov
+    # ======================
+
 
     if len(history)>=20:
 
 
         markov=markov_predict(
+
             history
+
         )
+
 
     else:
 
@@ -384,20 +379,27 @@ def predict(history):
 
 
 
+
+
+    # ======================
     # HMM
+    # ======================
+
 
     if len(history)>=50:
 
 
-        state=detect_state(
+        hmm=detect_state(
+
             history
+
         )
 
 
     else:
 
 
-        state={
+        hmm={
 
             "状态":
 
@@ -409,9 +411,12 @@ def predict(history):
 
 
 
-    conf=confidence(
+    # ======================
+    # 信心
+    # ======================
 
-        history,
+
+    confidence=model_confidence(
 
         scores
 
@@ -421,26 +426,24 @@ def predict(history):
 
 
 
+
     return {
+
 
 
         "模型版本":
 
-        "V4.0 FINAL",
+        "V4.1 QUANT FINAL",
 
 
 
         "数据质量":
 
         data_quality(
+
             history
+
         ),
-
-
-
-        "当前状态":
-
-        state,
 
 
 
@@ -466,9 +469,9 @@ def predict(history):
 
         [
 
-            get_zodiac(n)
+            get_zodiac(x)
 
-            for n in top3
+            for x in top3
 
         ],
 
@@ -477,7 +480,9 @@ def predict(history):
         "波色":
 
         predict_wave(
+
             history
+
         ),
 
 
@@ -485,34 +490,46 @@ def predict(history):
         "大小":
 
         analyze_size(
+
             history
+
         ),
 
 
 
         "单双":
 
-        analyze_odd_even(
+        analyze_even(
+
             history
+
         ),
 
 
 
-        "置信度":
+        "AI信心":
 
-        conf,
+        confidence,
 
 
 
-        "风险等级":
+        "风险":
 
-        risk_level(
-            conf
+        risk(
+
+            confidence
+
         ),
 
 
 
-        "马尔可夫":
+        "HMM状态":
+
+        hmm,
+
+
+
+        "Markov":
 
         markov[:5],
 
@@ -532,6 +549,7 @@ def predict(history):
 
 
     }
+
 
 
 
