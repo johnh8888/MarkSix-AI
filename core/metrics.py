@@ -881,3 +881,82 @@ def calculate_performance(
             "正常",
 
     }
+    # ============================================================
+# 兼容 core/engine.py 调用方式的补丁
+# 追加到 core/metrics.py 文件末尾
+# ============================================================
+
+# 保留原始 evaluate_prediction（2参数版本）的引用，
+# 下面用新的3参数版本覆盖同名函数，内部转调原始逻辑。
+_original_evaluate_prediction = evaluate_prediction
+
+
+def evaluate_prediction(
+    prediction: dict,
+    actual: dict,
+    train: list | None = None,
+) -> dict:
+
+    """
+    兼容 engine.py：
+
+        evaluate_prediction(prediction, actual, train)
+
+    train 参数当前未使用（预留给未来需要训练集上下文的评估逻辑），
+    实际评估仍完全复用原始的2参数版本。
+    """
+
+    return _original_evaluate_prediction(
+        prediction,
+        actual,
+    )
+
+
+def predict_attribute(
+    history: list[dict],
+    field: str,
+    limit: int = 100,
+) -> dict:
+
+    """
+    兼容 engine.py：
+
+        predict_attribute(history, "zodiac")
+        predict_attribute(history, "odd_even")
+        predict_attribute(history, "size")
+        predict_attribute(history, "wave")
+
+    单数版本，按字段名单独调用。
+    内部复用已有的 predict_zodiac / predict_single_attribute。
+    """
+
+    if field == "zodiac":
+
+        result = predict_zodiac(
+            history,
+            limit,
+        )
+
+        return {
+            "main": result["main"],
+            "secondary": result["secondary"],
+            "top5": result["top5"],
+            "double": result["top5"],
+        }
+
+    result = predict_single_attribute(
+        history,
+        field,
+        limit,
+    )
+
+    return {
+        "main": result["main"],
+        "secondary": result["secondary"],
+        "double": (
+            [result["main"]]
+            if result["main"]
+            else []
+        ),
+    }
+
