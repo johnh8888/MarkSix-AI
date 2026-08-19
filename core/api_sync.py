@@ -1,56 +1,46 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.1 FINAL
+六合彩 AI V3.2 FINAL
 
 API同步模块
 
-职责:
+功能:
 
-1. 请求在线API
-2. 调用parser解析
-3. 保存SQLite
-4. 返回同步状态
+1. 历史开奖同步
+2. 最新开奖同步
+3. 多格式解析
+4. SQLite保存
+
+支持:
+
+香港六合彩
+新澳门六合彩
+老澳门六合彩
 
 """
+
 
 from __future__ import annotations
 
 
 import requests
-
 import urllib3
+import re
+import json
 
 
 from datetime import datetime
 
 
-
 from config import (
-
     API_HISTORY,
-
     API_REALTIME,
-
     LOTTERIES
-
 )
-
 
 
 from .database import save_draw
-
-
-
-from .parser import (
-
-    parse_numbers,
-
-    parse_draw,
-
-    parse_issue
-
-)
 
 
 
@@ -59,7 +49,7 @@ urllib3.disable_warnings()
 
 
 # =====================================================
-# API请求
+# HTTP请求
 # =====================================================
 
 
@@ -72,20 +62,16 @@ def request_api(url):
         "正在请求API:"
     )
 
-    print(
-        url
-    )
+    print(url)
 
 
 
     headers={
 
         "User-Agent":
-
         "Mozilla/5.0",
 
         "Accept":
-
         "application/json"
 
     }
@@ -95,19 +81,20 @@ def request_api(url):
     try:
 
 
-        response=requests.get(
+        r=requests.get(
 
             url,
 
             timeout=20,
 
-            headers=headers
+            headers=headers,
+
+            verify=False
 
         )
 
 
-        response.raise_for_status()
-
+        r.raise_for_status()
 
 
         print(
@@ -115,7 +102,7 @@ def request_api(url):
         )
 
 
-        return response.json()
+        return r.json()
 
 
 
@@ -123,46 +110,14 @@ def request_api(url):
 
 
         print(
-
-            "SSL正常请求失败:",
-
+            "API失败:",
             e
-
         )
 
 
-        print(
-
-            "启用备用SSL模式"
-
-        )
+        return {}
 
 
-
-        response=requests.get(
-
-            url,
-
-            timeout=20,
-
-            verify=False,
-
-            headers=headers
-
-        )
-
-
-        response.raise_for_status()
-
-
-        print(
-
-            "备用请求成功"
-
-        )
-
-
-        return response.json()
 
 
 
@@ -174,17 +129,179 @@ def request_api(url):
 def identify(name):
 
 
-    for key,title in LOTTERIES.items():
+    text=str(name)
 
 
-        if title in name:
+
+    if "香港" in text:
+
+        return "hk"
 
 
-            return key
+
+    if "新澳门" in text:
+
+        return "newMacau"
+
+
+
+    if "老澳门" in text:
+
+        return "oldMacau"
 
 
 
     return None
+
+
+
+
+
+# =====================================================
+# 数字解析
+# =====================================================
+
+
+def parse_numbers(value):
+
+
+    if value is None:
+
+        return []
+
+
+
+    nums=re.findall(
+
+        r"\d+",
+
+        str(value)
+
+    )
+
+
+
+    result=[]
+
+
+
+    for x in nums:
+
+
+        n=int(x)
+
+
+        if 1<=n<=49:
+
+            result.append(n)
+
+
+
+    return result
+
+
+
+
+
+# =====================================================
+# 单条开奖解析
+# =====================================================
+
+
+def parse_draw(row):
+
+
+    issue=None
+
+    numbers=[]
+
+
+
+    if isinstance(row,dict):
+
+
+        issue=(
+
+            row.get("expect")
+
+            or
+
+            row.get("issue")
+
+            or
+
+            row.get("period")
+
+        )
+
+
+
+        code=(
+
+            row.get("openCode")
+
+            or
+
+            row.get("code")
+
+            or
+
+            row.get("numbers")
+
+        )
+
+
+        numbers=parse_numbers(code)
+
+
+
+    else:
+
+
+        text=str(row)
+
+
+        m=re.search(
+
+            r"(\d{3,})",
+
+            text
+
+        )
+
+
+        if m:
+
+            issue=m.group(1)
+
+
+
+        numbers=parse_numbers(text)
+
+
+
+
+    if len(numbers)>=7:
+
+
+        return {
+
+
+            "issue":str(issue),
+
+
+            "numbers":numbers[:6],
+
+
+            "special":numbers[6]
+
+        }
+
+
+
+    return None
+
+
 
 
 
@@ -201,9 +318,7 @@ def sync_history():
     print("="*70)
 
     print(
-
         "正在同步历史开奖"
-
     )
 
     print("="*70)
@@ -255,53 +370,46 @@ def sync_history():
 
 
 
-        history=item.get(
+        count=0
 
-            "history",
 
-            []
+
+        history=(
+
+            item.get(
+
+                "history",
+
+                []
+
+            )
 
         )
 
 
 
-        new_count=0
-
-        exist_count=0
-
-        error_count=0
+        for row in history:
 
 
-
-        for index,row in enumerate(history):
-
-
-            numbers=parse_numbers(
-
-                row
-
-            )
+            draw=parse_draw(row)
 
 
 
-            if len(numbers)<7:
-
-
-                error_count+=1
+            if not draw:
 
                 continue
 
 
 
-            save_result=save_draw(
+            ok=save_draw(
 
                 key,
 
-                str(index),
+                draw["issue"],
 
-                numbers[:6],
+                draw["numbers"],
 
-                numbers[6],
+                draw["special"],
 
                 "history_api"
 
@@ -309,74 +417,25 @@ def sync_history():
 
 
 
-            status=save_result.get(
+            if ok:
 
-                "status"
-
-            )
+                count+=1
 
 
 
-            if status=="new":
-
-                new_count+=1
+        result[key]=count
 
 
-            elif status=="exists":
-
-                exist_count+=1
-
-
-            else:
-
-                error_count+=1
-
-
-
-
-        result[key]={
-
-
-            "新增":
-
-            new_count,
-
-
-            "存在":
-
-            exist_count,
-
-
-            "错误":
-
-            error_count
-
-
-        }
-
-
-
-        print()
 
         print(
 
-            LOTTERIES[key]
-
-        )
-
-        print(
+            LOTTERIES[key],
 
             "新增:",
 
-            new_count
+            count,
 
-        )
-
-        print(
-
-            "已存在:",
-
-            exist_count
+            "期"
 
         )
 
@@ -386,12 +445,19 @@ def sync_history():
 
 
 
+
+
+
 # =====================================================
-# 实时同步
+# 最新同步
 # =====================================================
 
 
 def sync_realtime():
+
+
+    result={}
+
 
 
     print()
@@ -408,158 +474,120 @@ def sync_realtime():
 
 
 
-    result={}
-
-
 
     for key in LOTTERIES:
 
 
-        try:
+        url=(
 
+            API_REALTIME
 
-            url=(
+            +
 
-                API_REALTIME
+            "?type="
 
-                +
+            +
 
-                "?type="
+            key
 
-                +
+        )
 
-                key
 
-            )
 
+        data=request_api(
 
+            url
 
-            data=request_api(
+        )
 
-                url
 
-            )
 
+        draw=parse_draw(
 
+            data
 
-            numbers=parse_numbers(
+        )
 
-                data
 
-            )
 
-
-
-            if len(numbers)<7:
-
-
-                result[key]={
-
-                    "status":
-
-                    "error",
-
-                    "message":
-
-                    "号码不足"
-
-                }
-
-
-                continue
-
-
-
-            issue=(
-
-                parse_issue(data)
-
-                or
-
-                datetime.now().strftime(
-
-                    "%Y%m%d"
-
-                )
-
-            )
-
-
-
-            save_result=save_draw(
-
-                key,
-
-                issue,
-
-                numbers[:6],
-
-                numbers[6],
-
-                "realtime_api"
-
-            )
-
-
-
-            result[key]=save_result
-
-
-
-            print()
-
-            print(
-
-                LOTTERIES[key],
-
-                "最新期:",
-
-                issue
-
-            )
-
-            print(
-
-                "状态:",
-
-                save_result.get(
-
-                    "status"
-
-                )
-
-            )
-
-
-
-        except Exception as e:
+        if not draw:
 
 
             result[key]={
 
                 "status":
 
-                "error",
-
-                "message":
-
-                str(e)
+                "empty"
 
             }
 
 
+            continue
 
-            print(
 
-                key,
 
-                e
 
-            )
+
+        ok=save_draw(
+
+            key,
+
+            draw["issue"],
+
+            draw["numbers"],
+
+            draw["special"],
+
+            "realtime_api"
+
+        )
+
+
+
+        result[key]={
+
+
+            "status":
+
+            "new"
+
+            if ok
+
+            else
+
+            "exists",
+
+
+
+            "issue":
+
+            draw["issue"]
+
+        }
+
+
+
+
+        print(
+
+            LOTTERIES[key],
+
+            "最新期:",
+
+            draw["issue"],
+
+            "状态:",
+
+            result[key]["status"]
+
+        )
 
 
 
     return result
+
+
+
 
 
 
@@ -571,17 +599,20 @@ def sync_realtime():
 def sync_all():
 
 
-    print()
-
     print("="*70)
 
     print(
-
         "开始API同步"
-
     )
 
     print("="*70)
+
+
+
+    history={}
+
+
+    realtime={}
 
 
 
@@ -597,20 +628,11 @@ def sync_all():
 
         print(
 
-            "历史同步失败:",
+            "历史同步错误:",
 
             e
 
         )
-
-
-        history={
-
-            "error":
-
-            str(e)
-
-        }
 
 
 
@@ -626,20 +648,11 @@ def sync_all():
 
         print(
 
-            "实时同步失败:",
+            "实时同步错误:",
 
             e
 
         )
-
-
-        realtime={
-
-            "error":
-
-            str(e)
-
-        }
 
 
 
@@ -652,9 +665,11 @@ def sync_all():
         history,
 
 
+
         "realtime":
 
         realtime,
+
 
 
         "status":
@@ -662,11 +677,14 @@ def sync_all():
         "completed",
 
 
+
         "time":
 
         datetime.now().isoformat()
 
     }
+
+
 
 
 
