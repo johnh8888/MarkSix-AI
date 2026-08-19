@@ -1,158 +1,392 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
-生肖映射模块
+生肖分析模块
 
-以 2026 年为基准：
-2026 = 马年
 
-生肖每年向前循环。
+功能:
+
+号码生肖映射
+
+历史生肖统计
+
+冷热生肖
+
+趋势分析
+
+
 """
 
-from __future__ import annotations
+
+
+from collections import Counter
+
+
+
 
 
 # =====================================================
-# 2026 马年
+# 生肖表
 # =====================================================
 
-ZODIAC_2026 = [
-    "马",
-    "蛇",
-    "龙",
-    "兔",
-    "虎",
-    "牛",
+
+ZODIAC_ORDER = [
+
     "鼠",
-    "猪",
-    "狗",
-    "鸡",
+
+    "牛",
+
+    "虎",
+
+    "兔",
+
+    "龙",
+
+    "蛇",
+
+    "马",
+
+    "羊",
+
     "猴",
-    "羊"
+
+    "鸡",
+
+    "狗",
+
+    "猪"
+
 ]
 
 
-def get_zodiac(
-    number,
-    year=2026
-):
-    """
-    根据号码和年份返回生肖。
 
-    这里采用：
-
-    1号 = 当年生肖
-
-    然后顺时针循环。
-
-    例如：
-    2026年：
-    1 = 马
-    2 = 蛇
-    3 = 龙
-    ...
-    """
-
-    try:
-
-        number = int(number)
-        year = int(year)
-
-    except Exception:
-
-        return "未知"
-
-    if not 1 <= number <= 49:
-
-        return "未知"
-
-    # 2026是马年
-    zodiac_index = (
-        number - 1
-    ) % 12
-
-    # 年份相对于2026的偏移
-    year_offset = (
-        2026 - year
-    ) % 12
-
-    index = (
-        zodiac_index
-        +
-        year_offset
-    ) % 12
-
-    return ZODIAC_2026[index]
+# 49号码生肖映射
+# 按六合传统生肖循环
 
 
-def zodiac_numbers(
-    year=2026
-):
-    """
-    返回生肖对应号码。
-    """
+ZODIAC_MAP={}
 
-    result = {
-        zodiac: []
-        for zodiac
-        in ZODIAC_2026
-    }
 
-    for number in range(
-        1,
-        50
-    ):
 
-        zodiac = get_zodiac(
-            number,
-            year
+for i in range(1,50):
+
+
+    ZODIAC_MAP[i]=ZODIAC_ORDER[
+
+        (i-1)%12
+
+    ]
+
+
+
+
+
+
+
+# =====================================================
+# 单号码生肖
+# =====================================================
+
+
+def get_zodiac(number):
+
+
+    return ZODIAC_MAP.get(
+
+        int(number),
+
+        "未知"
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# 历史生肖
+# =====================================================
+
+
+def history_zodiac(history):
+
+
+    result=[]
+
+
+
+    for row in history:
+
+
+        special=row.get(
+
+            "special"
+
         )
 
-        result.setdefault(
-            zodiac,
-            []
-        ).append(
-            number
-        )
+
+        if special:
+
+
+            result.append(
+
+                get_zodiac(
+
+                    special
+
+                )
+
+            )
+
+
 
     return result
 
 
-def zodiac_rank(
-    numbers,
-    year=2026
-):
-    """
-    对号码对应生肖进行统计。
-    """
 
-    from collections import Counter
 
-    counter = Counter()
 
-    for number in numbers:
 
-        zodiac = get_zodiac(
-            number,
-            year
+# =====================================================
+# 生肖统计
+# =====================================================
+
+
+def zodiac_statistics(history):
+
+
+    values=history_zodiac(
+
+        history
+
+    )
+
+
+
+    if not values:
+
+
+        return {}
+
+
+
+
+
+    counter=Counter(
+
+        values
+
+    )
+
+
+
+    total=len(values)
+
+
+
+    result={}
+
+
+
+    for z in ZODIAC_ORDER:
+
+
+        result[z]={
+
+
+            "数量":
+
+            counter[z],
+
+
+
+            "比例":
+
+            round(
+
+                counter[z]/total,
+
+                3
+
+            )
+
+        }
+
+
+
+    return result
+
+
+
+
+
+
+# =====================================================
+# 热冷生肖
+# =====================================================
+
+
+def hot_cold_zodiac(history):
+
+
+    stats=zodiac_statistics(
+
+        history
+
+    )
+
+
+
+    if not stats:
+
+
+        return {}
+
+
+
+
+    ranking=sorted(
+
+        stats.items(),
+
+        key=lambda x:
+
+        x[1]["数量"],
+
+        reverse=True
+
+    )
+
+
+
+
+    return {
+
+
+        "热门生肖":
+
+        [
+
+            x[0]
+
+            for x in ranking[:3]
+
+        ],
+
+
+
+        "冷门生肖":
+
+        [
+
+            x[0]
+
+            for x in ranking[-3:]
+
+        ]
+
+    }
+
+
+
+
+
+
+# =====================================================
+# 生肖预测
+# =====================================================
+
+
+def predict_zodiac(history):
+
+
+    stats=zodiac_statistics(
+
+        history
+
+    )
+
+
+
+    if not stats:
+
+
+        return {
+
+
+            "状态":
+
+            "数据不足"
+
+        }
+
+
+
+
+
+    ranking=sorted(
+
+        stats.items(),
+
+        key=lambda x:
+
+        x[1]["比例"],
+
+        reverse=True
+
+    )
+
+
+
+
+    return {
+
+
+        "推荐生肖":
+
+        ranking[0][0],
+
+
+
+        "概率":
+
+        ranking[0][1]["比例"],
+
+
+
+        "统计":
+
+        stats,
+
+
+
+        "冷热":
+
+        hot_cold_zodiac(
+
+            history
+
         )
 
-        if zodiac != "未知":
-
-            counter[zodiac] += 1
-
-    return [
-        zodiac
-        for zodiac, count
-        in counter.most_common()
-    ]
+    }
 
 
-__all__ = [
-    "ZODIAC_2026",
+
+
+
+
+__all__=[
+
     "get_zodiac",
-    "zodiac_numbers",
-    "zodiac_rank"
+
+    "predict_zodiac",
+
+    "zodiac_statistics",
+
+    "history_zodiac"
+
 ]
