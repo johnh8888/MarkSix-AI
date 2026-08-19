@@ -1,205 +1,403 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
-HMM风格状态识别模块
+HMM状态识别模块
 
-状态：
+功能:
 
-HOT
-NORMAL
-COLD
-CHAOS
+开奖状态检测
 
-说明：
-V3.0 不依赖 hmmlearn，
-避免 GitHub Actions 因第三方依赖导致失败。
+状态:
+
+HOT     高频状态
+COLD    冷却状态
+STABLE  稳定状态
+CHAOS   混沌状态
+
 """
 
-from __future__ import annotations
 
 from collections import Counter
 
 
-STATES = (
-    "HOT",
-    "NORMAL",
-    "COLD",
-    "CHAOS"
-)
 
 
-def extract_specials(history):
 
-    result = []
-
-    for row in history:
-
-        if not isinstance(row, dict):
-            continue
-
-        try:
-            n = int(row["special"])
-        except Exception:
-            continue
-
-        if 1 <= n <= 49:
-            result.append(n)
-
-    return result
+# =====================================================
+# 状态计算
+# =====================================================
 
 
-def entropy(values):
+def calculate_entropy(values):
+
 
     if not values:
-        return 0.0
 
-    counter = Counter(
+        return 0
+
+
+
+    total=len(values)
+
+
+
+    counter=Counter(
+
         values
+
     )
 
-    total = len(values)
 
-    result = 0.0
+
+    entropy=0
+
+
 
     import math
 
-    for count in counter.values():
-
-        p = count / total
-
-        if p > 0:
-
-            result -= (
-                p * math.log(
-                    p,
-                    2
-                )
-            )
-
-    return result
 
 
-def detect_state(
-    history,
-    window=20
-):
-    """
-    判断当前市场状态。
+    for v in counter.values():
 
-    返回：
 
-    {
-        "状态": "HOT",
-        "熵": ...,
-        "波动": ...,
-        "样本": ...
-    }
-    """
+        p=v/total
 
-    specials = extract_specials(
-        history
+
+        entropy -= p*math.log(
+
+            p
+
+        )
+
+
+
+    return round(
+
+        entropy,
+
+        4
+
     )
 
-    if len(specials) < 5:
+
+
+
+
+
+# =====================================================
+# 热冷分析
+# =====================================================
+
+
+def analyze_hot_cold(history):
+
+
+    specials=[
+
+
+        x.get("special")
+
+        for x in history
+
+        if x.get("special")
+
+    ]
+
+
+
+    if len(specials)<10:
+
 
         return {
-            "状态": "NORMAL",
 
-            "熵": 0.0,
 
-            "波动": 0.0,
+            "状态":
 
-            "样本": len(specials)
+            "数据不足"
+
         }
 
-    recent = specials[-window:]
 
-    counter = Counter(
+
+
+
+
+    recent=specials[-20:]
+
+
+
+    counter=Counter(
+
         recent
+
     )
 
-    max_count = max(
-        counter.values()
-    )
 
-    unique_count = len(
-        counter
-    )
 
-    ent = entropy(
-        recent
-    )
+    most=counter.most_common(
 
-    # 重复率
-    repeat_ratio = (
         1
-        -
-        unique_count / len(recent)
-    )
 
-    # 最近号码变化程度
-    changes = 0
+    )[0]
 
-    for i in range(
-        1,
-        len(recent)
-    ):
 
-        if recent[i] != recent[i - 1]:
 
-            changes += 1
+    freq=most[1]/len(recent)
 
-    volatility = (
-        changes
-        /
-        max(
-            1,
-            len(recent) - 1
-        )
-    )
 
-    if repeat_ratio >= 0.35:
 
-        state = "HOT"
+    if freq>=0.2:
 
-    elif ent >= 3.8 and volatility >= 0.9:
 
-        state = "CHAOS"
+        state="HOT"
 
-    elif max_count <= 1:
 
-        state = "COLD"
+
+    elif freq<=0.05:
+
+
+        state="COLD"
+
+
 
     else:
 
-        state = "NORMAL"
+
+        state="STABLE"
+
+
+
+
 
     return {
-        "状态": state,
 
-        "熵": round(
-            ent,
-            4
-        ),
 
-        "波动": round(
-            volatility,
-            4
-        ),
+        "状态":
 
-        "样本": len(recent),
+        state,
 
-        "重复率": round(
-            repeat_ratio,
-            4
+
+
+        "高频号码":
+
+        most[0],
+
+
+
+        "频率":
+
+        round(
+
+            freq,
+
+            3
+
         )
+
     }
 
 
-__all__ = [
-    "STATES",
-    "entropy",
-    "detect_state"
+
+
+
+
+
+
+# =====================================================
+# 趋势检测
+# =====================================================
+
+
+def detect_trend(history):
+
+
+    if len(history)<20:
+
+
+        return "数据不足"
+
+
+
+    nums=[
+
+
+        x["special"]
+
+        for x in history[-20:]
+
+    ]
+
+
+
+    first=sum(
+
+        nums[:10]
+
+    )
+
+
+
+    second=sum(
+
+        nums[10:]
+
+    )
+
+
+
+    if second>first*1.15:
+
+
+        return "上升"
+
+
+
+    elif second<first*0.85:
+
+
+        return "下降"
+
+
+
+    else:
+
+
+        return "平稳"
+
+
+
+
+
+
+
+# =====================================================
+# HMM主接口
+# =====================================================
+
+
+def detect_state(history):
+
+
+    if len(history)<20:
+
+
+        return {
+
+
+            "状态":
+
+            "数据不足",
+
+
+
+            "趋势":
+
+            "未知"
+
+        }
+
+
+
+
+    specials=[
+
+
+        x["special"]
+
+        for x in history
+
+        if x.get("special")
+
+    ]
+
+
+
+
+    entropy=calculate_entropy(
+
+        specials[-50:]
+
+    )
+
+
+
+    hot=analyze_hot_cold(
+
+        history
+
+    )
+
+
+
+    trend=detect_trend(
+
+        history
+
+    )
+
+
+
+
+
+    if entropy>3.5:
+
+
+        state="CHAOS"
+
+
+
+    else:
+
+
+        state=hot.get(
+
+            "状态",
+
+            "STABLE"
+
+        )
+
+
+
+
+
+    return {
+
+
+        "HMM状态":
+
+        state,
+
+
+
+        "趋势":
+
+        trend,
+
+
+
+        "熵":
+
+        entropy,
+
+
+
+        "详细":
+
+        hot
+
+    }
+
+
+
+
+
+__all__=[
+
+    "detect_state",
+
+    "calculate_entropy"
+
 ]
