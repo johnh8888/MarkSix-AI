@@ -1,156 +1,377 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
-马尔可夫链模型
+Markov状态预测模块
 
-用于分析：
 
-上一期特码
-    ↓
-下一期可能号码
+支持:
 
-注意：
-这是统计排序模型，不代表真实中奖概率。
+特码状态
+波色状态
+大小状态
+单双状态
+
+
 """
 
-from __future__ import annotations
 
 from collections import defaultdict, Counter
 
 
-def extract_specials(history):
 
-    result = []
+from .features import (
+
+    extract_draw_feature
+
+)
+
+
+
+
+
+# =====================================================
+# 构造状态链
+# =====================================================
+
+
+def build_chain(
+
+        history,
+
+        key="special"
+
+):
+
+
+    chain=defaultdict(
+
+        Counter
+
+    )
+
+
+
+    states=[]
+
+
 
     for row in history:
 
-        if not isinstance(row, dict):
-            continue
 
-        try:
-            n = int(row["special"])
-        except Exception:
-            continue
+        if key=="special":
 
-        if 1 <= n <= 49:
-            result.append(n)
+
+            value=row.get(
+
+                "special"
+
+            )
+
+
+
+        else:
+
+
+            feature=extract_draw_feature(
+
+                row
+
+            )
+
+
+            value=feature.get(
+
+                key
+
+            )
+
+
+
+
+
+        if value is not None:
+
+
+            states.append(
+
+                value
+
+            )
+
+
+
+
+
+    for i in range(
+
+        len(states)-1
+
+    ):
+
+
+        current=states[i]
+
+
+        nxt=states[i+1]
+
+
+
+        chain[current][nxt]+=1
+
+
+
+
+    return chain
+
+
+
+
+
+# =====================================================
+# 概率计算
+# =====================================================
+
+
+def transition_probability(
+
+        chain,
+
+        current
+
+):
+
+
+    counter=chain.get(
+
+        current,
+
+        {}
+
+    )
+
+
+
+    if not counter:
+
+
+        return {}
+
+
+
+
+    total=sum(
+
+        counter.values()
+
+    )
+
+
+
+    result={}
+
+
+
+    for k,v in counter.items():
+
+
+        result[k]=round(
+
+            v/total,
+
+            4
+
+        )
+
+
 
     return result
 
 
-def build_transition(
-    history
-):
 
-    specials = extract_specials(
-        history
-    )
 
-    transition = defaultdict(
-        Counter
-    )
 
-    for i in range(
-        len(specials) - 1
-    ):
 
-        current = specials[i]
-
-        next_number = specials[i + 1]
-
-        transition[current][
-            next_number
-        ] += 1
-
-    return transition
+# =====================================================
+# Markov预测
+# =====================================================
 
 
 def markov_predict(
-    history,
-    top_n=10
+
+        history,
+
+        key="special"
+
 ):
-    """
-    根据最后一期特码，
-    返回下一期号码排序。
-    """
 
-    specials = extract_specials(
-        history
-    )
 
-    if not specials:
-        return []
+    if len(history)<5:
 
-    current = specials[-1]
-
-    transition = build_transition(
-        history
-    )
-
-    counter = transition.get(
-        current,
-        Counter()
-    )
-
-    if not counter:
 
         return []
 
-    return [
-        number
-        for number, count
-        in counter.most_common(top_n)
-    ]
 
 
-def markov_scores(
-    history
-):
 
-    specials = extract_specials(
-        history
+
+    chain=build_chain(
+
+        history,
+
+        key
+
     )
 
-    scores = {
-        n: 0.0
-        for n in range(1, 50)
-    }
 
-    if not specials:
-        return scores
 
-    current = specials[-1]
+    if not chain:
 
-    transition = build_transition(
-        history
-    )
 
-    counter = transition.get(
-        current,
-        Counter()
-    )
+        return []
 
-    total = sum(
-        counter.values()
-    )
 
-    if total <= 0:
-        return scores
 
-    for number, count in counter.items():
 
-        scores[number] = (
-            count / total
+    features=[]
+
+
+
+    if key=="special":
+
+
+        current=history[-1].get(
+
+            "special"
+
         )
 
-    return scores
 
 
-__all__ = [
-    "extract_specials",
-    "build_transition",
+    else:
+
+
+        current=extract_draw_feature(
+
+            history[-1]
+
+        ).get(
+
+            key
+
+        )
+
+
+
+
+    probs=transition_probability(
+
+        chain,
+
+        current
+
+    )
+
+
+
+    if not probs:
+
+
+        return []
+
+
+
+
+    ranking=sorted(
+
+        probs.items(),
+
+        key=lambda x:x[1],
+
+        reverse=True
+
+    )
+
+
+
+    return ranking
+
+
+
+
+
+
+
+# =====================================================
+# 多状态预测
+# =====================================================
+
+
+def markov_all(history):
+
+
+    return {
+
+
+        "特码":
+
+        markov_predict(
+
+            history,
+
+            "special"
+
+        ),
+
+
+
+        "波色":
+
+        markov_predict(
+
+            history,
+
+            "wave"
+
+        ),
+
+
+
+        "大小":
+
+        markov_predict(
+
+            history,
+
+            "size"
+
+        ),
+
+
+
+        "单双":
+
+        markov_predict(
+
+            history,
+
+            "odd_even"
+
+        )
+
+    }
+
+
+
+
+
+__all__=[
+
     "markov_predict",
-    "markov_scores"
+
+    "markov_all",
+
+    "build_chain"
+
 ]
