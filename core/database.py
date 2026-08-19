@@ -1,61 +1,71 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
-六合AI V10.0 FINAL
+六合彩 AI V3.0 FINAL
 
 SQLite数据库模块
 
-功能:
-历史保存
-实时保存
-预测读取
+唯一数据库接口
 """
 
+
 import sqlite3
-import os
+
+
 from datetime import datetime
 
 
-
-DB_FILE="marksix.db"
-
+from config import DATABASE_FILE
 
 
-# ==========================
-# 初始化
-# ==========================
 
-def init_db():
 
-    conn=sqlite3.connect(
-        DB_FILE
+
+# =====================================================
+# 初始化数据库
+# =====================================================
+
+
+def get_connection():
+
+    return sqlite3.connect(
+        DATABASE_FILE
     )
 
-    c=conn.cursor()
 
 
-    c.execute(
-    """
-    CREATE TABLE IF NOT EXISTS history(
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        lottery TEXT,
+def init_database():
 
-        issue TEXT,
 
-        n1 INTEGER,
-        n2 INTEGER,
-        n3 INTEGER,
-        n4 INTEGER,
-        n5 INTEGER,
-        n6 INTEGER,
-        special INTEGER,
+    conn=get_connection()
 
-        create_time TEXT
+    cur=conn.cursor()
 
-    )
-    """
+
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS draws
+        (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            lottery TEXT,
+
+            issue TEXT UNIQUE,
+
+            numbers TEXT,
+
+            special INTEGER,
+
+            source TEXT,
+
+            create_time TEXT
+
+        )
+        """
     )
 
 
@@ -66,161 +76,155 @@ def init_db():
 
 
 
-
-# ==========================
+# =====================================================
 # 保存开奖
-# ==========================
+# =====================================================
+
 
 def save_draw(
-    lottery,
-    issue,
-    numbers
-):
-
-
-    if not numbers:
-
-        return False
-
-
-
-    nums=list(numbers)
-
-
-
-    while len(nums)<7:
-
-        nums.append(0)
-
-
-
-    conn=sqlite3.connect(
-        DB_FILE
-    )
-
-
-    c=conn.cursor()
-
-
-
-    # 防止重复
-
-    c.execute(
-    """
-    SELECT id FROM history
-    WHERE lottery=? AND issue=?
-    """,
-    (
-        lottery,
-        issue
-    )
-    )
-
-
-
-    exists=c.fetchone()
-
-
-
-    if exists:
-
-        conn.close()
-
-        return False
-
-
-
-
-    c.execute(
-    """
-    INSERT INTO history
-    (
-    lottery,
-    issue,
-    n1,n2,n3,n4,n5,n6,
-    special,
-    create_time
-    )
-    VALUES
-    (?,?,?,?,?,?,?,?,?,?)
-    """,
-    (
 
         lottery,
 
         issue,
 
-        nums[0],
-        nums[1],
-        nums[2],
-        nums[3],
-        nums[4],
-        nums[5],
+        numbers,
 
-        nums[-1],
+        special,
 
-        datetime.now().isoformat()
+        source="api"
 
-    )
-
-    )
-
-
-
-    conn.commit()
-
-    conn.close()
-
-
-    return True
-
-
-
-
-
-# ==========================
-# 读取历史
-# ==========================
-
-def get_history(
-    lottery,
-    limit=500
 ):
 
 
-    conn=sqlite3.connect(
-        DB_FILE
-    )
+    conn=get_connection()
 
-
-    c=conn.cursor()
+    cur=conn.cursor()
 
 
 
-    c.execute(
-    """
-    SELECT
+    try:
 
-    n1,n2,n3,n4,n5,n6,special
 
-    FROM history
+        cur.execute(
 
-    WHERE lottery=?
+            """
+            INSERT OR IGNORE INTO draws
+            (
+            lottery,
+            issue,
+            numbers,
+            special,
+            source,
+            create_time
+            )
 
-    ORDER BY id DESC
+            VALUES (?,?,?,?,?,?)
 
-    LIMIT ?
+            """,
 
-    """,
-    (
+            (
+
+                lottery,
+
+                str(issue),
+
+                ",".join(
+
+                    map(str,numbers)
+
+                ),
+
+                int(special),
+
+                source,
+
+                datetime.now().isoformat()
+
+            )
+
+        )
+
+
+        conn.commit()
+
+
+        return cur.rowcount > 0
+
+
+
+    except Exception as e:
+
+
+        print(
+            "保存失败:",
+            e
+        )
+
+        return False
+
+
+
+    finally:
+
+
+        conn.close()
+
+
+
+
+
+# =====================================================
+# 获取历史
+# =====================================================
+
+
+def load_history(
+
         lottery,
-        limit
+
+        limit=500
+
+):
+
+
+    conn=get_connection()
+
+    cur=conn.cursor()
+
+
+
+    cur.execute(
+
+        """
+        SELECT
+        issue,
+        numbers,
+        special
+
+        FROM draws
+
+        WHERE lottery=?
+
+        ORDER BY id DESC
+
+        LIMIT ?
+
+        """,
+
+        (
+
+            lottery,
+
+            limit
+
+        )
+
     )
-    )
 
 
 
-    rows=c.fetchall()
+    rows=cur.fetchall()
+
 
 
     conn.close()
@@ -230,86 +234,57 @@ def get_history(
     result=[]
 
 
-    for r in rows:
-
-
-        nums=[
-
-            x for x in r
-
-            if x
-
-        ]
+    for issue,numbers,special in rows:
 
 
         result.append(
-            nums
+
+            {
+
+            "issue":issue,
+
+            "numbers":[
+
+                int(x)
+
+                for x in numbers.split(",")
+
+            ],
+
+            "special":special
+
+            }
+
         )
 
 
 
-    return result
+    return result[::-1]
 
 
 
 
 
-# ==========================
-# 获取数量
-# ==========================
-
-def count_history(
-    lottery
-):
+# =====================================================
+# 最新一期
+# =====================================================
 
 
-    conn=sqlite3.connect(
-        DB_FILE
-    )
+def latest_draw(lottery):
 
 
-    c=conn.cursor()
+    data=load_history(
 
-
-
-    c.execute(
-    """
-    SELECT COUNT(*)
-
-    FROM history
-
-    WHERE lottery=?
-
-    """,
-    (
         lottery,
+
+        1
+
     )
-    )
 
 
+    if data:
 
-    n=c.fetchone()[0]
-
-
-    conn.close()
+        return data[0]
 
 
-    return n
-
-
-
-
-
-# ==========================
-# 清空
-# ==========================
-
-def clear_db():
-
-    if os.path.exists(
-        DB_FILE
-    ):
-
-        os.remove(
-            DB_FILE
-        )
+    return None
