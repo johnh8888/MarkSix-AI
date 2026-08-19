@@ -1,3 +1,7 @@
+      # ==================================================
+      # 调试历史API
+      # ==================================================
+
       - name: 调试历史API返回
         run: |
 
@@ -5,7 +9,6 @@
 
           import requests
           import urllib3
-          import json
 
 
           urllib3.disable_warnings()
@@ -14,32 +17,23 @@
           url = "https://marksix6.net/index.php?api=1"
 
 
-          r = requests.get(
-
+          response = requests.get(
               url,
-
               verify=False,
-
               timeout=20,
-
               headers={
-
-                  "User-Agent":
-                  "Mozilla/5.0"
-
+                  "User-Agent": "Mozilla/5.0"
               }
-
           )
 
 
-          print("====================")
-          print("状态:")
-          print(r.status_code)
+          print("==============================")
+          print("HTTP状态:", response.status_code)
+          print("==============================")
 
-          print("====================")
 
           print(
-              r.text[:5000]
+              response.text[:5000]
           )
 
 
