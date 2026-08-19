@@ -1,10 +1,13 @@
-name: predict
+name: MarkSix AI
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: write
 
 jobs:
 
@@ -14,39 +17,184 @@ jobs:
 
     steps:
 
+      # ==========================================================
+      # 1. 拉取代码
+      # ==========================================================
+
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ==========================================================
+      # 2. Python
+      # ==========================================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ==========================================================
+      # 3. 安装依赖
+      # ==========================================================
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
+          else
+            pip install requests
           fi
 
-      - name: Compile
-        run: |
-          python -m compileall -q .
-          echo "Python语法正常"
+      # ==========================================================
+      # 4. 检查项目结构
+      # ==========================================================
 
-      - name: Prepare data
+      - name: Check project
+        run: |
+          echo "=============================="
+          echo "检查项目结构"
+          echo "=============================="
+
+          pwd
+
+          echo ""
+          echo "当前目录："
+          ls -lah
+
+          echo ""
+          echo "Python版本："
+          python --version
+
+          echo ""
+          echo "检查 main.py："
+
+          if [ ! -f main.py ]; then
+            echo "❌ main.py 不存在"
+            exit 1
+          fi
+
+          echo "✅ main.py 存在"
+
+          echo ""
+          echo "项目文件："
+          find . -maxdepth 2 -type f | sort
+
+      # ==========================================================
+      # 5. Python语法检查
+      # ==========================================================
+
+      - name: Compile Python
+        run: |
+          echo "=============================="
+          echo "Python语法检查"
+          echo "=============================="
+
+          python -m compileall -q .
+
+          echo "✅ Python语法正常"
+
+      # ==========================================================
+      # 6. 创建目录
+      # ==========================================================
+
+      - name: Prepare directories
         run: |
           mkdir -p data
           mkdir -p output
-          echo "目录准备完成"
 
-      - name: Run prediction
+          echo "=============================="
+          echo "目录准备完成"
+          echo "=============================="
+
+          ls -lah
+          ls -lah data
+          ls -lah output
+
+      # ==========================================================
+      # 7. 删除之前错误的数据库
+      #
+      # 重要：
+      # 这一步只用于修复当前被错误API数据污染的数据库。
+      # 等确认历史数据恢复正常后，可以删除这一整个步骤。
+      # ==========================================================
+
+      - name: Reset incorrect databases
         run: |
+          echo "=============================="
+          echo "清理旧数据库"
+          echo "=============================="
+
+          echo "删除前："
+          ls -lah data || true
+
+          rm -f data/new_macau.db
+          rm -f data/old_macau.db
+          rm -f data/hk.db
+
+          echo ""
+          echo "删除后："
+          ls -lah data || true
+
+          echo ""
+          echo "✅ 旧数据库清理完成"
+
+      # ==========================================================
+      # 8. 清理旧输出
+      # ==========================================================
+
+      - name: Reset output
+        run: |
+          echo "=============================="
+          echo "清理旧输出文件"
+          echo "=============================="
+
+          rm -f output/prediction.json
+          rm -f output/backtest.json
+          rm -f output/module_performance.json
+
+          echo "✅ 输出目录已清理"
+
+      # ==========================================================
+      # 9. 运行主程序
+      # ==========================================================
+
+      - name: Run prediction system
+        run: |
+          echo "=============================="
+          echo "开始运行六合彩预测系统"
+          echo "=============================="
+
           python -u main.py
 
-      - name: Check output
-        run: |
+      # ==========================================================
+      # 10. 检查数据库
+      # ==========================================================
 
+      - name: Check databases
+        run: |
+          echo "=============================="
+          echo "检查数据库"
+          echo "=============================="
+
+          echo ""
+          echo "data目录："
+          ls -lah data
+
+          test -f data/new_macau.db
+          test -f data/old_macau.db
+          test -f data/hk.db
+
+          echo ""
+          echo "✅ 三个数据库文件存在"
+
+      # ==========================================================
+      # 11. 检查输出文件
+      # ==========================================================
+
+      - name: Check output files
+        run: |
           echo "=============================="
           echo "检查预测结果"
           echo "=============================="
@@ -55,72 +203,50 @@ jobs:
           test -f output/backtest.json
           test -f output/module_performance.json
 
+          echo ""
+          echo "输出文件："
+          ls -lah output
+
+          echo ""
+          echo "✅ 三个输出文件全部存在"
+
+      # ==========================================================
+      # 12. 严格检查 prediction.json
+      # ==========================================================
+
+      - name: Validate prediction
+        run: |
           python - <<'PY'
 
           import json
-          import os
           import sys
+          import os
 
-          files = [
-              "output/prediction.json",
-              "output/backtest.json",
-              "output/module_performance.json",
-          ]
+          path = "output/prediction.json"
 
-          for path in files:
+          print("==============================")
+          print("验证 prediction.json")
+          print("==============================")
 
-              print(f"检查：{path}")
-
-              if not os.path.isfile(path):
-                  print(f"❌ 文件不存在：{path}")
-                  sys.exit(1)
-
-              try:
-
-                  with open(
-                      path,
-                      "r",
-                      encoding="utf-8"
-                  ) as f:
-                      data = json.load(f)
-
-              except Exception as exc:
-
-                  print(
-                      f"❌ JSON解析失败：{exc}"
-                  )
-
-                  sys.exit(1)
-
-              if not isinstance(data, dict):
-
-                  print(
-                      "❌ JSON顶层必须是object"
-                  )
-
-                  sys.exit(1)
-
-              print("✅ JSON正常")
+          if not os.path.isfile(path):
+              print("❌ prediction.json 不存在")
+              sys.exit(1)
 
           with open(
-              "output/prediction.json",
+              path,
               "r",
               encoding="utf-8"
           ) as f:
+              data = json.load(f)
 
-              prediction = json.load(f)
+          if not isinstance(data, dict):
+              print("❌ prediction.json 顶层必须是 object")
+              sys.exit(1)
 
-          lotteries = prediction.get(
-              "lotteries"
-          )
+          lotteries = data.get("lotteries")
 
-          if not isinstance(
-              lotteries,
-              dict
-          ):
-              print(
-                  "❌ 缺少lotteries"
-              )
+          if not isinstance(lotteries, dict):
+              print("❌ 缺少 lotteries")
               sys.exit(1)
 
           required = [
@@ -131,49 +257,261 @@ jobs:
 
           for lottery in required:
 
+              print()
+              print("检查：", lottery)
+
               if lottery not in lotteries:
-
-                  print(
-                      f"❌ 缺少：{lottery}"
-                  )
-
+                  print(f"❌ 缺少 {lottery}")
                   sys.exit(1)
 
               item = lotteries[lottery]
 
+              if not isinstance(item, dict):
+                  print(f"❌ {lottery} 数据结构错误")
+                  sys.exit(1)
+
+              required_fields = [
+                  "latest_issue",
+                  "latest_draw_issue",
+                  "prediction_issue",
+                  "next_prediction_issue",
+                  "latest_numbers",
+                  "special_number",
+                  "candidates",
+                  "special_candidates",
+                  "top5",
+                  "top10",
+                  "top12",
+                  "attributes",
+              ]
+
+              for field in required_fields:
+
+                  if field not in item:
+                      print(
+                          f"❌ {lottery} 缺少字段：{field}"
+                      )
+                      sys.exit(1)
+
+              latest_issue = str(
+                  item["latest_issue"]
+              )
+
+              prediction_issue = str(
+                  item["prediction_issue"]
+              )
+
+              numbers = item["latest_numbers"]
+
+              candidates = item["candidates"]
+
+              special_candidates = item[
+                  "special_candidates"
+              ]
+
+              top5 = item["top5"]
+              top10 = item["top10"]
+              top12 = item["top12"]
+
+              # ------------------------------------------
+              # 期号检查
+              # ------------------------------------------
+
+              if not latest_issue.isdigit():
+                  print(
+                      f"❌ {lottery} 最新期号错误："
+                      f"{latest_issue}"
+                  )
+                  sys.exit(1)
+
+              if not prediction_issue.isdigit():
+                  print(
+                      f"❌ {lottery} 预测期号错误："
+                      f"{prediction_issue}"
+                  )
+                  sys.exit(1)
+
+              # ------------------------------------------
+              # 开奖号码必须7个
+              # ------------------------------------------
+
+              if not isinstance(numbers, list):
+                  print(
+                      f"❌ {lottery} latest_numbers 不是数组"
+                  )
+                  sys.exit(1)
+
+              if len(numbers) != 7:
+                  print(
+                      f"❌ {lottery} 开奖号码不是7个："
+                      f"{numbers}"
+                  )
+                  sys.exit(1)
+
+              # ------------------------------------------
+              # 特别号码必须等于第7个
+              # ------------------------------------------
+
+              special_number = item[
+                  "special_number"
+              ]
+
+              if special_number != numbers[-1]:
+                  print(
+                      f"❌ {lottery} 特别号码不是第7个号码"
+                  )
+                  print(
+                      "开奖号码：",
+                      numbers
+                  )
+                  print(
+                      "特别号码：",
+                      special_number
+                  )
+                  sys.exit(1)
+
+              # ------------------------------------------
+              # 特别号码候选
+              # ------------------------------------------
+
               if not isinstance(
-                  item,
-                  dict
+                  special_candidates,
+                  list
               ):
-
                   print(
-                      f"❌ {lottery}结构错误"
+                      f"❌ {lottery} special_candidates 错误"
                   )
-
                   sys.exit(1)
 
-              if "candidates" not in item:
-
+              if not isinstance(
+                  candidates,
+                  list
+              ):
                   print(
-                      f"❌ {lottery}缺少candidates"
+                      f"❌ {lottery} candidates 错误"
                   )
-
                   sys.exit(1)
 
-              if "latest_issue" not in item:
-
+              if candidates != special_candidates:
                   print(
-                      f"❌ {lottery}缺少latest_issue"
+                      f"❌ {lottery} candidates "
+                      "与 special_candidates 不一致"
                   )
-
                   sys.exit(1)
 
-              if "prediction_issue" not in item:
+              # ------------------------------------------
+              # Top5 / Top10 / Top12
+              # ------------------------------------------
 
+              if len(top5) != 5:
                   print(
-                      f"❌ {lottery}缺少prediction_issue"
+                      f"❌ {lottery} Top5 数量错误"
                   )
+                  sys.exit(1)
 
+              if len(top10) != 10:
+                  print(
+                      f"❌ {lottery} Top10 数量错误"
+                  )
+                  sys.exit(1)
+
+              if len(top12) != 12:
+                  print(
+                      f"❌ {lottery} Top12 数量错误"
+                  )
+                  sys.exit(1)
+
+              # ------------------------------------------
+              # 属性检查
+              # ------------------------------------------
+
+              attrs = item["attributes"]
+
+              if not isinstance(attrs, dict):
+                  print(
+                      f"❌ {lottery} attributes 错误"
+                  )
+                  sys.exit(1)
+
+              # 生肖必须5个
+              zodiac = attrs.get("zodiac", {})
+
+              zodiac_top5 = zodiac.get(
+                  "top5",
+                  []
+              )
+
+              if len(zodiac_top5) != 5:
+                  print(
+                      f"❌ {lottery} 生肖不是5推："
+                      f"{zodiac_top5}"
+                  )
+                  sys.exit(1)
+
+              # 单双只能一个
+              odd_even = attrs.get(
+                  "odd_even",
+                  {}
+              )
+
+              odd_double = odd_even.get(
+                  "double",
+                  []
+              )
+
+              if len(odd_double) != 1:
+                  print(
+                      f"❌ {lottery} 单双不是单推："
+                      f"{odd_double}"
+                  )
+                  sys.exit(1)
+
+              # 大小只能一个
+              size = attrs.get(
+                  "size",
+                  {}
+              )
+
+              size_double = size.get(
+                  "double",
+                  []
+              )
+
+              if len(size_double) != 1:
+                  print(
+                      f"❌ {lottery} 大小不是单推："
+                      f"{size_double}"
+                  )
+                  sys.exit(1)
+
+              # 波色必须主推+次推+双色
+              wave = attrs.get(
+                  "wave",
+                  {}
+              )
+
+              if not wave.get("main"):
+                  print(
+                      f"❌ {lottery} 缺少波色主推"
+                  )
+                  sys.exit(1)
+
+              if not wave.get("secondary"):
+                  print(
+                      f"❌ {lottery} 缺少波色次推"
+                  )
+                  sys.exit(1)
+
+              wave_double = wave.get(
+                  "double",
+                  []
+              )
+
+              if len(wave_double) != 2:
+                  print(
+                      f"❌ {lottery} 波色双色错误："
+                      f"{wave_double}"
+                  )
                   sys.exit(1)
 
               print(
@@ -181,37 +519,126 @@ jobs:
               )
 
               print(
-                  f"   最新期：{item['latest_issue']}"
+                  f"   最新期：{latest_issue}"
               )
 
               print(
-                  f"   预测期：{item['prediction_issue']}"
+                  f"   预测期：{prediction_issue}"
+              )
+
+              print(
+                  f"   开奖号码："
+                  + " ".join(
+                      f"{x:02d}"
+                      for x in numbers
+                  )
+              )
+
+              print(
+                  f"   特别号码："
+                  f"{special_number:02d}"
+              )
+
+              print(
+                  "   特别候选："
+                  + " ".join(
+                      f"{x:02d}"
+                      for x in candidates
+                  )
+              )
+
+              print(
+                  "   生肖5推："
+                  + " ".join(
+                      zodiac_top5
+                  )
+              )
+
+              print(
+                  "   单双："
+                  + str(
+                      odd_double
+                  )
+              )
+
+              print(
+                  "   大小："
+                  + str(
+                      size_double
+                  )
+              )
+
+              print(
+                  "   波色："
+                  + str(
+                      wave_double
+                  )
               )
 
           print()
-          print(
-              "=============================="
-          )
-          print(
-              "预测结果检查通过"
-          )
-          print(
-              "=============================="
-          )
+          print("==============================")
+          print("预测结果结构检查通过")
+          print("==============================")
 
           PY
 
-      - name: Show output
-        run: |
+      # ==========================================================
+      # 13. 显示最终结果
+      # ==========================================================
 
+      - name: Show final output
+        run: |
           echo "=============================="
           echo "最终输出文件"
           echo "=============================="
 
-          ls -lah output/
+          ls -lah output
 
+          echo ""
           echo "=============================="
           echo "prediction.json"
           echo "=============================="
 
           cat output/prediction.json
+
+          echo ""
+          echo "=============================="
+          echo "backtest.json"
+          echo "=============================="
+
+          cat output/backtest.json
+
+          echo ""
+          echo "=============================="
+          echo "module_performance.json"
+          echo "=============================="
+
+          cat output/module_performance.json
+
+      # ==========================================================
+      # 14. 上传结果作为 GitHub Actions Artifact
+      # ==========================================================
+
+      - name: Upload prediction results
+        uses: actions/upload-artifact@v4
+        with:
+          name: marksix-prediction-results
+          path: |
+            output/prediction.json
+            output/backtest.json
+            output/module_performance.json
+          if-no-files-found: error
+
+      # ==========================================================
+      # 15. 上传数据库备份
+      # ==========================================================
+
+      - name: Upload databases
+        uses: actions/upload-artifact@v4
+        with:
+          name: marksix-databases
+          path: |
+            data/new_macau.db
+            data/old_macau.db
+            data/hk.db
+          if-no-files-found: error
