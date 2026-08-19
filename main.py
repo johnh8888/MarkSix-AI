@@ -816,7 +816,7 @@ def trend_score(history):
 def score_numbers(history):
 
 
-    freq=
+    freq = {}
 
     frequency_score(history)
 
