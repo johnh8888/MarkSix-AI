@@ -1,1885 +1,437 @@
+# core/engine.py
 # -*- coding: utf-8 -*-
 
 """
-六合彩 AI V3.6 FINAL
-core/engine.py
+MarkSix-AI
+核心运行引擎
+兼容 main.py:
+    from core.engine import run_system
 
-功能：
-
-1. API同步
-2. 三彩种统一分析
-3. 特码3码
-4. 特码10码
-5. 🔥 热号
-6. ❄ 冷号
-7. 📈 趋势
-8. 🐉 特别生肖5个
-9. 🌊 波色
-10. 📊 大小
-11. ⚖️ 单双
-12. 🎯 推荐理由
-13. JSON
-14. TXT
-15. HTML
+作用：
+1. 统一调用数据同步
+2. 统一执行三彩种分析
+3. 尽量兼容旧版模块
+4. 即使部分高级模型不存在，也不会因为导入失败直接退出
 """
 
-import json
+from __future__ import annotations
+
 import os
+import sys
+import traceback
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 # ============================================================
-# 路径
+# 基础工具
 # ============================================================
 
-BASE_DIR = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(__file__)
-    )
-)
-
-OUTPUT_DIR = os.path.join(
-    BASE_DIR,
-    "output"
-)
-
-os.makedirs(
-    OUTPUT_DIR,
-    exist_ok=True
-)
-
-JSON_FILE = os.path.join(
-    OUTPUT_DIR,
-    "prediction.json"
-)
-
-TXT_FILE = os.path.join(
-    OUTPUT_DIR,
-    "report.txt"
-)
-
-HTML_FILE = os.path.join(
-    OUTPUT_DIR,
-    "report.html"
-)
+def _log(message: str = "") -> None:
+    print(message, flush=True)
 
 
-# ============================================================
-# 彩种
-# ============================================================
-
-LOTTERY_NAMES = {
-
-    "hk":
-        "香港六合彩",
-
-    "newMacau":
-        "新澳门六合彩",
-
-    "oldMacau":
-        "老澳门六合彩",
-
-}
-
-
-# ============================================================
-# 安全转换
-# ============================================================
-
-def safe_int(value):
-
+def _safe_import(module_name: str):
+    """
+    安全导入模块。
+    某个高级模块不存在时，不让整个系统直接崩溃。
+    """
     try:
-        return int(value)
-
-    except (
-        TypeError,
-        ValueError,
-    ):
+        return __import__(module_name, fromlist=["*"])
+    except Exception as exc:
+        _log(f"[WARN] 模块 {module_name} 导入失败：{exc}")
         return None
 
 
-# ============================================================
-# 获取历史
-# ============================================================
-
-def get_history(
-    database,
-    lottery_code
-):
-
+def _call_if_exists(
+    module: Any,
+    function_names: List[str],
+    *args,
+    **kwargs
+) -> Any:
     """
-    兼容不同 database 实现。
-
-    优先尝试：
-
-    get_history(code)
-
-    get_lottery_history(code)
-
-    query_history(code)
+    在模块中寻找可用函数并调用。
     """
+    if module is None:
+        return None
 
-    methods = [
+    for name in function_names:
+        func = getattr(module, name, None)
 
-        "get_history",
-
-        "get_lottery_history",
-
-        "query_history",
-
-    ]
-
-    for method_name in methods:
-
-        method = getattr(
-            database,
-            method_name,
-            None
-        )
-
-        if not callable(method):
-
-            continue
-
-        try:
-
-            result = method(
-                lottery_code
-            )
-
-            if result is not None:
-
-                return list(
-                    result
-                )
-
-        except TypeError:
-
+        if callable(func):
             try:
-
-                result = method()
-
-                if result is not None:
-
-                    return list(
-                        result
+                return func(*args, **kwargs)
+            except TypeError:
+                # 参数不兼容时尝试无参数调用
+                try:
+                    return func()
+                except Exception as exc:
+                    _log(
+                        f"[WARN] 调用 {name}() 失败：{exc}"
                     )
+            except Exception as exc:
+                _log(
+                    f"[WARN] 调用 {name}() 失败：{exc}"
+                )
 
-            except Exception:
-
-                pass
-
-        except Exception:
-
-            pass
-
-    return []
+    return None
 
 
 # ============================================================
-# 兼容历史字段
+# 数据库 / 数据同步
 # ============================================================
 
-def normalize_history(
-    history
-):
-
-    result = []
-
-    for row in history:
-
-        # ----------------------------------------------------
-        # 已经是 dict
-        # ----------------------------------------------------
-
-        if isinstance(
-            row,
-            dict
-        ):
-
-            item = dict(
-                row
-            )
-
-            # special
-            if item.get(
-                "special"
-            ) is None:
-
-                for key in (
-                    "special_number",
-                    "specialNumber",
-                    "specialNum",
-                    "special_num",
-                ):
-
-                    if item.get(key) is not None:
-
-                        item["special"] = (
-                            item[key]
-                        )
-
-                        break
-
-            # issue
-            if item.get(
-                "issue"
-            ) is None:
-
-                for key in (
-                    "expect",
-                    "period",
-                    "qihao",
-                ):
-
-                    if item.get(key) is not None:
-
-                        item["issue"] = (
-                            item[key]
-                        )
-
-                        break
-
-            special = safe_int(
-                item.get(
-                    "special"
-                )
-            )
-
-            if special is None:
-
-                # 尝试从 numbers 提取
-                numbers = item.get(
-                    "numbers"
-                )
-
-                if isinstance(
-                    numbers,
-                    list
-                ) and numbers:
-
-                    try:
-
-                        special = int(
-                            numbers[-1]
-                        )
-
-                    except Exception:
-
-                        special = None
-
-            if special is None:
-
-                continue
-
-            item["special"] = (
-                special
-            )
-
-            result.append(
-                item
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # tuple / list
-        # ----------------------------------------------------
-
-        if isinstance(
-            row,
-            (list, tuple)
-        ):
-
-            if not row:
-
-                continue
-
-            item = {}
-
-            # 常见：
-
-            # issue
-            # numbers
-            # special
-
-            if len(row) >= 1:
-
-                item["issue"] = (
-                    row[0]
-                )
-
-            if len(row) >= 2:
-
-                value = row[1]
-
-                if isinstance(
-                    value,
-                    (list, tuple)
-                ):
-
-                    numbers = [
-                        safe_int(x)
-                        for x in value
-                    ]
-
-                    numbers = [
-                        x
-                        for x in numbers
-                        if x is not None
-                    ]
-
-                    if numbers:
-
-                        item["numbers"] = (
-                            numbers
-                        )
-
-                        item["special"] = (
-                            numbers[-1]
-                        )
-
-                else:
-
-                    value = safe_int(
-                        value
-                    )
-
-                    if value is not None:
-
-                        item["special"] = (
-                            value
-                        )
-
-            if len(row) >= 3:
-
-                value = safe_int(
-                    row[-1]
-                )
-
-                if value is not None:
-
-                    item["special"] = (
-                        value
-                    )
-
-            if item.get(
-                "special"
-            ) is not None:
-
-                result.append(
-                    item
-                )
-
-    return result
-
-
-# ============================================================
-# 热号
-# ============================================================
-
-def calculate_hot_numbers(
-    history
-):
-
-    numbers = []
-
-    for row in history:
-
-        try:
-
-            value = int(
-                row.get(
-                    "special"
-                )
-            )
-
-            if 1 <= value <= 49:
-
-                numbers.append(
-                    value
-                )
-
-        except Exception:
-
-            continue
-
-    if not numbers:
-
-        return []
-
-    # 最近50期
-    recent = numbers[-50:]
-
-    from collections import Counter
-
-    counter = Counter(
-        recent
-    )
-
-    return [
-        number
-        for number, count
-        in counter.most_common(8)
+def sync_data() -> Any:
+    """
+    尝试调用项目中现有的数据同步模块。
+
+    兼容：
+        core.data
+        core.sync
+        data
+        sync
+    """
+
+    candidates = [
+        "core.sync",
+        "core.data",
+        "core.data_sync",
+        "sync",
+        "data",
     ]
 
-
-# ============================================================
-# 冷号
-# ============================================================
-
-def calculate_cold_numbers(
-    history
-):
-
-    numbers = []
-
-    for row in history:
-
-        try:
-
-            value = int(
-                row.get(
-                    "special"
-                )
-            )
-
-            if 1 <= value <= 49:
-
-                numbers.append(
-                    value
-                )
-
-        except Exception:
-
-            continue
-
-    if not numbers:
-
-        return []
-
-    missing = {}
-
-    for number in range(
-        1,
-        50
-    ):
-
-        count = 0
-
-        for value in reversed(
-            numbers
-        ):
-
-            if value == number:
-
-                break
-
-            count += 1
-
-        missing[number] = count
-
-    return [
-        number
-        for number, _ in sorted(
-            missing.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:8]
+    functions = [
+        "sync_all",
+        "sync_data",
+        "update_all",
+        "update_data",
+        "fetch_and_save",
+        "fetch_online",
+        "run_sync",
     ]
 
+    for module_name in candidates:
+        module = _safe_import(module_name)
 
-# ============================================================
-# 趋势
-# ============================================================
-
-def calculate_trend(
-    history,
-    prediction
-):
-
-    result = {}
-
-    wave = prediction.get(
-        "波色"
-    )
-
-    if isinstance(
-        wave,
-        dict
-    ):
-
-        result[
-            "波色趋势"
-        ] = wave.get(
-            "推荐波色",
-            "未知"
-        )
-
-    size = prediction.get(
-        "大小"
-    )
-
-    if isinstance(
-        size,
-        dict
-    ):
-
-        result[
-            "大小趋势"
-        ] = size.get(
-            "推荐",
-            "未知"
-        )
-
-    odd_even = prediction.get(
-        "单双"
-    )
-
-    if isinstance(
-        odd_even,
-        dict
-    ):
-
-        result[
-            "单双趋势"
-        ] = odd_even.get(
-            "推荐",
-            "未知"
-        )
-
-    return result
-
-
-# ============================================================
-# 推荐理由
-# ============================================================
-
-def build_reasons(
-    history,
-    prediction
-):
-
-    reasons = []
-
-    count = len(
-        history
-    )
-
-    if count >= 500:
-
-        reasons.append(
-            "历史数据充足"
-        )
-
-    elif count >= 100:
-
-        reasons.append(
-            "历史数据较充足"
-        )
-
-    else:
-
-        reasons.append(
-            "历史数据有限"
-        )
-
-    if prediction.get(
-        "🔥热号"
-    ):
-
-        reasons.append(
-            "近期热号参与评分"
-        )
-
-    if prediction.get(
-        "❄冷号"
-    ):
-
-        reasons.append(
-            "遗漏走势参与评分"
-        )
-
-    if prediction.get(
-        "波色"
-    ):
-
-        reasons.append(
-            "波色模型参与"
-        )
-
-    models = prediction.get(
-        "模型状态",
-        {}
-    )
-
-    if models.get(
-        "Markov"
-    ) == "启用":
-
-        reasons.append(
-            "Markov趋势参与"
-        )
-
-    if models.get(
-        "HMM"
-    ) == "启用":
-
-        reasons.append(
-            "HMM状态参与"
-        )
-
-    reasons.append(
-        "综合评分排序"
-    )
-
-    return reasons
-
-
-# ============================================================
-# 整理特别生肖
-# ============================================================
-
-def normalize_zodiac(
-    zodiac
-):
-
-    if not isinstance(
-        zodiac,
-        dict
-    ):
-
-        return {
-            "特别生肖": [],
-            "特别生肖Top5": [],
-            "对应号码": {},
-        }
-
-    top5 = zodiac.get(
-        "特别生肖Top5",
-        []
-    )
-
-    simple = zodiac.get(
-        "特别生肖",
-        []
-    )
-
-    number_map = {}
-
-    for item in top5:
-
-        if not isinstance(
-            item,
-            dict
-        ):
-
+        if module is None:
             continue
 
-        name = item.get(
-            "生肖"
+        result = _call_if_exists(
+            module,
+            functions,
         )
 
-        numbers = item.get(
-            "对应号码",
-            []
-        )
+        if result is not None:
+            return result
 
-        if name:
-
-            number_map[name] = (
-                numbers
-            )
-
-    return {
-
-        "特别生肖":
-            simple[:5],
-
-        "特别生肖Top5":
-            top5[:5],
-
-        "对应号码":
-            number_map,
-
-    }
+    _log("[INFO] 未找到独立数据同步函数，继续使用已有数据。")
+    return None
 
 
 # ============================================================
-# 单个彩种分析
+# 单彩种分析
 # ============================================================
 
 def analyze_lottery(
-    code,
-    history,
-    predictor
-):
+    lottery_name: str,
+    data: Any = None,
+) -> Dict[str, Any]:
+    """
+    单个彩种分析。
 
-    name = LOTTERY_NAMES.get(
-        code,
-        code
-    )
+    尽量兼容项目中已有的分析模块。
+    """
 
-    print()
-    print("=" * 60)
-    print(
-        f"分析: {name}"
-    )
-    print("=" * 60)
+    result: Dict[str, Any] = {
+        "lottery": lottery_name,
+        "time": datetime.now().isoformat(),
+        "success": False,
+    }
 
-    history = normalize_history(
-        history
-    )
+    module_candidates = [
+        "core.predictor",
+        "core.prediction",
+        "core.analyzer",
+        "core.analysis",
+        "core.model",
+        "core.models",
+        "predictor",
+        "prediction",
+        "analyzer",
+        "analysis",
+    ]
 
-    print(
-        f"历史数量: {len(history)}"
-    )
+    function_candidates = [
+        "predict",
+        "predict_next",
+        "predict_lottery",
+        "run_prediction",
+        "analyze",
+        "analyze_lottery",
+        "run_analysis",
+    ]
 
-    # --------------------------------------------------------
-    # predictor
-    # --------------------------------------------------------
+    for module_name in module_candidates:
 
-    prediction = predictor(
-        history
-    )
+        module = _safe_import(module_name)
 
-    if not isinstance(
-        prediction,
-        dict
-    ):
+        if module is None:
+            continue
 
-        prediction = {}
+        # ----------------------------------------------------
+        # 第一种：带 lottery_name + data
+        # ----------------------------------------------------
 
-    # --------------------------------------------------------
-    # 兼容旧字段
-    # --------------------------------------------------------
+        for function_name in function_candidates:
 
-    top3 = prediction.get(
-        "🎯推荐3码"
-    )
+            func = getattr(module, function_name, None)
 
-    if not top3:
+            if not callable(func):
+                continue
 
-        top3 = prediction.get(
-            "重点3码",
-            []
-        )
+            attempts = [
+                (lottery_name, data),
+                (lottery_name,),
+                (data,),
+                (),
+            ]
 
-    top10 = prediction.get(
-        "⭐10码范围"
-    )
+            for args in attempts:
 
-    if not top10:
+                try:
+                    value = func(*args)
 
-        top10 = prediction.get(
-            "特码10码",
-            []
-        )
+                    if value is not None:
+                        result["success"] = True
+                        result["result"] = value
+                        return result
 
-    hot = prediction.get(
-        "🔥热号"
-    )
+                except TypeError:
+                    continue
 
-    if hot is None:
-
-        hot = calculate_hot_numbers(
-            history
-        )
-
-    cold = prediction.get(
-        "❄冷号"
-    )
-
-    if cold is None:
-
-        cold = calculate_cold_numbers(
-            history
-        )
+                except Exception as exc:
+                    _log(
+                        f"[WARN] {module_name}.{function_name} "
+                        f"执行失败：{exc}"
+                    )
+                    continue
 
     # --------------------------------------------------------
-    # 生肖
+    # 没有高级预测器时，返回基础状态
     # --------------------------------------------------------
 
-    zodiac = normalize_zodiac(
-        prediction.get(
-            "🐉特别生肖",
-            prediction.get(
-                "特别生肖",
-                {}
-            )
-        )
-    )
-
-    # --------------------------------------------------------
-    # 趋势
-    # --------------------------------------------------------
-
-    trend = prediction.get(
-        "📈趋势"
-    )
-
-    if not isinstance(
-        trend,
-        dict
-    ):
-
-        trend = calculate_trend(
-            history,
-            prediction
-        )
-
-    # --------------------------------------------------------
-    # 推荐理由
-    # --------------------------------------------------------
-
-    reasons = prediction.get(
-        "🎯推荐理由"
-    )
-
-    if not reasons:
-
-        reasons = build_reasons(
-            history,
-            prediction
-        )
-
-    # --------------------------------------------------------
-    # 最终结构
-    # --------------------------------------------------------
-
-    result = {
-
-        "模型版本":
-            "V3.6 FINAL",
-
-        "彩种":
-            name,
-
-        "代码":
-            code,
-
-        "历史数量":
-            len(history),
-
-        "🎯推荐3码":
-            top3,
-
-        "⭐10码范围":
-            top10,
-
-        "🔥热号":
-            hot,
-
-        "❄冷号":
-            cold,
-
-        "📈趋势":
-            trend,
-
-        "🐉特别生肖":
-            zodiac,
-
-        "波色":
-            prediction.get(
-                "波色",
-                {}
-            ),
-
-        "大小":
-            prediction.get(
-                "大小",
-                {}
-            ),
-
-        "单双":
-            prediction.get(
-                "单双",
-                {}
-            ),
-
-        "第一推荐":
-            prediction.get(
-                "第一推荐",
-                top3[0]
-                if top3
-                else None
-            ),
-
-        "置信度":
-            prediction.get(
-                "置信度",
-                0
-            ),
-
-        "风险等级":
-            prediction.get(
-                "风险等级",
-                "高风险"
-            ),
-
-        "🎯推荐理由":
-            reasons,
-
-        "模型状态":
-            prediction.get(
-                "模型状态",
-                {}
-            ),
-
-        "当前状态":
-            prediction.get(
-                "当前状态",
-                {}
-            ),
-
-        "评分":
-            prediction.get(
-                "评分",
-                {}
-            ),
-
+    result["result"] = {
+        "lottery": lottery_name,
+        "message": "暂无可用预测模块，已完成引擎初始化。",
     }
 
     return result
 
 
 # ============================================================
-# 控制台显示
+# 三彩种统一分析
 # ============================================================
 
-def print_prediction(
-    result
-):
+def run_all_lotteries(
+    data: Any = None,
+) -> Dict[str, Any]:
 
-    print()
-    print(
-        "🎲 " +
-        result.get(
-            "彩种",
-            "未知"
-        )
-    )
+    lotteries = [
+        "新澳门彩",
+        "老澳门彩",
+        "香港彩",
+    ]
 
-    print("-" * 60)
+    results: Dict[str, Any] = {}
 
-    # --------------------------------------------------------
-    # 推荐
-    # --------------------------------------------------------
+    for lottery in lotteries:
 
-    print(
-        "🎯 推荐3码:",
-        result.get(
-            "🎯推荐3码",
-            []
-        )
-    )
+        _log("")
+        _log("=" * 70)
+        _log(f"正在分析：{lottery}")
+        _log("=" * 70)
 
-    print(
-        "⭐ 10码:",
-        result.get(
-            "⭐10码范围",
-            []
-        )
-    )
-
-    print()
-
-    # --------------------------------------------------------
-    # 热冷
-    # --------------------------------------------------------
-
-    print(
-        "🔥 热号:",
-        result.get(
-            "🔥热号",
-            []
-        )
-    )
-
-    print(
-        "❄ 冷号:",
-        result.get(
-            "❄冷号",
-            []
-        )
-    )
-
-    print()
-
-    # --------------------------------------------------------
-    # 趋势
-    # --------------------------------------------------------
-
-    print(
-        "📈 趋势:"
-    )
-
-    trend = result.get(
-        "📈趋势",
-        {}
-    )
-
-    if isinstance(
-        trend,
-        dict
-    ):
-
-        for key, value in trend.items():
-
-            print(
-                f"   {key}: {value}"
+        try:
+            results[lottery] = analyze_lottery(
+                lottery,
+                data,
             )
 
-    # --------------------------------------------------------
-    # 特别生肖
-    # --------------------------------------------------------
+        except Exception as exc:
 
-    print()
-    print(
-        "🐉 特别生肖:"
-    )
-
-    zodiac = result.get(
-        "🐉特别生肖",
-        {}
-    )
-
-    top5 = zodiac.get(
-        "特别生肖Top5",
-        []
-    )
-
-    if top5:
-
-        for item in top5:
-
-            if not isinstance(
-                item,
-                dict
-            ):
-
-                continue
-
-            rank = item.get(
-                "排名",
-                ""
+            _log(
+                f"[ERROR] {lottery} 分析失败：{exc}"
             )
 
-            name = item.get(
-                "生肖",
-                "未知"
-            )
+            results[lottery] = {
+                "lottery": lottery,
+                "success": False,
+                "error": str(exc),
+            }
 
-            numbers = item.get(
-                "对应号码",
-                []
-            )
-
-            score = item.get(
-                "评分",
-                0
-            )
-
-            print(
-                f"   {rank}. {name}"
-                f" 号码:{numbers}"
-                f" 评分:{score}"
-            )
-
-    else:
-
-        print(
-            "   暂无"
-        )
-
-    # --------------------------------------------------------
-    # 波色
-    # --------------------------------------------------------
-
-    wave = result.get(
-        "波色",
-        {}
-    )
-
-    if isinstance(
-        wave,
-        dict
-    ):
-
-        print()
-        print(
-            "🌊 波色:",
-            wave.get(
-                "推荐波色",
-                "未知"
-            ),
-            "(",
-            wave.get(
-                "概率",
-                0
-            ),
-            ")"
-        )
-
-    # --------------------------------------------------------
-    # 大小
-    # --------------------------------------------------------
-
-    size = result.get(
-        "大小",
-        {}
-    )
-
-    if isinstance(
-        size,
-        dict
-    ):
-
-        print(
-            "📊 大小:",
-            size.get(
-                "推荐",
-                "未知"
-            )
-        )
-
-    # --------------------------------------------------------
-    # 单双
-    # --------------------------------------------------------
-
-    odd_even = result.get(
-        "单双",
-        {}
-    )
-
-    if isinstance(
-        odd_even,
-        dict
-    ):
-
-        print(
-            "⚖️ 单双:",
-            odd_even.get(
-                "推荐",
-                "未知"
-            )
-        )
-
-    # --------------------------------------------------------
-    # 置信度
-    # --------------------------------------------------------
-
-    print(
-        "📊 置信度:",
-        result.get(
-            "置信度",
-            0
-        )
-    )
-
-    print(
-        "⚠️ 风险:",
-        result.get(
-            "风险等级",
-            "高风险"
-        )
-    )
-
-    # --------------------------------------------------------
-    # 推荐理由
-    # --------------------------------------------------------
-
-    print()
-    print(
-        "🎯 推荐理由:"
-    )
-
-    for reason in result.get(
-        "🎯推荐理由",
-        []
-    ):
-
-        print(
-            f"   - {reason}"
-        )
+    return results
 
 
 # ============================================================
-# TXT报告
+# 结果输出
 # ============================================================
 
-def build_txt(
-    results
-):
+def print_results(results: Dict[str, Any]) -> None:
 
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    _log("")
+    _log("=" * 70)
+    _log("预测系统运行结果")
+    _log("=" * 70)
 
-    lines = []
+    for lottery, result in results.items():
 
-    lines.append(
-        "=============================================="
-    )
+        _log("")
+        _log(f"【{lottery}】")
 
-    lines.append(
-        "🔥 六合AI智能预测报告"
-    )
+        if not isinstance(result, dict):
+            _log(str(result))
+            continue
 
-    lines.append(
-        f"时间: {now}"
-    )
+        success = result.get("success", False)
 
-    lines.append(
-        "=============================================="
-    )
+        if success:
+            _log("状态：分析完成")
+        else:
+            _log("状态：基础引擎完成")
 
-    for result in results.values():
+        prediction = result.get("result")
 
-        lines.append("")
+        if prediction is not None:
+            _log(f"结果：{prediction}")
 
-        lines.append(
-            f"🎲 {result['彩种']}"
-        )
+        if result.get("error"):
+            _log(f"错误：{result['error']}")
 
-        lines.append(
-            "----------------------------------------------"
-        )
-
-        lines.append(
-            "🎯 推荐3码: "
-            + str(
-                result["🎯推荐3码"]
-            )
-        )
-
-        lines.append(
-            "⭐ 10码: "
-            + str(
-                result["⭐10码范围"]
-            )
-        )
-
-        lines.append(
-            "🔥 热号: "
-            + str(
-                result["🔥热号"]
-            )
-        )
-
-        lines.append(
-            "❄ 冷号: "
-            + str(
-                result["❄冷号"]
-            )
-        )
-
-        lines.append(
-            "📈 趋势:"
-        )
-
-        for key, value in result[
-            "📈趋势"
-        ].items():
-
-            lines.append(
-                f"   {key}: {value}"
-            )
-
-        lines.append(
-            "🐉 特别生肖:"
-        )
-
-        zodiac = result[
-            "🐉特别生肖"
-        ]
-
-        for item in zodiac.get(
-            "特别生肖Top5",
-            []
-        ):
-
-            lines.append(
-                f"   {item.get('排名')}. "
-                f"{item.get('生肖')} "
-                f"号码:{item.get('对应号码')}"
-            )
-
-        lines.append(
-            "🌊 波色: "
-            + str(
-                result[
-                    "波色"
-                ].get(
-                    "推荐波色",
-                    "未知"
-                )
-            )
-        )
-
-        lines.append(
-            "📊 大小: "
-            + str(
-                result[
-                    "大小"
-                ].get(
-                    "推荐",
-                    "未知"
-                )
-            )
-        )
-
-        lines.append(
-            "⚖️ 单双: "
-            + str(
-                result[
-                    "单双"
-                ].get(
-                    "推荐",
-                    "未知"
-                )
-            )
-        )
-
-        lines.append(
-            "📊 置信度: "
-            + str(
-                result[
-                    "置信度"
-                ]
-            )
-        )
-
-        lines.append(
-            "⚠️ 风险: "
-            + str(
-                result[
-                    "风险等级"
-                ]
-            )
-        )
-
-        lines.append(
-            "🎯 推荐理由:"
-        )
-
-        for reason in result[
-            "🎯推荐理由"
-        ]:
-
-            lines.append(
-                f"   - {reason}"
-            )
-
-    lines.append("")
-
-    lines.append(
-        "=============================================="
-    )
-
-    return "\n".join(
-        lines
-    )
+    _log("")
+    _log("=" * 70)
+    _log("运行结束")
+    _log("=" * 70)
 
 
 # ============================================================
-# HTML报告
+# 主入口
 # ============================================================
 
-def build_html(
-    results
-):
+def run_system(
+    sync: bool = True,
+    data: Any = None,
+    auto_sync: Optional[bool] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    主系统入口。
 
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    main.py 可以直接：
 
-    html = []
+        from core.engine import run_system
 
-    html.append(
-        "<!DOCTYPE html>"
-    )
+        run_system()
 
-    html.append(
-        "<html lang='zh-CN'>"
-    )
+    也兼容：
 
-    html.append(
-        "<head>"
-    )
+        run_system(sync=True)
 
-    html.append(
-        "<meta charset='UTF-8'>"
-    )
+        run_system(auto_sync=True)
 
-    html.append(
-        "<meta name='viewport' "
-        "content='width=device-width,initial-scale=1'>"
-    )
+        run_system(data=data)
+    """
 
-    html.append(
-        "<title>六合彩 AI 智能预测</title>"
-    )
+    _log("")
+    _log("=" * 70)
+    _log("六合彩综合预测系统")
+    _log("=" * 70)
+    _log(f"启动时间：{datetime.now().isoformat()}")
+    _log("=" * 70)
 
-    html.append(
-        "<style>"
-    )
+    # --------------------------------------------------------
+    # 兼容 auto_sync 参数
+    # --------------------------------------------------------
 
-    html.append(
-        """
-        body{
-            font-family:Arial,
-            "Microsoft YaHei",
-            sans-serif;
-            margin:0;
-            padding:20px;
-            background:#f5f5f5;
-        }
+    if auto_sync is not None:
+        sync = auto_sync
 
-        .container{
-            max-width:1000px;
-            margin:auto;
-        }
+    # --------------------------------------------------------
+    # 数据同步
+    # --------------------------------------------------------
 
-        .title{
-            font-size:28px;
-            font-weight:bold;
-            margin-bottom:8px;
-        }
+    if sync and data is None:
 
-        .time{
-            color:#666;
-            margin-bottom:20px;
-        }
+        _log("")
+        _log("正在更新在线数据...")
 
-        .card{
-            background:white;
-            border-radius:12px;
-            padding:20px;
-            margin-bottom:20px;
-            box-shadow:
-                0 2px 8px
-                rgba(0,0,0,.08);
-        }
+        try:
+            sync_result = sync_data()
 
-        .number{
-            display:inline-block;
-            padding:8px 12px;
-            margin:4px;
-            border-radius:8px;
-            background:#eee;
-            font-weight:bold;
-        }
+            if sync_result is not None:
+                data = sync_result
 
-        .recommend{
-            font-size:24px;
-            font-weight:bold;
-        }
+        except Exception as exc:
 
-        .section{
-            margin-top:15px;
-            font-weight:bold;
-        }
-
-        ul{
-            line-height:1.8;
-        }
-        """
-    )
-
-    html.append(
-        "</style>"
-    )
-
-    html.append(
-        "</head>"
-    )
-
-    html.append(
-        "<body>"
-    )
-
-    html.append(
-        "<div class='container'>"
-    )
-
-    html.append(
-        "<div class='title'>🔥 "
-        "六合彩 AI 智能预测</div>"
-    )
-
-    html.append(
-        f"<div class='time'>{now}</div>"
-    )
-
-    for result in results.values():
-
-        html.append(
-            "<div class='card'>"
-        )
-
-        html.append(
-            f"<h2>🎲 "
-            f"{result['彩种']}</h2>"
-        )
-
-        html.append(
-            "<div class='recommend'>"
-            "🎯 推荐3码: "
-        )
-
-        for number in result[
-            "🎯推荐3码"
-        ]:
-
-            html.append(
-                f"<span class='number'>"
-                f"{number:02d}</span>"
+            _log(
+                f"[WARN] 在线数据更新失败：{exc}"
             )
 
-        html.append(
-            "</div>"
-        )
-
-        html.append(
-            "<div class='section'>⭐ 10码</div>"
-        )
-
-        html.append(
-            str(
-                result[
-                    "⭐10码范围"
-                ]
-            )
-        )
-
-        html.append(
-            "<div class='section'>🔥 热号</div>"
-        )
-
-        html.append(
-            str(
-                result[
-                    "🔥热号"
-                ]
-            )
-        )
-
-        html.append(
-            "<div class='section'>❄ 冷号</div>"
-        )
-
-        html.append(
-            str(
-                result[
-                    "❄冷号"
-                ]
-            )
-        )
-
-        html.append(
-            "<div class='section'>📈 趋势</div>"
-        )
-
-        for key, value in result[
-            "📈趋势"
-        ].items():
-
-            html.append(
-                f"<div>{key}: "
-                f"{value}</div>"
+            _log(
+                "继续使用本地已有数据。"
             )
 
-        html.append(
-            "<div class='section'>"
-            "🐉 特别生肖"
-            "</div>"
+    # --------------------------------------------------------
+    # 执行三彩种分析
+    # --------------------------------------------------------
+
+    try:
+
+        results = run_all_lotteries(
+            data=data,
         )
 
-        for item in result[
-            "🐉特别生肖"
-        ].get(
-            "特别生肖Top5",
-            []
-        ):
+    except Exception as exc:
 
-            html.append(
-                f"<div>"
-                f"{item.get('排名')}. "
-                f"{item.get('生肖')} "
-                f"— "
-                f"{item.get('对应号码')}"
-                f"</div>"
-            )
+        _log("")
+        _log("[ERROR] 核心分析引擎异常")
+        _log(str(exc))
 
-        html.append(
-            "<div class='section'>🎯 推荐理由</div>"
-        )
+        traceback.print_exc()
 
-        html.append(
-            "<ul>"
-        )
+        results = {
+            "success": False,
+            "error": str(exc),
+        }
 
-        for reason in result[
-            "🎯推荐理由"
-        ]:
+    # --------------------------------------------------------
+    # 输出
+    # --------------------------------------------------------
 
-            html.append(
-                f"<li>{reason}</li>"
-            )
+    if isinstance(results, dict):
+        print_results(results)
 
-        html.append(
-            "</ul>"
-        )
-
-        html.append(
-            f"<div>🌊 波色: "
-            f"{result['波色'].get('推荐波色','未知')}"
-            f"</div>"
-        )
-
-        html.append(
-            f"<div>📊 大小: "
-            f"{result['大小'].get('推荐','未知')}"
-            f"</div>"
-        )
-
-        html.append(
-            f"<div>⚖️ 单双: "
-            f"{result['单双'].get('推荐','未知')}"
-            f"</div>"
-        )
-
-        html.append(
-            f"<div>📊 置信度: "
-            f"{result['置信度']}"
-            f"</div>"
-        )
-
-        html.append(
-            f"<div>⚠️ 风险: "
-            f"{result['风险等级']}"
-            f"</div>"
-        )
-
-        html.append(
-            "</div>"
-        )
-
-    html.append(
-        "</div>"
-    )
-
-    html.append(
-        "</body>"
-    )
-
-    html.append(
-        "</html>"
-    )
-
-    return "\n".join(
-        html
-    )
+    return results
 
 
 # ============================================================
-# Engine主入口
+# 兼容旧版本可能使用的函数名称
 # ============================================================
 
-def run_engine(
-    database,
-    predictor,
-    sync_result=None
-):
+def run(*args, **kwargs):
+    return run_system(*args, **kwargs)
 
-    print()
-    print("=" * 60)
-    print(
-        "🔥 六合AI V3.6 FINAL"
-    )
-    print(
-        datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-    )
-    print("=" * 60)
 
-    results = {}
+def start(*args, **kwargs):
+    return run_system(*args, **kwargs)
 
-    # ========================================================
-    # 三彩种
-    # ========================================================
 
-    for code in (
-        "hk",
-        "newMacau",
-        "oldMacau",
-    ):
-
-        history = get_history(
-            database,
-            code
-        )
-
-        result = analyze_lottery(
-            code,
-            history,
-            predictor
-        )
-
-        results[code] = result
-
-        # ====================================================
-        # 直接显示预测
-        # ====================================================
-
-        print_prediction(
-            result
-        )
-
-    # ========================================================
-    # JSON
-    # ========================================================
-
-    output = {
-
-        "版本":
-            "V3.6 FINAL",
-
-        "系统":
-            "六合彩 AI V3.6 FINAL",
-
-        "时间":
-            datetime.now().isoformat(),
-
-        "同步":
-            sync_result,
-
-        "预测":
-            results,
-
-    }
-
-    with open(
-        JSON_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            output,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
-    # ========================================================
-    # TXT
-    # ========================================================
-
-    txt = build_txt(
-        results
-    )
-
-    with open(
-        TXT_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        f.write(
-            txt
-        )
-
-    # ========================================================
-    # HTML
-    # ========================================================
-
-    html = build_html(
-        results
-    )
-
-    with open(
-        HTML_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        f.write(
-            html
-        )
-
-    # ========================================================
-    # 文件
-    # ========================================================
-
-    print()
-    print("=" * 60)
-
-    print(
-        f"JSON输出: {JSON_FILE}"
-    )
-
-    print(
-        f"文字报告: {TXT_FILE}"
-    )
-
-    print(
-        f"网页报告: {HTML_FILE}"
-    )
-
-    print("=" * 60)
-
-    return output
+def main(*args, **kwargs):
+    return run_system(*args, **kwargs)
 
 
 # ============================================================
-# 兼容旧调用
+# 直接运行 engine.py
 # ============================================================
 
-def generate_report(
-    results
-):
-
-    txt = build_txt(
-        results
-    )
-
-    with open(
-        TXT_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        f.write(
-            txt
-        )
-
-    html = build_html(
-        results
-    )
-
-    with open(
-        HTML_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        f.write(
-            html
-        )
-
-    return {
-        "json": JSON_FILE,
-        "txt": TXT_FILE,
-        "html": HTML_FILE,
-    }
-
-
-__all__ = [
-    "run_engine",
-    "analyze_lottery",
-    "print_prediction",
-    "generate_report",
-]
+if __name__ == "__main__":
+    run_system()
