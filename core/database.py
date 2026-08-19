@@ -3,44 +3,45 @@
 """
 六合彩 AI V3.0 FINAL
 
-SQLite数据库模块
+SQLite数据库核心
 
-唯一数据库接口
+负责:
+
+初始化数据库
+保存开奖
+读取历史
 """
+
+from __future__ import annotations
 
 
 import sqlite3
 
-
 from datetime import datetime
-
 
 from pathlib import Path
 
 
-import sys
-
-
 
 # =====================================================
-# 修复 GitHub Actions 导入路径
+# 正确导入 config
 # =====================================================
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+try:
+
+    from config import DATABASE_FILE
 
 
-if str(BASE_DIR) not in sys.path:
+except Exception:
 
-    sys.path.insert(
-        0,
-        str(BASE_DIR)
+
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+    DATABASE_FILE = (
+        BASE_DIR /
+        "marksix.db"
     )
-
-
-
-from config import DATABASE_FILE
-
 
 
 
@@ -53,47 +54,52 @@ from config import DATABASE_FILE
 
 def get_connection():
 
-
     return sqlite3.connect(
-        DATABASE_FILE
+        str(DATABASE_FILE)
     )
 
 
 
 
 
-
-
 # =====================================================
-# 初始化数据库
+# 初始化
 # =====================================================
 
 
 def init_database():
 
 
-    conn=get_connection()
+    conn = get_connection()
 
-    cur=conn.cursor()
+    cur = conn.cursor()
 
 
 
     cur.execute(
         """
+
         CREATE TABLE IF NOT EXISTS draws
+
         (
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            lottery TEXT,
 
-            issue TEXT,
+            lottery TEXT NOT NULL,
 
-            numbers TEXT,
 
-            special INTEGER,
+            issue TEXT NOT NULL,
+
+
+            numbers TEXT NOT NULL,
+
+
+            special INTEGER NOT NULL,
+
 
             source TEXT,
+
 
             create_time TEXT,
 
@@ -101,8 +107,10 @@ def init_database():
             UNIQUE(lottery,issue)
 
         )
+
         """
     )
+
 
 
     conn.commit()
@@ -110,6 +118,11 @@ def init_database():
     conn.close()
 
 
+
+    print(
+        "数据库初始化完成:",
+        DATABASE_FILE
+    )
 
 
 
@@ -135,19 +148,21 @@ def save_draw(
 ):
 
 
-    conn=get_connection()
-
-    cur=conn.cursor()
-
-
-
     try:
+
+
+        conn = get_connection()
+
+        cur = conn.cursor()
+
 
 
         cur.execute(
 
             """
+
             INSERT OR IGNORE INTO draws
+
             (
 
             lottery,
@@ -164,25 +179,35 @@ def save_draw(
 
             )
 
-            VALUES (?,?,?,?,?,?)
+            VALUES
+
+            (?,?,?,?,?,?)
 
             """,
+
 
             (
 
                 lottery,
 
+
                 str(issue),
+
 
                 ",".join(
 
-                    map(str,numbers)
+                    str(x)
+
+                    for x in numbers
 
                 ),
 
+
                 int(special),
 
+
                 source,
+
 
                 datetime.now().isoformat()
 
@@ -191,11 +216,21 @@ def save_draw(
         )
 
 
+
         conn.commit()
 
 
 
-        return cur.rowcount > 0
+        ok = (
+            cur.rowcount > 0
+        )
+
+
+        conn.close()
+
+
+
+        return ok
 
 
 
@@ -203,8 +238,11 @@ def save_draw(
 
 
         print(
-            "保存失败:",
+
+            "保存开奖失败:",
+
             e
+
         )
 
 
@@ -212,20 +250,10 @@ def save_draw(
 
 
 
-    finally:
-
-
-        conn.close()
-
-
-
-
-
-
 
 
 # =====================================================
-# 获取历史
+# 读取历史
 # =====================================================
 
 
@@ -238,9 +266,9 @@ def load_history(
 ):
 
 
-    conn=get_connection()
+    conn = get_connection()
 
-    cur=conn.cursor()
+    cur = conn.cursor()
 
 
 
@@ -268,7 +296,9 @@ def load_history(
 
         LIMIT ?
 
+
         """,
+
 
         (
 
@@ -282,7 +312,7 @@ def load_history(
 
 
 
-    rows=cur.fetchall()
+    rows = cur.fetchall()
 
 
 
@@ -301,10 +331,15 @@ def load_history(
 
             {
 
-                "issue":issue,
+
+                "issue":
+
+                issue,
 
 
-                "numbers":[
+                "numbers":
+
+                [
 
                     int(x)
 
@@ -315,7 +350,10 @@ def load_history(
                 ],
 
 
-                "special":special
+
+                "special":
+
+                int(special)
 
             }
 
@@ -323,9 +361,9 @@ def load_history(
 
 
 
+    # 正序
+
     return result[::-1]
-
-
 
 
 
@@ -339,7 +377,7 @@ def load_history(
 def latest_draw(lottery):
 
 
-    data=load_history(
+    data = load_history(
 
         lottery,
 
@@ -349,7 +387,6 @@ def latest_draw(lottery):
 
 
     if data:
-
 
         return data[0]
 
@@ -362,6 +399,7 @@ def latest_draw(lottery):
 
 __all__=[
 
+
     "init_database",
 
     "save_draw",
@@ -369,5 +407,6 @@ __all__=[
     "load_history",
 
     "latest_draw"
+
 
 ]
