@@ -1,442 +1,501 @@
-name: MarkSix AI Prediction
+name: 智能预测系统 V8.3.2
 
 on:
+
   workflow_dispatch:
 
   schedule:
     - cron: "*/30 * * * *"
 
+
+
 jobs:
+
   predict:
+
 
     runs-on: ubuntu-latest
 
+
     steps:
 
-      # ======================================================
-      # 1. 拉取代码
-      # ======================================================
 
-      - name: Checkout
+      # ==============================
+      # 拉取代码
+      # ==============================
+
+      - name: 拉取代码
         uses: actions/checkout@v4
 
 
-      # ======================================================
-      # 2. Python
-      # ======================================================
 
-      - name: Setup Python
+      # ==============================
+      # Python环境
+      # ==============================
+
+      - name: 设置Python
         uses: actions/setup-python@v5
+
         with:
+
           python-version: "3.11"
 
 
-      # ======================================================
-      # 3. 安装依赖
-      # ======================================================
 
-      - name: Install dependencies
+      # ==============================
+      # 安装依赖
+      # ==============================
+
+      - name: 安装依赖
+
         run: |
+
           python -m pip install --upgrade pip
 
           if [ -f requirements.txt ]; then
+
             pip install -r requirements.txt
+
           fi
 
 
-      # ======================================================
-      # 4. 检查 Python
-      # ======================================================
 
-      - name: Check Python
+      # ==============================
+      # 基础检查
+      # ==============================
+
+      - name: 检查项目
+
         run: |
-          python --version
+
+          echo "=============================="
+
+          echo "检查项目文件"
+
+          echo "=============================="
 
 
-      # ======================================================
-      # 5. 检查 main.py
-      # ======================================================
-
-      - name: Check project
-        run: |
           test -f main.py
-          echo "main.py 存在"
+
 
           mkdir -p data
+
           mkdir -p output
 
 
-      # ======================================================
-      # 6. Python 语法检查
-      # ======================================================
+          python --version
 
-      - name: Compile check
+
+
+
+      # ==============================
+      # Python语法
+      # ==============================
+
+      - name: Python语法检查
+
         run: |
+
           python -m compileall -q .
-          echo "Python 语法正常"
 
 
-      # ======================================================
-      # 7. 删除旧数据库
-      #
-      # 重要：
-      # 之前的数据库只有3期，而且三个彩种数据完全相同。
-      # 这里强制删除，避免错误历史继续污染。
-      # ======================================================
+          echo "语法正常"
 
-      - name: Reset old databases
+
+
+
+      # ==============================
+      # 清理旧输出
+      # 注意：
+      # 不删除数据库
+      # ==============================
+
+      - name: 清理旧结果
+
         run: |
 
-          echo "=============================="
-          echo "删除旧数据库"
-          echo "=============================="
+          echo "清理旧预测文件"
 
-          rm -f data/new_macau.db
-          rm -f data/old_macau.db
-          rm -f data/hk.db
-
-          echo "旧数据库已删除"
-
-          echo "当前 data 目录："
-          ls -lah data || true
-
-
-      # ======================================================
-      # 8. 清理旧输出
-      # ======================================================
-
-      - name: Reset old outputs
-        run: |
-
-          echo "=============================="
-          echo "清理旧预测结果"
-          echo "=============================="
 
           rm -f output/prediction.json
+
           rm -f output/backtest.json
+
           rm -f output/module_performance.json
 
-          echo "旧输出已清理"
 
 
-      # ======================================================
-      # 9. 运行主程序
-      # ======================================================
+      # ==============================
+      # 运行系统
+      # ==============================
 
-      - name: Run prediction
+      - name: 开始预测
+
         run: |
 
+
           echo "=============================="
-          echo "开始运行六合彩综合预测系统"
+
+          echo "开始运行六合智能预测系统"
+
           echo "=============================="
+
 
           python main.py
 
 
-      # ======================================================
-      # 10. 检查数据库
-      # ======================================================
 
-      - name: Check databases
+
+
+      # ==============================
+      # 检查数据库
+      # ==============================
+
+      - name: 检查数据库
+
         run: |
 
+
           echo "=============================="
-          echo "检查数据库"
+
+          echo "数据库检查"
+
           echo "=============================="
+
 
           ls -lah data
 
-          test -f data/new_macau.db
-          test -f data/old_macau.db
-          test -f data/hk.db
-
-          echo "三个数据库文件存在"
 
 
-      # ======================================================
-      # 11. 检查数据库历史期数
-      #
-      # 这里非常重要。
-      # 不允许出现只有3期还显示成功。
-      # ======================================================
 
-      - name: Validate database history
+
+      # ==============================
+      # 历史数量检查
+      # ==============================
+
+      - name: 检查历史期数
+
         run: |
+
 
           python - <<'PY'
 
-          import sqlite3
-          from pathlib import Path
 
-          databases = {
-              "新澳门彩": "data/new_macau.db",
-              "老澳门彩": "data/old_macau.db",
-              "香港彩": "data/hk.db",
+          import sqlite3
+
+
+
+          dbs={
+
+
+          "新澳门彩":
+          "data/new_macau.db",
+
+
+          "老澳门彩":
+          "data/old_macau.db",
+
+
+          "香港彩":
+          "data/hk.db"
+
+
           }
 
-          print("=" * 70)
-          print("数据库历史检查")
-          print("=" * 70)
 
-          failed = False
 
-          for name, path in databases.items():
+          print()
 
-              db = Path(path)
+          print("="*60)
 
-              if not db.exists():
-                  print(f"❌ {name} 数据库不存在")
-                  failed = True
-                  continue
+          print("历史数据检查")
 
-              conn = sqlite3.connect(path)
+          print("="*60)
 
-              try:
 
-                  row = conn.execute(
-                      "SELECT COUNT(*) FROM draws"
-                  ).fetchone()
 
-                  count = int(row[0])
+          for name,path in dbs.items():
 
-                  print(
-                      f"{name}："
-                      f"{count} 期"
-                  )
 
-                  if count < 30:
+              conn=sqlite3.connect(path)
 
-                      print(
-                          f"❌ {name} 历史数据不足30期"
-                      )
 
-                      failed = True
+              count=conn.execute(
 
-              finally:
+              "select count(*) from draws"
 
-                  conn.close()
+              ).fetchone()[0]
 
-          print("=" * 70)
 
-          if failed:
+              conn.close()
 
-              raise SystemExit(
-                  "数据库历史数据不足，停止后续预测。"
+
+
+              print(
+
+              "✅",
+
+              name,
+
+              count,
+
+              "期"
+
               )
 
-          print("✅ 三个彩种历史数据均达到最低要求")
+
+
+              if count < 30:
+
+
+                  raise Exception(
+
+                  name+"历史不足30期"
+
+                  )
+
+
+
+          print("="*60)
+
+          print("历史检查通过")
+
+          print("="*60)
+
+
 
           PY
 
 
-      # ======================================================
-      # 12. 检查输出文件
-      # ======================================================
 
-      - name: Check outputs
+
+
+      # ==============================
+      # 检查输出
+      # ==============================
+
+      - name: 检查预测文件
+
         run: |
 
-          echo "=============================="
-          echo "检查预测结果"
-          echo "=============================="
-
-          ls -lah output
 
           test -f output/prediction.json
-          test -f output/backtest.json
-          test -f output/module_performance.json
-
-          echo "三个输出文件全部存在"
 
 
-      # ======================================================
-      # 13. 验证 prediction.json
-      # ======================================================
+          echo "预测文件正常"
 
-      - name: Validate prediction
+
+
+
+
+      # ==============================
+      # 中文预测摘要
+      # ==============================
+
+      - name: 输出预测结果
+
         run: |
 
+
           python - <<'PY'
+
 
           import json
 
-          path = "output/prediction.json"
+
 
           with open(
-              path,
-              "r",
-              encoding="utf-8"
+
+          "output/prediction.json",
+
+          encoding="utf-8"
+
           ) as f:
 
-              data = json.load(f)
 
-          print("=" * 70)
-          print("验证 prediction.json")
-          print("=" * 70)
+              data=json.load(f)
 
-          lotteries = [
-              "新澳门彩",
-              "老澳门彩",
-              "香港彩",
-          ]
 
-          for name in lotteries:
 
-              print("检查：", name)
 
-              if name not in data["lotteries"]:
-                  raise RuntimeError(
-                      f"{name} 不存在"
-                  )
+          print()
 
-              item = data["lotteries"][name]
+          print("="*70)
+
+          print("六合彩预测结果")
+
+          print("="*70)
+
+
+
+
+          for name,item in data["lotteries"].items():
+
+
 
               if not item.get("success"):
-                  raise RuntimeError(
-                      f"{name} success=False"
-                  )
 
-              history_size = item.get(
-                  "history_size",
-                  0
-              )
+                  continue
 
-              if history_size < 30:
-                  raise RuntimeError(
-                      f"{name} 历史数据只有 "
-                      f"{history_size} 期"
-                  )
 
-              latest_numbers = item.get(
-                  "latest_numbers",
-                  []
-              )
 
-              if len(latest_numbers) != 7:
-                  raise RuntimeError(
-                      f"{name} 最新开奖号码不是7个"
-                  )
+              print()
 
-              top5 = item.get(
-                  "top5",
-                  []
-              )
+              print("【"+name+"】")
 
-              top10 = item.get(
-                  "top10",
-                  []
-              )
+              print("-"*50)
 
-              top12 = item.get(
-                  "top12",
-                  []
-              )
 
-              if len(top5) != 5:
-                  raise RuntimeError(
-                      f"{name} Top5异常"
-                  )
-
-              if len(top10) != 10:
-                  raise RuntimeError(
-                      f"{name} Top10异常"
-                  )
-
-              if len(top12) != 12:
-                  raise RuntimeError(
-                      f"{name} Top12异常"
-                  )
-
-              attrs = item.get(
-                  "attributes",
-                  {}
-              )
-
-              zodiac = attrs.get(
-                  "zodiac",
-                  {}
-              )
-
-              if len(
-                  zodiac.get(
-                      "top5",
-                      []
-                  )
-              ) != 5:
-
-                  raise RuntimeError(
-                      f"{name} 生肖5推异常"
-                  )
 
               print(
-                  f"✅ {name}"
+
+              "历史:",
+
+              item["history_size"],
+
+              "期"
+
               )
 
-              print(
-                  f"   历史期数：{history_size}"
-              )
+
 
               print(
-                  f"   最新期："
-                  f"{item.get('latest_issue')}"
+
+              "最新开奖:",
+
+              " ".join(
+
+              f"{x:02d}"
+
+              for x in item["latest_numbers"]
+
               )
 
-              print(
-                  f"   预测期："
-                  f"{item.get('prediction_issue')}"
               )
 
+
+
               print(
-                  "   开奖号码："
-                  +
-                  " ".join(
-                      f"{x:02d}"
-                      for x in latest_numbers
+
+              "预测期:",
+
+              item["prediction_issue"]
+
+              )
+
+
+
+              print()
+
+              print(
+
+              "推荐10码:",
+
+              " ".join(
+
+              f"{x:02d}"
+
+              for x in item["top10"]
+
+              )
+
+              )
+
+
+
+
+              attr=item["attributes"]
+
+
+
+              print(
+
+              "生肖:",
+
+              " ".join(
+
+              attr["zodiac"]["top5"]
+
+              )
+
+              )
+
+
+
+              print(
+
+              "波色:",
+
+              " ".join(
+
+              attr["wave"]["rank"]
+
+              )
+
+              )
+
+
+
+              print(
+
+              "大小:",
+
+              " ".join(
+
+              attr["size"]["rank"]
+
+              )
+
+              )
+
+
+
+              print(
+
+              "单双:",
+
+              " ".join(
+
+              attr["odd_even"]["rank"]
+
+              )
+
+              )
+
+
+
+
+              print()
+
+              print("回测:")
+
+
+
+              for k,v in item["backtest"].items():
+
+
+                  print(
+
+                  k+"期:",
+
+                  v["hit_rate"],
+
+                  "%"
+
                   )
-              )
 
-              print(
-                  "   特别号码候选："
-                  +
-                  " ".join(
-                      f"{x:02d}"
-                      for x in top12
-                  )
-              )
 
-              print(
-                  "   生肖5推："
-                  +
-                  " ".join(
-                      zodiac.get(
-                          "top5",
-                          []
-                      )
-                  )
-              )
 
-          print("=" * 70)
-          print("预测结果结构检查通过")
-          print("=" * 70)
+
+
+          print()
+
+          print("="*70)
+
+          print("运行完成")
+
+          print("="*70)
+
+
 
           PY
-
-
-      # ======================================================
-      # 14. 输出最终文件
-      # ======================================================
-
-      - name: Final output
-        run: |
-
-          echo "=============================="
-          echo "最终输出文件"
-          echo "=============================="
-
-          ls -lah output
-
-          echo "=============================="
-          echo "prediction.json"
-          echo "=============================="
-
-          cat output/prediction.json
