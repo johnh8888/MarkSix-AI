@@ -1,87 +1,68 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI 智能预测系统 V5.1 FINAL
+六合彩 AI V3.0 FINAL
 
-core/features.py
+特征工程
 
-特征工程模块
+生成:
 
-功能：
-
-1. 高频统计
-2. 遗漏统计
-3. 最近趋势
-4. 波色特征
-5. 大小单双特征
-6. 综合评分
-
-输出：
-
-号码 -> 特征评分
-
-
-注意：
-评分不是中奖概率
-只是模型排序依据
-
+波色
+大小
+单双
+尾数
+区域
+冷热
 """
 
-
-from __future__ import annotations
 
 
 from collections import Counter
 
 
-from typing import List, Dict
+
+# ===============================
+# 波色
+# ===============================
 
 
-
-
-
-NUMBERS=list(range(1,50))
-
-
-
-RED={
-1,2,7,8,12,13,18,19,
-23,24,29,30,34,35,
-40,45,46
+RED = {
+    1,2,7,8,12,13,18,19,
+    23,24,29,30,34,35,
+    40,45,46
 }
 
 
-BLUE={
-3,4,9,10,14,15,
-20,25,26,31,
-36,37,41,42,47,48
+BLUE = {
+    3,4,9,10,14,15,
+    20,25,26,31,
+    36,37,41,42,47,48
 }
 
 
-GREEN={
-5,6,11,16,17,
-21,22,27,28,
-32,33,38,39,43,44,49
+GREEN = {
+    5,6,11,16,17,
+    21,22,27,28,
+    32,33,38,39,
+    43,44,49
 }
 
 
 
-
-
-# =====================================================
-# 基础属性
-# =====================================================
 
 
 def get_wave(n):
 
     if n in RED:
+
         return "红"
 
     if n in BLUE:
+
         return "蓝"
 
     if n in GREEN:
+
         return "绿"
 
     return "未知"
@@ -92,7 +73,17 @@ def get_wave(n):
 
 def get_size(n):
 
-    return "大" if n>=25 else "小"
+    return (
+
+        "大"
+
+        if n>=25
+
+        else
+
+        "小"
+
+    )
 
 
 
@@ -100,299 +91,130 @@ def get_size(n):
 
 def get_parity(n):
 
-    return "单" if n%2 else "双"
+    return (
 
+        "单"
 
+        if n%2
 
+        else
 
+        "双"
 
-# =====================================================
-# 频率
-# =====================================================
-
-
-def frequency_score(history):
-
-
-    count=Counter(
-        history[:120]
-    )
-
-
-    total=max(
-        1,
-        len(history[:120])
-    )
-
-
-    return {
-
-        n:
-        count[n]/total
-
-        for n in NUMBERS
-
-    }
-
-
-
-
-
-
-# =====================================================
-# 遗漏
-# =====================================================
-
-
-def omission_score(history):
-
-
-    result={}
-
-
-
-    for n in NUMBERS:
-
-
-        miss=120
-
-
-        for i,x in enumerate(history):
-
-            if x==n:
-
-                miss=i
-
-                break
-
-
-
-        result[n]=min(
-            miss,
-            120
-        )/120
-
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 最近趋势
-# =====================================================
-
-
-def trend_score(history):
-
-
-    short=Counter(
-        history[:12]
-    )
-
-
-    medium=Counter(
-        history[:36]
-    )
-
-
-    result={}
-
-
-
-    for n in NUMBERS:
-
-
-        result[n]=(
-
-            short[n]*0.6
-
-            +
-
-            medium[n]*0.4
-
-        )
-
-
-
-    maxv=max(
-        result.values()
     )
 
 
 
-    if maxv==0:
 
-        return result
+
+def get_tail(n):
+
+    return n%10
+
+
+
+
+
+def get_zone(n):
+
+
+    if n<=10:
+
+        return 1
+
+    if n<=20:
+
+        return 2
+
+    if n<=30:
+
+        return 3
+
+    if n<=40:
+
+        return 4
+
+
+    return 5
+
+
+
+
+
+
+
+def build_features(history):
+
+
+    numbers=[
+
+        x["special"]
+
+        for x in history
+
+    ]
 
 
 
     return {
 
-        n:v/maxv
 
-        for n,v in result.items()
+        "wave":
 
-    }
+        Counter(
 
+            get_wave(x)
 
+            for x in numbers
 
+        ),
 
 
-# =====================================================
-# 属性评分
-# =====================================================
 
+        "size":
 
-def attribute_score(history,n):
+        Counter(
 
+            get_size(x)
 
-    score=0
+            for x in numbers
 
+        ),
 
 
-    recent=history[:36]
 
+        "parity":
 
+        Counter(
 
-    wave=get_wave(n)
+            get_parity(x)
 
-    size=get_size(n)
+            for x in numbers
 
-    parity=get_parity(n)
+        ),
 
 
 
-    for x in recent:
+        "tail":
 
+        Counter(
 
-        if get_wave(x)==wave:
+            get_tail(x)
 
-            score+=0.4
+            for x in numbers
 
+        ),
 
 
-        if get_size(x)==size:
 
-            score+=0.3
+        "zone":
 
+        Counter(
 
+            get_zone(x)
 
-        if get_parity(x)==parity:
-
-            score+=0.3
-
-
-
-    return score/max(
-        1,
-        len(recent)
-    )
-
-
-
-
-
-# =====================================================
-# 综合特征
-# =====================================================
-
-
-def build_feature_score(
-
-        history:List[int]
-
-)->Dict[int,float]:
-
-
-    if not history:
-
-
-        return {}
-
-
-
-    freq=frequency_score(
-        history
-    )
-
-
-    omit=omission_score(
-        history
-    )
-
-
-    trend=trend_score(
-        history
-    )
-
-
-
-    result={}
-
-
-
-    for n in NUMBERS:
-
-
-        result[n]=(
-
-
-            freq[n]*0.35
-
-
-            +
-
-
-            omit[n]*0.15
-
-
-            +
-
-
-            trend[n]*0.30
-
-
-            +
-
-
-            attribute_score(
-                history,
-                n
-            )*0.20
-
+            for x in numbers
 
         )
 
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 兼容接口
-# =====================================================
-
-
-def extract_features(history):
-
-    return build_feature_score(
-        history
-    )
-
-
-
-
-
-__all__=[
-
-"build_feature_score",
-
-"extract_features"
-
-]
+    }
