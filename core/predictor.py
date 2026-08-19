@@ -1,465 +1,501 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
-预测核心模块
+智能预测核心
 
-功能：
+功能:
 
-1. 号码频率
-2. 遗漏
-3. 马尔可夫
-4. 状态识别
-5. 波色
-6. 生肖
-7. 综合评分
-8. Top10
-9. Top3
+历史评分
+频率模型
+遗漏模型
+Markov
+HMM状态
+波色
+生肖
 
-注意：
-
-本系统输出的是统计排序结果，
-不是保证中奖概率。
 """
 
-from __future__ import annotations
 
 from collections import Counter
 
-from .features import (
-    get_wave,
-    get_size,
-    get_parity,
-    get_tail,
-    get_zone
-)
 
-from .wave import (
-    predict_wave
-)
+from .wave import predict_wave
 
-from .zodiac import (
-    get_zodiac
-)
+from .zodiac import get_zodiac
 
-from .markov import (
-    markov_scores,
-    markov_predict
-)
+from .markov import markov_predict
 
-from .hmm import (
-    detect_state
-)
+from .hmm import detect_state
+
+
+
 
 
 # =====================================================
-# 提取特码
+# 数据质量
 # =====================================================
 
-def extract_specials(history):
 
-    result = []
+def data_quality(history):
 
-    for row in history:
 
-        if not isinstance(row, dict):
-            continue
+    count=len(history)
 
-        try:
 
-            n = int(
-                row.get("special")
-            )
 
-        except Exception:
+    if count>=500:
 
-            continue
 
-        if 1 <= n <= 49:
+        level="优秀"
 
-            result.append(n)
 
-    return result
+
+    elif count>=100:
+
+
+        level="良好"
+
+
+
+    elif count>=30:
+
+
+        level="一般"
+
+
+
+    else:
+
+
+        level="不足"
+
+
+
+    return {
+
+
+        "数量":
+
+        count,
+
+
+        "等级":
+
+        level
+
+
+
+    }
+
+
+
+
 
 
 # =====================================================
-# 号码综合评分
+# 特码评分
 # =====================================================
+
 
 def score_numbers(history):
 
-    specials = extract_specials(
-        history
+
+    scores={}
+
+
+
+    freq=Counter(
+
+
+        x["special"]
+
+        for x in history
+
     )
 
-    scores = {
-        n: 0.0
-        for n in range(1, 50)
-    }
 
-    if not specials:
 
-        return scores
 
-    # -------------------------------------------------
-    # 历史频率
-    # -------------------------------------------------
+    recent=[
 
-    freq = Counter(
-        specials
-    )
 
-    # -------------------------------------------------
-    # 最近20期
-    # -------------------------------------------------
+        x["special"]
 
-    recent20 = specials[-20:]
+        for x in history[-30:]
 
-    recent10 = specials[-10:]
+    ]
 
-    recent36 = specials[-36:]
 
-    # -------------------------------------------------
-    # 马尔可夫
-    # -------------------------------------------------
 
-    markov = markov_scores(
-        history
-    )
 
-    # -------------------------------------------------
-    # 计算
-    # -------------------------------------------------
+    for n in range(1,50):
 
-    for n in range(1, 50):
 
-        score = 0.0
+        score=0
+
+
 
         # 历史频率
-        score += (
-            freq[n] * 1.0
-        )
 
-        # 最近20期
-        score += (
-            recent20.count(n)
-            * 0.8
-        )
+        score += freq[n]*1.0
 
-        # 最近10期
-        score += (
-            recent10.count(n)
-            * 0.5
-        )
 
-        # 最近36期
-        score += (
-            recent36.count(n)
-            * 0.2
-        )
 
-        # 遗漏
-        if n not in recent10:
 
-            score += 0.5
+        # 遗漏补偿
 
-        # 马尔可夫
-        score += (
-            markov.get(n, 0.0)
-            * 3.0
-        )
 
-        scores[n] = round(
+        if n not in recent:
+
+
+            score+=1.5
+
+
+
+        else:
+
+
+            score-=0.5
+
+
+
+
+
+        # 最近热度
+
+
+        recent10=[
+
+
+            x["special"]
+
+            for x in history[-10:]
+
+        ]
+
+
+
+        if n in recent10:
+
+
+            score+=2
+
+
+
+
+
+        scores[n]=round(
+
             score,
-            4
+
+            3
+
         )
+
+
 
     return scores
 
 
+
+
+
+
 # =====================================================
-# 大小预测
+# 模型状态
 # =====================================================
 
-def predict_size(history):
 
-    specials = extract_specials(
-        history
-    )
+def model_status(history):
 
-    recent = specials[-36:]
 
-    if not recent:
+    size=len(history)
 
-        return {
-            "主推": "未知",
-            "统计": {}
-        }
 
-    counter = Counter(
-        get_size(n)
-        for n in recent
-    )
-
-    ranking = counter.most_common()
 
     return {
-        "主推": ranking[0][0],
 
-        "统计": dict(counter)
+
+        "历史数据":
+
+        size,
+
+
+
+        "Markov":
+
+        "启用"
+
+        if size>=20
+
+        else
+
+        "等待数据",
+
+
+
+        "HMM":
+
+        "启用"
+
+        if size>=50
+
+        else
+
+        "等待数据",
+
+
+
+        "高级模型":
+
+        "启用"
+
+        if size>=100
+
+        else
+
+        "等待数据"
+
     }
 
 
-# =====================================================
-# 单双预测
-# =====================================================
 
-def predict_parity(history):
-
-    specials = extract_specials(
-        history
-    )
-
-    recent = specials[-36:]
-
-    if not recent:
-
-        return {
-            "主推": "未知",
-            "统计": {}
-        }
-
-    counter = Counter(
-        get_parity(n)
-        for n in recent
-    )
-
-    ranking = counter.most_common()
-
-    return {
-        "主推": ranking[0][0],
-
-        "统计": dict(counter)
-    }
-
-
-# =====================================================
-# 尾数统计
-# =====================================================
-
-def predict_tail(history):
-
-    specials = extract_specials(
-        history
-    )
-
-    recent = specials[-36:]
-
-    counter = Counter(
-        get_tail(n)
-        for n in recent
-    )
-
-    ranking = [
-        x[0]
-        for x in counter.most_common()
-    ]
-
-    return {
-        "主推": ranking[:3],
-
-        "统计": dict(counter)
-    }
-
-
-# =====================================================
-# 分区统计
-# =====================================================
-
-def predict_zone(history):
-
-    specials = extract_specials(
-        history
-    )
-
-    recent = specials[-36:]
-
-    counter = Counter(
-        get_zone(n)
-        for n in recent
-    )
-
-    ranking = [
-        x[0]
-        for x in counter.most_common()
-    ]
-
-    return {
-        "主推": ranking[:2],
-
-        "统计": dict(counter)
-    }
-
-
-# =====================================================
-# 生肖预测
-# =====================================================
-
-def predict_zodiac(
-    ranking
-):
-
-    counter = Counter()
-
-    for number, score in ranking:
-
-        zodiac = get_zodiac(
-            number
-        )
-
-        if zodiac != "未知":
-
-            counter[zodiac] += score
-
-    ranking = sorted(
-        counter.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    return [
-        zodiac
-        for zodiac, score
-        in ranking[:5]
-    ]
 
 
 # =====================================================
 # 主预测
 # =====================================================
 
+
 def predict(history):
+
 
     if not history:
 
-        return {
-            "错误": "无历史数据"
-        }
-
-    specials = extract_specials(
-        history
-    )
-
-    if not specials:
 
         return {
-            "错误": "没有有效特码数据"
+
+
+            "error":
+
+            "无历史数据"
+
         }
 
-    scores = score_numbers(
+
+
+
+    quality=data_quality(
+
         history
+
     )
 
-    ranking = sorted(
+
+
+    scores=score_numbers(
+
+        history
+
+    )
+
+
+
+
+    ranking=sorted(
+
         scores.items(),
-        key=lambda x: (
-            x[1],
-            -x[0]
-        ),
+
+        key=lambda x:x[1],
+
         reverse=True
+
     )
 
-    top10 = [
-        number
-        for number, score
-        in ranking[:10]
+
+
+
+
+    top10=[
+
+
+        x[0]
+
+        for x in ranking[:10]
+
     ]
 
-    top3 = [
-        number
-        for number, score
-        in ranking[:3]
+
+
+
+    top3=[
+
+
+        x[0]
+
+        for x in ranking[:3]
+
     ]
 
-    state = detect_state(
-        history
-    )
 
-    wave = predict_wave(
-        history
-    )
 
-    markov = markov_predict(
-        history,
-        10
-    )
+
+
+    # -------------------------
+    # Markov
+    # -------------------------
+
+
+    if len(history)>=20:
+
+
+        markov=markov_predict(
+
+            history
+
+        )
+
+
+    else:
+
+
+        markov=[]
+
+
+
+
+
+    # -------------------------
+    # HMM
+    # -------------------------
+
+
+    if len(history)>=50:
+
+
+        state=detect_state(
+
+            history
+
+        )
+
+
+    else:
+
+
+        state={
+
+            "状态":
+
+            "数据不足"
+
+        }
+
+
+
+
 
     return {
 
-        "模型版本": "V3.0 FINAL",
 
-        "说明":
-            "统计模型仅用于排序，不代表真实中奖概率",
 
-        "样本数量":
-            len(specials),
+        "模型版本":
 
-        "状态":
-            state,
+        "V3.2 FINAL",
+
+
+
+        "数据质量":
+
+        quality,
+
+
+
+        "模型状态":
+
+        model_status(
+
+            history
+
+        ),
+
+
+
+        "当前状态":
+
+        state,
+
+
 
         "特码10码":
-            top10,
+
+        top10,
+
+
 
         "重点3码":
-            top3,
+
+        top3,
+
+
 
         "第一推荐":
-            top3[0] if top3 else None,
 
-        "生肖5肖":
-            predict_zodiac(
-                ranking
-            ),
+        top3[0],
+
+
 
         "波色":
-            wave,
 
-        "大小":
-            predict_size(
-                history
-            ),
+        predict_wave(
 
-        "单双":
-            predict_parity(
-                history
-            ),
+            history
 
-        "尾数":
-            predict_tail(
-                history
-            ),
+        ),
 
-        "分区":
-            predict_zone(
-                history
-            ),
+
+
+        "生肖":
+
+        [
+
+            get_zodiac(x)
+
+            for x in top3
+
+        ],
+
+
 
         "马尔可夫":
-            markov,
+
+        markov[:5],
+
+
 
         "评分":
-            {
-                str(number):
-                    round(score, 4)
-                for number, score
-                in ranking[:10]
-            }
+
+        {
+
+
+            str(k):
+
+            v
+
+            for k,v in ranking[:10]
+
+        }
+
     }
 
 
-__all__ = [
-    "predict",
-    "score_numbers",
-    "extract_specials"
+
+
+
+__all__=[
+
+    "predict"
+
 ]
