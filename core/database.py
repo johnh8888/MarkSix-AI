@@ -1,462 +1,482 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.1 FINAL
 
-SQLite 数据库模块
+SQLite数据库模块
 
-职责：
+功能：
+
 1. 初始化数据库
-2. 保存开奖数据
-3. 读取历史数据
-4. 获取最新一期
+2. 保存开奖
+3. 查询历史
+4. 查询最新一期
+5. 防重复写入
 
-整个 V3.0 只允许通过本文件操作 SQLite。
 """
 
 from __future__ import annotations
 
+
 import sqlite3
+
 from datetime import datetime
+
 from pathlib import Path
 
 
-# =====================================================
-# 配置导入
-# =====================================================
+from config import DATABASE_FILE
 
-try:
-    from config import DATABASE_FILE, HISTORY_LIMIT
-except ImportError:
-    from ..config import DATABASE_FILE, HISTORY_LIMIT
-
-
-# =====================================================
-# 数据库路径
-# =====================================================
-
-DATABASE_PATH = Path(DATABASE_FILE)
-
-DATABASE_PATH.parent.mkdir(
-    parents=True,
-    exist_ok=True
-)
 
 
 # =====================================================
 # 数据库连接
 # =====================================================
 
+
 def get_connection():
-    """
-    创建 SQLite 连接。
-    """
 
-    conn = sqlite3.connect(
-        str(DATABASE_PATH),
-        timeout=30
+    return sqlite3.connect(
+        DATABASE_FILE
     )
 
-    conn.execute(
-        "PRAGMA journal_mode=WAL"
-    )
-
-    conn.execute(
-        "PRAGMA foreign_keys=ON"
-    )
-
-    return conn
 
 
 # =====================================================
 # 初始化数据库
 # =====================================================
 
+
 def init_database():
-    """
-    初始化 draws 表。
-    """
 
     conn = get_connection()
 
-    try:
+    cur = conn.cursor()
 
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS draws
-            (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                lottery TEXT NOT NULL,
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS draws
+        (
 
-                issue TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                numbers TEXT NOT NULL,
 
-                special INTEGER NOT NULL,
+            lottery TEXT NOT NULL,
 
-                source TEXT DEFAULT 'api',
 
-                create_time TEXT NOT NULL,
+            issue TEXT NOT NULL,
 
-                UNIQUE(lottery, issue)
-            )
-            """
+
+            numbers TEXT NOT NULL,
+
+
+            special INTEGER NOT NULL,
+
+
+            source TEXT,
+
+
+            create_time TEXT,
+
+
+            UNIQUE(lottery, issue)
+
         )
-
-        conn.execute(
-            """
-            CREATE INDEX IF NOT EXISTS
-            idx_draws_lottery
-            ON draws(lottery)
-            """
-        )
-
-        conn.execute(
-            """
-            CREATE INDEX IF NOT EXISTS
-            idx_draws_issue
-            ON draws(lottery, issue)
-            """
-        )
-
-        conn.commit()
-
-    finally:
-
-        conn.close()
-
-    print(
-        f"数据库初始化完成: {DATABASE_PATH}"
+        """
     )
 
 
-# =====================================================
-# 数据验证
-# =====================================================
+    conn.commit()
 
-def validate_draw(numbers, special):
-    """
-    验证开奖数据。
+    conn.close()
 
-    正常六合彩：
-    6个正码 + 1个特码
-    """
 
-    try:
+    print(
+        "数据库初始化完成:",
+        DATABASE_FILE
+    )
 
-        nums = [
-            int(x)
-            for x in numbers
-        ]
-
-        sp = int(special)
-
-    except Exception:
-
-        return False
-
-    if len(nums) != 6:
-        return False
-
-    if len(set(nums)) != 6:
-        return False
-
-    if any(
-        x < 1 or x > 49
-        for x in nums
-    ):
-        return False
-
-    if sp < 1 or sp > 49:
-        return False
-
-    if sp in nums:
-        return False
-
-    return True
 
 
 # =====================================================
 # 保存开奖
 # =====================================================
 
+
 def save_draw(
-    lottery,
-    issue,
-    numbers,
-    special,
-    source="api"
-):
-    """
-    保存一期开奖。
-
-    返回：
-    True  = 新增
-    False = 已存在或数据无效
-    """
-
-    if not validate_draw(
+        lottery,
+        issue,
         numbers,
-        special
-    ):
-        print(
-            "跳过无效开奖:",
-            lottery,
-            issue,
-            numbers,
-            special
-        )
+        special,
+        source="api"
+):
 
-        return False
 
     conn = get_connection()
 
+    cur = conn.cursor()
+
+
     try:
 
-        cur = conn.execute(
+
+        # 查询是否存在
+
+        cur.execute(
             """
-            INSERT OR IGNORE INTO draws
+            SELECT id
+            FROM draws
+            WHERE lottery=?
+            AND issue=?
+            """,
+
             (
                 lottery,
-                issue,
-                numbers,
-                special,
-                source,
-                create_time
+                str(issue)
             )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
+        )
+
+
+        exists = cur.fetchone()
+
+
+
+        if exists:
+
+
+            return {
+
+                "status":
+                    "exists",
+
+                "lottery":
+                    lottery,
+
+                "issue":
+                    str(issue)
+
+            }
+
+
+
+
+        cur.execute(
+
+            """
+            INSERT INTO draws
             (
-                str(lottery),
+
+            lottery,
+
+            issue,
+
+            numbers,
+
+            special,
+
+            source,
+
+            create_time
+
+            )
+
+            VALUES(?,?,?,?,?,?)
+
+            """,
+
+            (
+
+                lottery,
 
                 str(issue),
 
                 ",".join(
-                    str(x)
-                    for x in numbers
+                    map(
+                        str,
+                        numbers
+                    )
                 ),
 
                 int(special),
 
-                str(source),
+                source,
 
                 datetime.now().isoformat()
+
             )
+
         )
+
 
         conn.commit()
 
-        return cur.rowcount > 0
+
+
+        return {
+
+            "status":
+                "new",
+
+            "lottery":
+                lottery,
+
+            "issue":
+                str(issue)
+
+        }
+
+
 
     except Exception as e:
 
+
         print(
-            "保存开奖失败:",
+            "数据库保存错误:",
             e
         )
 
-        return False
+
+        return {
+
+            "status":
+                "error",
+
+            "error":
+                str(e)
+
+        }
+
+
 
     finally:
+
 
         conn.close()
 
 
+
 # =====================================================
-# 获取历史数据
+# 兼容旧版本
 # =====================================================
+
+
+def save_draw_bool(
+        lottery,
+        issue,
+        numbers,
+        special,
+        source="api"
+):
+
+
+    result = save_draw(
+        lottery,
+        issue,
+        numbers,
+        special,
+        source
+    )
+
+
+    return (
+        result.get("status")
+        ==
+        "new"
+    )
+
+
+
+# =====================================================
+# 获取历史
+# =====================================================
+
 
 def load_history(
-    lottery,
-    limit=None
+        lottery,
+        limit=500
 ):
-    """
-    获取指定彩种历史开奖。
 
-    返回：
-
-    [
-        {
-            "issue": "...",
-            "numbers": [1,2,3,4,5,6],
-            "special": 7
-        }
-    ]
-    """
-
-    if limit is None:
-
-        limit = HISTORY_LIMIT
-
-    try:
-
-        limit = int(limit)
-
-    except Exception:
-
-        limit = HISTORY_LIMIT
-
-    limit = max(
-        1,
-        min(limit, 5000)
-    )
 
     conn = get_connection()
 
-    try:
-
-        rows = conn.execute(
-            """
-            SELECT
-                issue,
-                numbers,
-                special
-            FROM draws
-            WHERE lottery = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (
-                str(lottery),
-                limit
-            )
-        ).fetchall()
-
-    finally:
-
-        conn.close()
-
-    result = []
-
-    for issue, numbers, special in rows:
-
-        try:
-
-            nums = [
-                int(x)
-                for x in str(numbers).split(",")
-                if str(x).strip()
-            ]
-
-            result.append(
-                {
-                    "issue": str(issue),
-
-                    "numbers": nums,
-
-                    "special": int(special)
-                }
-            )
-
-        except Exception:
-
-            continue
-
-    # 数据按照旧 → 新排列
-    result.reverse()
-
-    return result
+    cur = conn.cursor()
 
 
-# =====================================================
-# 获取特码历史
-# =====================================================
 
-def load_specials(
-    lottery,
-    limit=None
-):
-    """
-    直接获取特码序列。
-    """
+    cur.execute(
 
-    history = load_history(
-        lottery,
-        limit
+        """
+
+        SELECT
+
+        issue,
+
+        numbers,
+
+        special
+
+
+        FROM draws
+
+
+        WHERE lottery=?
+
+
+        ORDER BY id DESC
+
+
+        LIMIT ?
+
+        """,
+
+        (
+
+            lottery,
+
+            limit
+
+        )
+
     )
 
-    return [
-        int(row["special"])
-        for row in history
-        if row.get("special") is not None
-    ]
+
+    rows = cur.fetchall()
+
+
+    conn.close()
+
+
+
+    result=[]
+
+
+    for issue,numbers,special in rows:
+
+
+        result.append(
+
+            {
+
+                "issue":
+
+                    issue,
+
+
+                "numbers":
+
+                    [
+
+                        int(x)
+
+                        for x in numbers.split(",")
+
+                        if x
+
+                    ],
+
+
+                "special":
+
+                    int(special)
+
+            }
+
+        )
+
+
+
+    return result[::-1]
+
 
 
 # =====================================================
 # 最新一期
 # =====================================================
 
-def latest_draw(lottery):
-    """
-    获取最新一期。
-    """
+
+def latest_draw(
+        lottery
+):
+
 
     data = load_history(
         lottery,
         1
     )
 
+
     if data:
 
-        return data[-1]
+        return data[0]
+
 
     return None
+
 
 
 # =====================================================
 # 数据统计
 # =====================================================
 
-def count_draws(lottery=None):
-    """
-    获取数据库开奖数量。
-    """
 
-    conn = get_connection()
+def count_draws(
+        lottery=None
+):
 
-    try:
 
-        if lottery is None:
+    conn=get_connection()
 
-            row = conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM draws
-                """
-            ).fetchone()
+    cur=conn.cursor()
 
-        else:
 
-            row = conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM draws
-                WHERE lottery=?
-                """,
-                (str(lottery),)
-            ).fetchone()
+    if lottery:
 
-        return int(
-            row[0]
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM draws
+            WHERE lottery=?
+            """,
+            (
+                lottery,
+            )
         )
 
-    finally:
-
-        conn.close()
+    else:
 
 
-# =====================================================
-# 导出接口
-# =====================================================
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM draws
+            """
+        )
 
-__all__ = [
-    "get_connection",
+
+    count = cur.fetchone()[0]
+
+
+    conn.close()
+
+
+    return count
+
+
+
+__all__=[
+
     "init_database",
-    "validate_draw",
+
     "save_draw",
+
+    "save_draw_bool",
+
     "load_history",
-    "load_specials",
+
     "latest_draw",
+
     "count_draws"
+
 ]
