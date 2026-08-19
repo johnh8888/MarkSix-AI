@@ -1,22 +1,47 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩 API 同步模块
+MarkSix-AI V7.0
+六合彩历史数据同步模块
 
 功能：
 
-1. 主 API
-2. 备用 API
-3. SSL 证书异常自动处理
-4. JSON 解析
-5. 历史开奖提取
-6. 防止重复期号
-7. 兼容多种 API 数据结构
+1. 历史 API：
+   https://marksix6.net/index.php?api=1
+
+2. 最新 API：
+   https://api3.marksix6.net/lottery_api.php?type=xxx
+
+3. SSL 证书过期自动处理
+
+4. 自动解析：
+   lottery_data
+   history
+   records
+   data
+   list
+
+5. 支持：
+   新澳门彩
+   老澳门彩
+   香港彩
+
+6. 自动去重期号
+
+7. 自动补充最新一期
+
+8. 返回完整历史记录
+
+注意：
+api3 单彩接口目前主要返回最新一期。
+历史数据优先从 index.php?api=1 获取。
 """
+
 
 from __future__ import annotations
 
 import json
+import re
 import ssl
 import urllib.request
 
@@ -24,8 +49,12 @@ from typing import Any
 
 
 # ============================================================
-# API 地址
+# API
 # ============================================================
+
+HISTORY_API = (
+    "https://marksix6.net/index.php?api=1"
+)
 
 PRIMARY_API = (
     "https://marksix6.net/api/lottery_api.php"
@@ -37,7 +66,7 @@ BACKUP_API = (
 
 
 # ============================================================
-# 三彩种 API 类型
+# 三彩种
 # ============================================================
 
 API_TYPES = {
@@ -52,6 +81,39 @@ API_TYPES = {
 
 
 # ============================================================
+# 历史接口可能出现的名称
+# ============================================================
+
+LOTTERY_NAME_ALIASES = {
+
+    "新澳门彩": {
+        "新澳门彩",
+        "新澳门六合彩",
+        "新澳彩",
+        "newMacau",
+        "newmacau",
+    },
+
+    "老澳门彩": {
+        "老澳门彩",
+        "老澳门六合彩",
+        "老澳彩",
+        "oldMacau",
+        "oldmacau",
+    },
+
+    "香港彩": {
+        "香港彩",
+        "香港六合彩",
+        "hk",
+        "hongkong",
+        "hongkonglottery",
+    },
+
+}
+
+
+# ============================================================
 # HTTP Header
 # ============================================================
 
@@ -59,21 +121,26 @@ HEADERS = {
 
     "User-Agent":
         "Mozilla/5.0 "
-        "(compatible; MarkSix-AI/6.2)",
+        "(Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/151.0.0.0 Safari/537.36 "
+        "MarkSix-AI/7.0",
 
     "Accept":
         "application/json,text/plain,*/*",
+
+    "Cache-Control":
+        "no-cache",
+
+    "Pragma":
+        "no-cache",
 
 }
 
 
 # ============================================================
-# SSL 备用上下文
-#
-# marksix6 主站当前可能出现证书过期。
-#
-# 优先正常 SSL。
-# 如果证书验证失败，则允许备用连接继续获取数据。
+# SSL
 # ============================================================
 
 UNVERIFIED_CONTEXT = (
@@ -85,10 +152,10 @@ UNVERIFIED_CONTEXT = (
 # HTTP 请求
 # ============================================================
 
-def request_json(
+def request_bytes(
     url: str,
-    timeout: int = 20,
-) -> Any:
+    timeout: int = 30,
+) -> bytes:
 
     request = urllib.request.Request(
 
@@ -110,9 +177,40 @@ def request_json(
 
         ) as response:
 
-            raw = response.read()
+            return response.read()
 
-    except ssl.SSLCertVerificationError:
+    except (
+        ssl.SSLCertVerificationError,
+        urllib.error.URLError,
+    ) as exc:
+
+        message = str(exc).lower()
+
+        ssl_error = (
+
+            isinstance(
+                exc,
+                ssl.SSLCertVerificationError,
+            )
+
+            or
+
+            "certificate" in message
+
+            or
+
+            "ssl" in message
+
+        )
+
+        if not ssl_error:
+
+            raise
+
+        print(
+            "[WARN] SSL证书验证失败，"
+            "启用兼容模式继续请求"
+        )
 
         with urllib.request.urlopen(
 
@@ -124,7 +222,25 @@ def request_json(
 
         ) as response:
 
-            raw = response.read()
+            return response.read()
+
+
+# ============================================================
+# JSON 请求
+# ============================================================
+
+def request_json(
+    url: str,
+    timeout: int = 30,
+) -> Any:
+
+    raw = request_bytes(
+
+        url,
+
+        timeout=timeout,
+
+    )
 
     text = raw.decode(
 
@@ -134,7 +250,19 @@ def request_json(
 
     ).strip()
 
-    text = text.lstrip("\ufeff")
+    text = text.lstrip(
+        "\ufeff"
+    )
+
+    if not text:
+
+        raise ValueError(
+            "API返回空内容"
+        )
+
+    # --------------------------------------------------------
+    # 正常 JSON
+    # --------------------------------------------------------
 
     try:
 
@@ -142,21 +270,89 @@ def request_json(
 
     except json.JSONDecodeError:
 
-        # 尝试处理简单 JSONP
-        if (
-            text.startswith("(")
-            and text.endswith(")")
-        ):
+        pass
 
-            text = text[1:-1]
+    # --------------------------------------------------------
+    # JSONP
+    # --------------------------------------------------------
 
-            return json.loads(text)
+    jsonp_match = re.search(
 
-        raise
+        r"\((.*)\)\s*;?\s*$",
+
+        text,
+
+        flags=re.S,
+
+    )
+
+    if jsonp_match:
+
+        try:
+
+            return json.loads(
+                jsonp_match.group(1)
+            )
+
+        except json.JSONDecodeError:
+
+            pass
+
+    # --------------------------------------------------------
+    # 尝试截取 JSON
+    # --------------------------------------------------------
+
+    first_obj = text.find("{")
+    last_obj = text.rfind("}")
+
+    if (
+        first_obj >= 0
+        and last_obj > first_obj
+    ):
+
+        candidate = text[
+            first_obj:last_obj + 1
+        ]
+
+        try:
+
+            return json.loads(
+                candidate
+            )
+
+        except json.JSONDecodeError:
+
+            pass
+
+    first_arr = text.find("[")
+    last_arr = text.rfind("]")
+
+    if (
+        first_arr >= 0
+        and last_arr > first_arr
+    ):
+
+        candidate = text[
+            first_arr:last_arr + 1
+        ]
+
+        try:
+
+            return json.loads(
+                candidate
+            )
+
+        except json.JSONDecodeError:
+
+            pass
+
+    raise ValueError(
+        "API返回内容不是有效JSON"
+    )
 
 
 # ============================================================
-# 期号转换
+# 期号
 # ============================================================
 
 def normalize_issue(
@@ -167,48 +363,92 @@ def normalize_issue(
 
         return None
 
-    text = str(value).strip()
+    if isinstance(
+        value,
+        bool,
+    ):
+
+        return None
+
+    text = str(
+        value
+    ).strip()
 
     if not text:
 
         return None
 
-    if not text.isdigit():
+    # --------------------------------------------------------
+    # 处理：
+    # 2026231
+    # 2026231期
+    # 第2026231期
+    # --------------------------------------------------------
+
+    match = re.search(
+        r"(\d{3,10})",
+        text,
+    )
+
+    if not match:
 
         return None
 
-    # 六合期号一般为纯数字
-    if not 3 <= len(text) <= 10:
+    issue = match.group(1)
+
+    if not (
+        3 <= len(issue) <= 10
+    ):
 
         return None
 
-    return text
+    return issue
 
 
 # ============================================================
-# 号码转换
+# 号码
 # ============================================================
 
 def normalize_numbers(
     value: Any,
 ) -> list[int] | None:
 
-    # ------------------------------------------
+    # --------------------------------------------------------
     # list / tuple
-    # ------------------------------------------
+    # --------------------------------------------------------
 
     if isinstance(
         value,
         (list, tuple),
     ):
 
-        numbers = []
+        values = []
 
         for item in value:
 
+            # 字典情况
+            if isinstance(
+                item,
+                dict,
+            ):
+
+                for key in (
+                    "number",
+                    "num",
+                    "value",
+                ):
+
+                    if key in item:
+
+                        item = item[key]
+
+                        break
+
             try:
 
-                number = int(item)
+                number = int(
+                    str(item).strip()
+                )
 
             except (
                 TypeError,
@@ -217,22 +457,28 @@ def normalize_numbers(
 
                 return None
 
-            if not 1 <= number <= 49:
+            if not (
+                1 <= number <= 49
+            ):
 
                 return None
 
-            numbers.append(number)
+            values.append(
+                number
+            )
 
         if (
-            len(numbers) == 7
-            and len(set(numbers)) == 7
+            len(values) == 7
+            and len(set(values)) == 7
         ):
 
-            return numbers
+            return values
 
-    # ------------------------------------------
+        return None
+
+    # --------------------------------------------------------
     # 字符串
-    # ------------------------------------------
+    # --------------------------------------------------------
 
     if isinstance(
         value,
@@ -241,58 +487,60 @@ def normalize_numbers(
 
         text = value.strip()
 
-        for separator in (
-            ",",
-            " ",
-            "|",
-            "-",
-            "/",
-        ):
+        if not text:
 
-            if separator not in text:
+            return None
 
-                continue
+        # 找出所有数字
+        matches = re.findall(
+            r"\d{1,2}",
+            text,
+        )
 
-            parts = [
-
-                x.strip()
-
-                for x in text.split(separator)
-
-                if x.strip()
-
-            ]
-
-            if len(parts) != 7:
-
-                continue
+        if len(matches) == 7:
 
             try:
 
-                numbers = [
+                values = [
                     int(x)
-                    for x in parts
+                    for x in matches
                 ]
 
             except ValueError:
 
-                continue
+                return None
 
             if (
                 all(
                     1 <= x <= 49
-                    for x in numbers
+                    for x in values
                 )
-                and len(set(numbers)) == 7
+                and len(
+                    set(values)
+                ) == 7
             ):
 
-                return numbers
+                return values
 
     return None
 
 
 # ============================================================
-# 从单个 dict 提取开奖
+# 判断是否像开奖号码
+# ============================================================
+
+def looks_like_numbers(
+    value: Any,
+) -> bool:
+
+    return (
+        normalize_numbers(value)
+        is not None
+    )
+
+
+# ============================================================
+# 从单条记录解析
 # ============================================================
 
 def parse_record(
@@ -300,6 +548,10 @@ def parse_record(
 ) -> dict[str, Any] | None:
 
     issue = None
+
+    # --------------------------------------------------------
+    # 期号
+    # --------------------------------------------------------
 
     issue_keys = (
 
@@ -309,13 +561,23 @@ def parse_record(
 
         "issueNo",
 
+        "issue_no",
+
         "period",
+
+        "periodNo",
 
         "qihao",
 
         "drawNo",
 
         "drawIssue",
+
+        "draw_issue",
+
+        "lotteryNo",
+
+        "number",
 
     )
 
@@ -333,6 +595,10 @@ def parse_record(
 
             break
 
+    # --------------------------------------------------------
+    # 开奖号码
+    # --------------------------------------------------------
+
     numbers = None
 
     number_keys = (
@@ -345,9 +611,19 @@ def parse_record(
 
         "openNumbers",
 
+        "open_numbers",
+
         "code",
 
+        "codes",
+
         "result",
+
+        "results",
+
+        "number",
+
+        "nums",
 
     )
 
@@ -365,19 +641,24 @@ def parse_record(
 
             break
 
-    # ------------------------------------------
-    # 尝试 openCode1 ~ openCode7
-    # ------------------------------------------
+    # --------------------------------------------------------
+    # openCode1 ~ openCode7
+    # num1 ~ num7
+    # number1 ~ number7
+    # --------------------------------------------------------
 
     if not numbers:
 
         for prefix in (
             "openCode",
+            "open_code",
             "num",
             "number",
         ):
 
             values = []
+
+            valid = True
 
             for index in range(
                 1,
@@ -390,14 +671,16 @@ def parse_record(
 
                 if key not in data:
 
-                    values = []
+                    valid = False
 
                     break
 
                 try:
 
-                    values.append(
-                        int(data[key])
+                    number = int(
+                        str(
+                            data[key]
+                        ).strip()
                     )
 
                 except (
@@ -405,17 +688,24 @@ def parse_record(
                     ValueError,
                 ):
 
-                    values = []
+                    valid = False
 
                     break
 
+                values.append(
+                    number
+                )
+
             if (
-                len(values) == 7
+                valid
+                and len(values) == 7
                 and all(
                     1 <= x <= 49
                     for x in values
                 )
-                and len(set(values)) == 7
+                and len(
+                    set(values)
+                ) == 7
             ):
 
                 numbers = values
@@ -427,7 +717,7 @@ def parse_record(
         and numbers
     ):
 
-        return {
+        result = {
 
             "issue": issue,
 
@@ -435,35 +725,259 @@ def parse_record(
 
         }
 
+        # 可选字段
+        for key in (
+            "openTime",
+            "open_time",
+            "time",
+            "drawTime",
+        ):
+
+            if key in data:
+
+                result[
+                    "open_time"
+                ] = data[key]
+
+                break
+
+        return result
+
     return None
 
 
 # ============================================================
-# 递归解析 API
+# 从 history 字符串解析
+#
+# 支持：
+#
+# 2026231期：39 46 23 11 08 13 20
+#
+# 2026231:39,46,23,11,08,13,20
 # ============================================================
 
-def extract_records(
+def parse_history_text(
+    text: str,
+) -> list[dict[str, Any]]:
+
+    records = []
+
+    if not text:
+
+        return records
+
+    # --------------------------------------------------------
+    # 每一期单独匹配
+    # --------------------------------------------------------
+
+    pattern = re.compile(
+
+        r"(?P<issue>\d{3,10})"
+
+        r"(?:\s*期)?"
+
+        r"\s*[:：=\-]\s*"
+
+        r"(?P<numbers>"
+
+        r"(?:\d{1,2}"
+
+        r"[\s,，|/\-]+"
+
+        r"){6}"
+
+        r"\d{1,2}"
+
+        r")",
+
+        flags=re.I,
+
+    )
+
+    for match in pattern.finditer(
+        text
+    ):
+
+        issue = normalize_issue(
+            match.group("issue")
+        )
+
+        numbers = normalize_numbers(
+            match.group("numbers")
+        )
+
+        if (
+            issue
+            and numbers
+        ):
+
+            records.append({
+
+                "issue": issue,
+
+                "numbers": numbers,
+
+            })
+
+    return records
+
+
+# ============================================================
+# history 数组解析
+# ============================================================
+
+def parse_history_value(
+    value: Any,
+) -> list[dict[str, Any]]:
+
+    records = []
+
+    # --------------------------------------------------------
+    # 字符串
+    # --------------------------------------------------------
+
+    if isinstance(
+        value,
+        str,
+    ):
+
+        # 先尝试 JSON
+        try:
+
+            parsed = json.loads(
+                value
+            )
+
+            return parse_history_value(
+                parsed
+            )
+
+        except Exception:
+
+            pass
+
+        records.extend(
+            parse_history_text(
+                value
+            )
+        )
+
+        return records
+
+    # --------------------------------------------------------
+    # list
+    # --------------------------------------------------------
+
+    if isinstance(
+        value,
+        list,
+    ):
+
+        for item in value:
+
+            if isinstance(
+                item,
+                dict,
+            ):
+
+                record = parse_record(
+                    item
+                )
+
+                if record:
+
+                    records.append(
+                        record
+                    )
+
+                else:
+
+                    # 继续递归
+                    records.extend(
+                        parse_any_node(
+                            item
+                        )
+                    )
+
+            elif isinstance(
+                item,
+                str,
+            ):
+
+                records.extend(
+                    parse_history_text(
+                        item
+                    )
+                )
+
+        return records
+
+    # --------------------------------------------------------
+    # dict
+    # --------------------------------------------------------
+
+    if isinstance(
+        value,
+        dict,
+    ):
+
+        record = parse_record(
+            value
+        )
+
+        if record:
+
+            records.append(
+                record
+            )
+
+        else:
+
+            records.extend(
+                parse_any_node(
+                    value
+                )
+            )
+
+    return records
+
+
+# ============================================================
+# 解析任意节点
+# ============================================================
+
+def parse_any_node(
     node: Any,
-    output: list[dict[str, Any]],
-) -> None:
+) -> list[dict[str, Any]]:
+
+    records = []
+
+    # --------------------------------------------------------
+    # dict
+    # --------------------------------------------------------
 
     if isinstance(
         node,
         dict,
     ):
 
-        record = parse_record(node)
+        # 先自己尝试
+        record = parse_record(
+            node
+        )
 
         if record:
 
-            output.append(record)
+            records.append(
+                record
+            )
 
-        # 先处理历史数据字段
-        priority = []
+        # history 优先
+        priority_keys = []
 
-        normal = []
+        normal_keys = []
 
-        for key, value in node.items():
+        for key in node.keys():
 
             key_lower = str(
                 key
@@ -475,26 +989,62 @@ def extract_records(
                     "history",
                     "lottery_data",
                     "records",
+                    "record",
                     "list",
-                    "result",
                     "data",
+                    "result",
                 )
             ):
 
-                priority.append(value)
+                priority_keys.append(
+                    key
+                )
 
             else:
 
-                normal.append(value)
+                normal_keys.append(
+                    key
+                )
 
-        for value in (
-            priority + normal
+        for key in (
+            priority_keys
+            + normal_keys
         ):
 
-            extract_records(
-                value,
-                output,
-            )
+            # 自身已经作为记录解析
+            # 就不要重复
+            if key in (
+                "numbers",
+                "openCode",
+                "open_code",
+            ):
+
+                continue
+
+            value = node[key]
+
+            if (
+                "history"
+                in str(key).lower()
+            ):
+
+                records.extend(
+                    parse_history_value(
+                        value
+                    )
+                )
+
+            else:
+
+                records.extend(
+                    parse_any_node(
+                        value
+                    )
+                )
+
+    # --------------------------------------------------------
+    # list
+    # --------------------------------------------------------
 
     elif isinstance(
         node,
@@ -503,79 +1053,327 @@ def extract_records(
 
         for item in node:
 
-            extract_records(
-                item,
-                output,
+            records.extend(
+                parse_any_node(
+                    item
+                )
             )
 
+    return records
+
 
 # ============================================================
-# 标准化全部开奖记录
+# 去重
 # ============================================================
 
-def normalize_records(
-    payload: Any,
-) -> list[dict[str, Any]]:
-
-    records = []
-
-    extract_records(
-        payload,
-        records,
-    )
+def deduplicate_records(
+    records: list[
+        dict[str, Any]
+    ],
+) -> list[
+    dict[str, Any]
+]:
 
     unique = {}
 
     for record in records:
 
-        issue = record["issue"]
+        issue = normalize_issue(
+            record.get("issue")
+        )
 
-        if issue not in unique:
+        numbers = normalize_numbers(
+            record.get("numbers")
+        )
 
-            unique[issue] = record
+        if (
+            not issue
+            or not numbers
+        ):
+
+            continue
+
+        # 后出现的数据覆盖前面的
+        unique[issue] = {
+
+            "issue": issue,
+
+            "numbers": numbers,
+
+        }
+
+        if "open_time" in record:
+
+            unique[
+                issue
+            ][
+                "open_time"
+            ] = record[
+                "open_time"
+            ]
 
     result = list(
         unique.values()
     )
 
-    def sort_key(item):
-
-        try:
-
-            return int(
-                item["issue"]
-            )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-
-            return 0
-
     result.sort(
-        key=sort_key
+
+        key=lambda x:
+        int(x["issue"])
+
     )
 
     return result
 
 
 # ============================================================
-# 获取某个彩种
+# 获取历史总接口
 # ============================================================
 
-def fetch_lottery(
+def fetch_all_history() -> Any:
+
+    print(
+        "[HISTORY] 请求历史总接口"
+    )
+
+    print(
+        HISTORY_API
+    )
+
+    try:
+
+        payload = request_json(
+
+            HISTORY_API,
+
+            timeout=40,
+
+        )
+
+        print(
+            "[HISTORY] 历史接口请求成功"
+        )
+
+        return payload
+
+    except Exception as exc:
+
+        print(
+            "[WARN] 历史接口失败："
+            f"{exc}"
+        )
+
+        return None
+
+
+# ============================================================
+# 找到指定彩种
+# ============================================================
+
+def find_lottery_nodes(
+    payload: Any,
     lottery_name: str,
-) -> list[dict[str, Any]]:
+) -> list[Any]:
+
+    result = []
+
+    aliases = {
+        x.lower()
+        for x in LOTTERY_NAME_ALIASES.get(
+            lottery_name,
+            {lottery_name},
+        )
+    }
+
+    api_type = API_TYPES[
+        lottery_name
+    ].lower()
+
+    # --------------------------------------------------------
+    # 递归搜索
+    # --------------------------------------------------------
+
+    def walk(node: Any):
+
+        if isinstance(
+            node,
+            dict,
+        ):
+
+            # 当前节点名称
+            names = []
+
+            for key in (
+                "name",
+                "lottery",
+                "lotteryName",
+                "type",
+                "code",
+                "key",
+                "id",
+            ):
+
+                if key in node:
+
+                    names.append(
+                        str(
+                            node[key]
+                        ).strip().lower()
+                    )
+
+            matched = False
+
+            for name in names:
+
+                if (
+                    name in aliases
+                    or name == api_type
+                    or api_type in name
+                ):
+
+                    matched = True
+
+                    break
+
+            if matched:
+
+                result.append(
+                    node
+                )
+
+            for value in node.values():
+
+                walk(value)
+
+        elif isinstance(
+            node,
+            list,
+        ):
+
+            for item in node:
+
+                walk(item)
+
+    walk(payload)
+
+    return result
+
+
+# ============================================================
+# 从历史总接口提取指定彩种
+# ============================================================
+
+def extract_history_for_lottery(
+    payload: Any,
+    lottery_name: str,
+) -> list[
+    dict[str, Any]
+]:
+
+    records = []
+
+    nodes = find_lottery_nodes(
+
+        payload,
+
+        lottery_name,
+
+    )
+
+    print(
+        f"[{lottery_name}] "
+        f"历史彩种节点："
+        f"{len(nodes)}"
+    )
+
+    # --------------------------------------------------------
+    # 正常情况
+    # lottery_data:
+    # [
+    #   {
+    #      name: 新澳门彩,
+    #      history: [...]
+    #   }
+    # ]
+    # --------------------------------------------------------
+
+    for node in nodes:
+
+        record = parse_record(
+            node
+        )
+
+        if record:
+
+            records.append(
+                record
+            )
+
+        # history
+        for key, value in node.items():
+
+            key_lower = str(
+                key
+            ).lower()
+
+            if (
+                "history"
+                in key_lower
+            ):
+
+                records.extend(
+                    parse_history_value(
+                        value
+                    )
+                )
+
+    # --------------------------------------------------------
+    # 如果名称匹配不到
+    # 对整个 payload 再搜索
+    # --------------------------------------------------------
+
+    if not records:
+
+        print(
+            f"[{lottery_name}] "
+            "名称节点未直接匹配，"
+            "尝试全局解析"
+        )
+
+        all_records = parse_any_node(
+            payload
+        )
+
+        records.extend(
+            all_records
+        )
+
+    records = deduplicate_records(
+        records
+    )
+
+    print(
+        f"[{lottery_name}] "
+        f"历史接口解析："
+        f"{len(records)} 期"
+    )
+
+    return records
+
+
+# ============================================================
+# 获取最新一期
+# ============================================================
+
+def fetch_latest(
+    lottery_name: str,
+) -> list[
+    dict[str, Any]
+]:
 
     api_type = API_TYPES[
         lottery_name
     ]
-
-    print(
-        f"[{lottery_name}] "
-        f"API类型：{api_type}"
-    )
 
     urls = [
 
@@ -591,8 +1389,6 @@ def fetch_lottery(
 
     ]
 
-    final_records = []
-
     for index, url in enumerate(
         urls,
         start=1,
@@ -600,7 +1396,7 @@ def fetch_lottery(
 
         print(
             f"[{lottery_name}] "
-            f"请求API 第{index}次"
+            f"请求最新API 第{index}次"
         )
 
         print(url)
@@ -611,31 +1407,229 @@ def fetch_lottery(
                 url
             )
 
-            records = normalize_records(
-                payload
+            records = deduplicate_records(
+
+                parse_any_node(
+                    payload
+                )
+
             )
 
             print(
                 f"[{lottery_name}] "
-                f"API解析得到："
+                f"最新API解析："
                 f"{len(records)} 期"
             )
 
-            # --------------------------------------
-            # 非空才替换
-            # --------------------------------------
-
             if records:
 
-                final_records = records
-
-                break
+                return records
 
         except Exception as exc:
 
             print(
-                f"[WARN] "
-                f"请求失败：{exc}"
+                "[WARN] 最新API失败："
+                f"{exc}"
             )
 
-    return final_records
+    return []
+
+
+# ============================================================
+# 主函数
+# ============================================================
+
+def fetch_lottery(
+    lottery_name: str,
+) -> list[
+    dict[str, Any]
+]:
+
+    if lottery_name not in API_TYPES:
+
+        raise ValueError(
+            f"不支持的彩种："
+            f"{lottery_name}"
+        )
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        f"正在同步："
+        f"{lottery_name}"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    # ========================================================
+    # 第一阶段
+    # 历史 API
+    # ========================================================
+
+    history_records = []
+
+    history_payload = (
+        fetch_all_history()
+    )
+
+    if history_payload is not None:
+
+        history_records = (
+            extract_history_for_lottery(
+
+                history_payload,
+
+                lottery_name,
+
+            )
+        )
+
+    # ========================================================
+    # 第二阶段
+    # 最新 API
+    # ========================================================
+
+    latest_records = fetch_latest(
+        lottery_name
+    )
+
+    # ========================================================
+    # 第三阶段
+    # 合并
+    # ========================================================
+
+    combined = (
+        history_records
+        + latest_records
+    )
+
+    combined = deduplicate_records(
+        combined
+    )
+
+    # ========================================================
+    # 输出
+    # ========================================================
+
+    print(
+        f"[{lottery_name}] "
+        f"最终获得："
+        f"{len(combined)} 期"
+    )
+
+    if combined:
+
+        print(
+            f"[{lottery_name}] "
+            f"最早期号："
+            f"{combined[0]['issue']}"
+        )
+
+        print(
+            f"[{lottery_name}] "
+            f"最新期号："
+            f"{combined[-1]['issue']}"
+        )
+
+    else:
+
+        print(
+            f"[{lottery_name}] "
+            "未获得有效开奖数据"
+        )
+
+    return combined
+
+
+# ============================================================
+# 三彩种批量同步
+# ============================================================
+
+def fetch_all_lotteries() -> dict[
+    str,
+    list[
+        dict[str, Any]
+    ]
+]:
+
+    result = {}
+
+    for lottery_name in API_TYPES:
+
+        result[
+            lottery_name
+        ] = fetch_lottery(
+            lottery_name
+        )
+
+    return result
+
+
+# ============================================================
+# 测试入口
+# ============================================================
+
+if __name__ == "__main__":
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        "MarkSix-AI API历史同步测试"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    all_data = (
+        fetch_all_lotteries()
+    )
+
+    for lottery_name, records in (
+        all_data.items()
+    ):
+
+        print()
+        print(
+            lottery_name
+        )
+
+        print(
+            f"记录数："
+            f"{len(records)}"
+        )
+
+        if records:
+
+            print(
+                f"最新："
+                f"{records[-1]['issue']}"
+            )
+
+            print(
+                f"号码："
+                f"{records[-1]['numbers']}"
+            )
+
+            print(
+                "前5期："
+            )
+
+            for record in records[
+                -5:
+            ]:
+
+                print(
+                    record
+                )
+
+    print()
+    print(
+        "=" * 70
+    )
