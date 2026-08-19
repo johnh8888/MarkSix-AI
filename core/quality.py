@@ -1,122 +1,304 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
 数据质量检测模块
+
+功能:
+
+历史数量检测
+重复检测
+号码检测
+数据评分
+
 """
 
-from __future__ import annotations
+
+from collections import Counter
 
 
-def check_history(history):
 
-    if not history:
 
-        return {
-            "质量": 0.0,
 
-            "等级": "无数据",
+# =====================================================
+# 数字合法性
+# =====================================================
 
-            "样本": 0
-        }
 
-    total = len(
-        history
+def check_numbers(draw):
+
+
+    numbers=draw.get(
+
+        "numbers",
+
+        []
+
     )
 
-    valid = 0
 
-    for row in history:
+    special=draw.get(
 
-        if not isinstance(row, dict):
-            continue
+        "special"
 
-        try:
-
-            numbers = row.get(
-                "numbers",
-                []
-            )
-
-            special = int(
-                row.get("special")
-            )
-
-            if len(numbers) != 6:
-                continue
-
-            if len(set(numbers)) != 6:
-                continue
-
-            if any(
-                int(x) < 1
-                or int(x) > 49
-                for x in numbers
-            ):
-                continue
-
-            if not 1 <= special <= 49:
-                continue
-
-            if special in numbers:
-                continue
-
-            valid += 1
-
-        except Exception:
-
-            continue
-
-    score = (
-        valid / total
-        if total
-        else 0.0
     )
 
-    if score >= 0.95:
 
-        level = "优秀"
 
-    elif score >= 0.80:
+    if len(numbers)!=6:
 
-        level = "良好"
 
-    elif score >= 0.60:
+        return False
 
-        level = "一般"
+
+
+
+    for n in numbers:
+
+
+        if not 1 <= n <=49:
+
+
+            return False
+
+
+
+
+    if special is not None:
+
+
+        if not 1 <= int(special) <=49:
+
+
+            return False
+
+
+
+
+    return True
+
+
+
+
+
+
+# =====================================================
+# 重复检测
+# =====================================================
+
+
+def check_duplicate(history):
+
+
+    issues=[
+
+
+        x.get("issue")
+
+        for x in history
+
+    ]
+
+
+
+    count=Counter(
+
+        issues
+
+    )
+
+
+
+    duplicates=[
+
+
+        k
+
+        for k,v in count.items()
+
+        if v>1
+
+    ]
+
+
+
+    return duplicates
+
+
+
+
+
+# =====================================================
+# 完整度评分
+# =====================================================
+
+
+def score_history(history):
+
+
+    total=len(history)
+
+
+
+    if total>=500:
+
+
+        score=100
+
+
+
+    elif total>=300:
+
+
+        score=90
+
+
+
+    elif total>=100:
+
+
+        score=80
+
+
+
+    elif total>=50:
+
+
+        score=60
+
+
 
     else:
 
-        level = "较差"
+
+        score=max(
+
+            total,
+
+            10
+
+        )
+
+
+
+
+    return score
+
+
+
+
+
+# =====================================================
+# 数据质量分析
+# =====================================================
+
+
+def analyze_quality(history):
+
+
+    total=len(history)
+
+
+
+    invalid=0
+
+
+
+    for row in history:
+
+
+        if not check_numbers(row):
+
+
+            invalid+=1
+
+
+
+
+    duplicates=check_duplicate(
+
+        history
+
+    )
+
+
+
+    score=score_history(
+
+        history
+
+    )
+
+
+
+    if total>=100:
+
+
+        status="READY"
+
+
+
+    elif total>=30:
+
+
+        status="LIMITED"
+
+
+
+    else:
+
+
+        status="WAIT"
+
+
+
+
 
     return {
 
-        "质量":
-            round(score, 4),
 
-        "等级":
-            level,
+        "历史数量":
 
-        "样本":
-            total,
+        total,
 
-        "有效":
-            valid,
 
-        "无效":
-            total - valid
+
+        "异常数据":
+
+        invalid,
+
+
+
+        "重复期":
+
+        len(duplicates),
+
+
+
+        "质量评分":
+
+        score,
+
+
+
+        "模型状态":
+
+        status
+
     }
 
 
-def quality_score(history):
-
-    return check_history(
-        history
-    )["质量"]
 
 
-__all__ = [
-    "check_history",
-    "quality_score"
+
+
+__all__=[
+
+    "analyze_quality",
+
+    "check_numbers",
+
+    "score_history"
+
 ]
