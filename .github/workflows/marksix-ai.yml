@@ -1,9 +1,12 @@
-name: 六合AI V10 FINAL
-
+name: AI V3.0 自动运行
 
 on:
 
   workflow_dispatch:
+
+  schedule:
+
+    - cron: "5 * * * *"
 
 
 permissions:
@@ -11,39 +14,23 @@ permissions:
   contents: write
 
 
-
 jobs:
-
 
   run:
 
-
-    runs-on:
-
-      ubuntu-latest
-
+    runs-on: ubuntu-latest
 
 
     steps:
 
 
-    - name:
-
-        拉取代码
-
-      uses:
-
-        actions/checkout@v4
+    - name: 下载代码
+      uses: actions/checkout@v4
 
 
 
-    - name:
-
-        Python
-
-      uses:
-
-        actions/setup-python@v5
+    - name: Python环境
+      uses: actions/setup-python@v5
 
       with:
 
@@ -51,120 +38,42 @@ jobs:
 
 
 
-    - name:
+    - name: 安装依赖
 
-        设置中文环境
+      run:
+
+        pip install -r requirements.txt
+
+
+
+    - name: Python检查
+
+      run:
+
+        python -m compileall .
+
+
+
+    - name: 运行系统
+
+      run:
+
+        python main.py
+
+
+
+    - name: 保存结果
 
       run:
 
         |
 
-        echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
+        git config user.name github-actions
 
-        echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
+        git config user.email github-actions@github.com
 
-        echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
+        git add .
 
+        git commit -m "update prediction" || true
 
-
-    - name:
-
-        安装依赖
-
-      run:
-
-        |
-
-        pip install requests pandas numpy
-
-
-
-    - name:
-
-        运行AI
-
-      env:
-
-        PYTHONPATH:
-
-          ${{github.workspace}}
-
-      run:
-
-        |
-
-        python -u main.py
-
-
-
-    - name:
-
-        最终预测
-
-      run:
-
-        |
-
-        python - <<'PY'
-
-        import json
-
-
-        d=json.load(
-          open(
-          "output/prediction.json",
-          encoding="utf-8"
-          )
-        )
-
-
-        print("="*40)
-
-        print("       六合AI V10最终预测")
-
-        print("="*40)
-
-
-        for k,v in d["lotteries"].items():
-
-            print()
-
-            print(v.get("彩种",k))
-
-            print("-"*30)
-
-
-            p=v.get("预测",{})
-
-
-            print(
-            "特码10码:",
-            p.get("特码10码")
-            )
-
-
-            print(
-            "重点3码:",
-            p.get("重点3码")
-            )
-
-
-            print(
-            "第一推荐:",
-            p.get("第一推荐")
-            )
-
-
-            print(
-            "生肖5肖:",
-            p.get("生肖5肖")
-            )
-
-
-            print(
-            "属性:",
-            p.get("属性")
-            )
-
-
-        PY
+        git push || true
