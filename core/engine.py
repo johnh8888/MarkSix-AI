@@ -1,41 +1,6 @@
 # core/engine.py
 # -*- coding: utf-8 -*-
 
-"""
-============================================================
-MarkSix-AI
-三彩种智能数据分析核心引擎
-============================================================
-
-支持：
-    香港彩
-    新澳门彩
-    老澳门彩
-
-核心功能：
-    1. 在线数据同步
-    2. SQLite 本地存储
-    3. 历史开奖统计
-    4. 波色分析
-    5. 大小分析
-    6. 单双分析
-    7. 尾数分析
-    8. 分区分析
-    9. 热冷分析
-    10. 频率分析
-    11. 综合评分
-    12. 下一期候选号码分析
-
-主入口：
-    from core.engine import run_system
-
-    run_system()
-
-Python:
-    3.11+
-============================================================
-"""
-
 from __future__ import annotations
 
 import json
@@ -44,14 +9,13 @@ import re
 import sqlite3
 import ssl
 import urllib.request
-import urllib.parse
 from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 
 # ============================================================
-# 基础配置
+# 基础路径
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -61,12 +25,14 @@ BASE_DIR = os.path.dirname(
 )
 
 DATA_DIR = os.path.join(BASE_DIR, "data")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 # ============================================================
-# 数据库配置
+# 三彩种数据库
 # ============================================================
 
 DB_FILES = {
@@ -77,18 +43,29 @@ DB_FILES = {
 
 
 # ============================================================
-# API 配置
+# 三彩种 API
 # ============================================================
 
-API_URLS = [
-    "https://api3.marksix6.net/lottery_api.php?type=hk",
-    "https://marksix6.net/index.php?api=1",
-    "https://marksix6.net/api/lottery_api.php",
-]
+API_URLS = {
+    "香港彩": [
+        "https://marksix6.net/api/lottery_api.php?type=hk",
+        "https://api3.marksix6.net/lottery_api.php?type=hk",
+    ],
+
+    "新澳门彩": [
+        "https://marksix6.net/api/lottery_api.php?type=newMacau",
+        "https://api3.marksix6.net/lottery_api.php?type=newMacau",
+    ],
+
+    "老澳门彩": [
+        "https://marksix6.net/api/lottery_api.php?type=oldMacau",
+        "https://api3.marksix6.net/lottery_api.php?type=oldMacau",
+    ],
+}
 
 
 # ============================================================
-# 香港六合彩波色
+# 波色
 # ============================================================
 
 RED_NUMBERS = {
@@ -115,6 +92,7 @@ GREEN_NUMBERS = {
 # ============================================================
 
 def get_color(number: int) -> str:
+
     number = int(number)
 
     if number in RED_NUMBERS:
@@ -141,14 +119,7 @@ def get_tail(number: int) -> int:
     return int(number) % 10
 
 
-def get_mod7(number: int) -> int:
-    return int(number) % 7
-
-
 def get_zone(number: int) -> int:
-    """
-    1-49 分成 5 个区域
-    """
 
     number = int(number)
 
@@ -171,7 +142,7 @@ def get_zone(number: int) -> int:
 
 
 # ============================================================
-# 输出
+# 日志
 # ============================================================
 
 def log(message: str = "") -> None:
@@ -183,29 +154,23 @@ def separator(char: str = "=", length: int = 70) -> None:
 
 
 # ============================================================
-# SQLite
+# 数据库
 # ============================================================
 
 def get_db_path(lottery: str) -> str:
-    return DB_FILES.get(
-        lottery,
-        os.path.join(
-            DATA_DIR,
-            "default.db"
-        )
-    )
+    return DB_FILES[lottery]
 
 
-def get_connection(lottery: str) -> sqlite3.Connection:
+def get_connection(lottery: str):
+
     path = get_db_path(lottery)
 
     os.makedirs(
         os.path.dirname(path),
-        exist_ok=True
+        exist_ok=True,
     )
 
     conn = sqlite3.connect(path)
-
     conn.row_factory = sqlite3.Row
 
     return conn
@@ -244,7 +209,8 @@ def init_all_databases() -> None:
             init_database(lottery)
         except Exception as exc:
             log(
-                f"[WARN] 初始化 {lottery} 数据库失败：{exc}"
+                f"[WARN] 初始化数据库失败："
+                f"{lottery}: {exc}"
             )
 
 
@@ -257,62 +223,65 @@ def clean_numbers(value: Any) -> List[int]:
     if value is None:
         return []
 
-    result: List[int] = []
-
     if isinstance(value, (list, tuple)):
 
-        for item in value:
+        result = []
+
+        for x in value:
 
             try:
-                n = int(item)
+
+                n = int(x)
 
                 if 1 <= n <= 49:
                     result.append(n)
 
             except Exception:
-                continue
+                pass
 
         return result
 
     text = str(value)
 
-    parts = re.findall(
-        r"\d{1,2}",
-        text
-    )
+    result = []
 
-    for item in parts:
+    for x in re.findall(
+        r"\d{1,2}",
+        text,
+    ):
 
         try:
 
-            n = int(item)
+            n = int(x)
 
             if 1 <= n <= 49:
                 result.append(n)
 
         except Exception:
-            continue
+            pass
 
     return result
 
 
 # ============================================================
-# API 请求
+# HTTP
 # ============================================================
 
-def http_get_json(
+def http_get(
     url: str,
-    timeout: int = 15,
+    timeout: int = 20,
 ) -> Optional[Any]:
 
     headers = {
         "User-Agent": (
             "Mozilla/5.0 "
-            "(Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "Chrome/151.0 Safari/537.36"
+            "MarkSix-AI/4.0"
         ),
-        "Accept": "application/json,text/plain,*/*",
+        "Accept": (
+            "application/json,"
+            "text/plain,"
+            "*/*"
+        ),
     }
 
     request = urllib.request.Request(
@@ -343,74 +312,134 @@ def http_get_json(
 
             try:
                 return json.loads(text)
-
-            except json.JSONDecodeError:
-
-                # 有些接口可能返回 JSONP
-                text = re.sub(
-                    r"^[^(]*\(",
-                    "",
-                    text,
-                )
-
-                text = re.sub(
-                    r"\);?\s*$",
-                    "",
-                    text,
-                )
-
-                try:
-                    return json.loads(text)
-                except Exception:
-                    return text
+            except Exception:
+                return text
 
     except Exception as exc:
 
         log(
-            f"[WARN] API 请求失败：{url}"
-        )
-
-        log(
-            f"[WARN] {exc}"
+            f"[WARN] 请求失败：{exc}"
         )
 
         return None
 
 
 # ============================================================
-# 从各种 API 格式提取开奖
+# 解析开奖记录
 # ============================================================
+
+def parse_draw_dict(
+    item: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+
+    issue = None
+
+    for key in (
+        "expect",
+        "issue",
+        "period",
+        "periods",
+        "draw",
+        "drawNo",
+        "draw_number",
+        "qihao",
+        "qishu",
+    ):
+
+        if key in item:
+
+            value = item.get(key)
+
+            if value is not None:
+
+                value = str(value).strip()
+
+                if value:
+                    issue = value
+                    break
+
+    numbers = []
+
+    for key in (
+        "numbers",
+        "number",
+        "openCode",
+        "open_code",
+        "openCodeList",
+        "code",
+        "result",
+        "open_number",
+    ):
+
+        if key in item:
+
+            numbers = clean_numbers(
+                item.get(key)
+            )
+
+            if len(numbers) >= 7:
+                break
+
+    if len(numbers) < 7:
+
+        for value in item.values():
+
+            if isinstance(value, list):
+
+                candidate = clean_numbers(
+                    value
+                )
+
+                if len(candidate) >= 7:
+
+                    numbers = candidate
+                    break
+
+    if not issue or len(numbers) < 7:
+        return None
+
+    open_time = ""
+
+    for key in (
+        "openTime",
+        "open_time",
+        "drawTime",
+        "date",
+        "time",
+    ):
+
+        if key in item:
+
+            value = item.get(key)
+
+            if value is not None:
+
+                open_time = str(value)
+                break
+
+    return {
+        "issue": issue,
+        "open_time": open_time,
+        "numbers": numbers[:7],
+    }
+
 
 def extract_draws(
     payload: Any,
 ) -> List[Dict[str, Any]]:
 
-    results: List[Dict[str, Any]] = []
+    results = []
 
     if payload is None:
         return results
 
-    # --------------------------------------------------------
-    # 字符串
-    # --------------------------------------------------------
-
     if isinstance(payload, str):
 
-        # 尝试寻找常见 JSON 结构
         try:
             obj = json.loads(payload)
-
-            if obj != payload:
-                return extract_draws(obj)
-
+            return extract_draws(obj)
         except Exception:
-            pass
-
-        return results
-
-    # --------------------------------------------------------
-    # 列表
-    # --------------------------------------------------------
+            return results
 
     if isinstance(payload, list):
 
@@ -423,11 +452,7 @@ def extract_draws(
                 if draw:
                     results.append(draw)
 
-        return results
-
-    # --------------------------------------------------------
-    # 字典
-    # --------------------------------------------------------
+        return deduplicate_draws(results)
 
     if isinstance(payload, dict):
 
@@ -436,7 +461,6 @@ def extract_draws(
         if direct:
             results.append(direct)
 
-        # 常见列表字段
         for key in (
             "history",
             "data",
@@ -462,23 +486,20 @@ def extract_draws(
 
             elif isinstance(value, dict):
 
-                nested = extract_draws(value)
+                results.extend(
+                    extract_draws(value)
+                )
 
-                results.extend(nested)
+    return deduplicate_draws(results)
 
-        # 防止某些接口 data 嵌套
-        for value in payload.values():
 
-            if isinstance(value, dict):
+def deduplicate_draws(
+    draws: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
 
-                nested = extract_draws(value)
+    unique = {}
 
-                results.extend(nested)
-
-    # 去重
-    unique: Dict[str, Dict[str, Any]] = {}
-
-    for draw in results:
+    for draw in draws:
 
         issue = str(
             draw.get("issue", "")
@@ -491,123 +512,13 @@ def extract_draws(
 
 
 # ============================================================
-# 解析单期开奖
-# ============================================================
-
-def parse_draw_dict(
-    item: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-
-    issue_keys = [
-        "expect",
-        "issue",
-        "period",
-        "periods",
-        "draw",
-        "drawNo",
-        "draw_number",
-        "qihao",
-        "qishu",
-    ]
-
-    number_keys = [
-        "numbers",
-        "number",
-        "openCode",
-        "open_code",
-        "openCodeList",
-        "code",
-        "result",
-        "open_number",
-    ]
-
-    time_keys = [
-        "openTime",
-        "open_time",
-        "drawTime",
-        "date",
-        "time",
-    ]
-
-    issue = None
-
-    for key in issue_keys:
-
-        if key in item:
-
-            value = item.get(key)
-
-            if value is not None:
-
-                issue = str(value).strip()
-
-                if issue:
-                    break
-
-    numbers: List[int] = []
-
-    for key in number_keys:
-
-        if key not in item:
-            continue
-
-        value = item.get(key)
-
-        numbers = clean_numbers(value)
-
-        if len(numbers) >= 7:
-            break
-
-    # 如果 numbers 是嵌套字典
-    if len(numbers) < 7:
-
-        for key, value in item.items():
-
-            if isinstance(value, list):
-
-                candidate = clean_numbers(value)
-
-                if len(candidate) >= 7:
-                    numbers = candidate
-                    break
-
-    if not issue:
-        return None
-
-    if len(numbers) < 7:
-        return None
-
-    numbers = numbers[:7]
-
-    open_time = ""
-
-    for key in time_keys:
-
-        if key in item:
-
-            value = item.get(key)
-
-            if value is not None:
-
-                open_time = str(value)
-
-                break
-
-    return {
-        "issue": issue,
-        "open_time": open_time,
-        "numbers": numbers,
-        "source": "online",
-    }
-
-
-# ============================================================
-# 保存开奖
+# 保存数据
 # ============================================================
 
 def save_draws(
     lottery: str,
     draws: List[Dict[str, Any]],
+    source: str,
 ) -> int:
 
     if not draws:
@@ -631,52 +542,40 @@ def save_draws(
                 draw.get("numbers")
             )
 
-            if not issue:
+            if not issue or len(numbers) < 7:
                 continue
 
-            if len(numbers) < 7:
-                continue
-
-            try:
-
-                cursor = conn.execute(
-                    """
-                    INSERT OR IGNORE INTO draws
-                    (
-                        issue,
-                        open_time,
-                        numbers,
-                        source,
-                        created_at
-                    )
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        issue,
-                        str(draw.get("open_time", "")),
-                        json.dumps(
-                            numbers,
-                            ensure_ascii=False,
-                        ),
-                        str(
-                            draw.get(
-                                "source",
-                                "online",
-                            )
-                        ),
-                        datetime.now().isoformat(),
+            cursor = conn.execute(
+                """
+                INSERT OR IGNORE INTO draws
+                (
+                    issue,
+                    open_time,
+                    numbers,
+                    source,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    issue,
+                    str(
+                        draw.get(
+                            "open_time",
+                            "",
+                        )
                     ),
-                )
+                    json.dumps(
+                        numbers,
+                        ensure_ascii=False,
+                    ),
+                    source,
+                    datetime.now().isoformat(),
+                ),
+            )
 
-                if cursor.rowcount:
-                    inserted += 1
-
-            except Exception as exc:
-
-                log(
-                    f"[WARN] 保存 {lottery} "
-                    f"{issue} 失败：{exc}"
-                )
+            if cursor.rowcount:
+                inserted += 1
 
         conn.commit()
 
@@ -687,7 +586,7 @@ def save_draws(
 
 
 # ============================================================
-# 读取历史
+# 读取数据
 # ============================================================
 
 def load_draws(
@@ -712,29 +611,26 @@ def load_draws(
             ORDER BY id DESC
             LIMIT ?
             """,
-            (int(limit),),
+            (limit,),
         ).fetchall()
 
     finally:
         conn.close()
 
-    results: List[Dict[str, Any]] = []
+    result = []
 
     for row in rows:
 
         try:
-
             numbers = json.loads(
                 row["numbers"]
             )
-
         except Exception:
-
             numbers = clean_numbers(
                 row["numbers"]
             )
 
-        results.append(
+        result.append(
             {
                 "issue": row["issue"],
                 "open_time": row["open_time"],
@@ -743,7 +639,7 @@ def load_draws(
             }
         )
 
-    return results
+    return result
 
 
 # ============================================================
@@ -759,244 +655,102 @@ def sync_lottery(
     log(f"正在更新：{lottery}")
     separator()
 
-    # --------------------------------------------------------
-    # 初始化
-    # --------------------------------------------------------
+    urls = API_URLS.get(
+        lottery,
+        [],
+    )
 
-    init_database(lottery)
+    all_draws = []
+    used_url = ""
 
-    total_inserted = 0
-    all_draws: List[Dict[str, Any]] = []
-
-    # --------------------------------------------------------
-    # API
-    # --------------------------------------------------------
-
-    for index, url in enumerate(API_URLS, start=1):
+    for index, url in enumerate(
+        urls,
+        start=1,
+    ):
 
         log(
-            f"[{lottery}] 请求API 第{index}次"
+            f"[{lottery}] 请求API "
+            f"第{index}次"
         )
 
         log(url)
 
-        payload = http_get_json(url)
+        payload = http_get(url)
 
         if payload is None:
             continue
 
-        draws = extract_draws(payload)
+        draws = extract_draws(
+            payload
+        )
 
         if not draws:
+
             log(
-                f"[{lottery}] API 未解析到有效开奖数据"
+                f"[{lottery}] "
+                f"没有解析到有效开奖"
             )
+
             continue
 
         log(
-            f"[{lottery}] 解析开奖：{len(draws)} 期"
+            f"[{lottery}] "
+            f"解析开奖：{len(draws)} 期"
         )
 
-        all_draws.extend(draws)
+        all_draws = draws
+        used_url = url
 
-        # 有有效数据就可以结束
-        if draws:
-            break
+        break
 
-    # --------------------------------------------------------
-    # 保存
-    # --------------------------------------------------------
+    inserted = 0
 
     if all_draws:
 
-        # 去重
-        unique: Dict[str, Dict[str, Any]] = {}
-
-        for draw in all_draws:
-
-            issue = str(
-                draw.get("issue", "")
-            )
-
-            if issue:
-                unique[issue] = draw
-
-        all_draws = list(
-            unique.values()
-        )
-
-        total_inserted = save_draws(
+        inserted = save_draws(
             lottery,
             all_draws,
-        )
-
-        log(
-            f"本次新增：{total_inserted} 期"
+            used_url,
         )
 
     else:
 
         log(
-            f"[{lottery}] 在线数据暂时不可用"
+            f"[{lottery}] "
+            f"在线数据暂不可用，"
+            f"继续使用本地数据库"
         )
-
-    # --------------------------------------------------------
-    # 当前最新
-    # --------------------------------------------------------
 
     history = load_draws(
         lottery,
-        limit=1,
+        1,
     )
 
     latest_issue = ""
 
     if history:
-
         latest_issue = history[0]["issue"]
 
     log(
-        f"最新期：{latest_issue or '暂无'}"
+        f"本次新增：{inserted} 期"
+    )
+
+    log(
+        f"最新期："
+        f"{latest_issue or '暂无'}"
     )
 
     return {
         "lottery": lottery,
         "parsed": len(all_draws),
-        "inserted": total_inserted,
+        "inserted": inserted,
         "latest_issue": latest_issue,
+        "source": used_url,
     }
 
 
-def sync_all() -> Dict[str, Any]:
-
-    results = {}
-
-    for lottery in DB_FILES:
-
-        try:
-
-            results[lottery] = sync_lottery(
-                lottery
-            )
-
-        except Exception as exc:
-
-            log(
-                f"[ERROR] {lottery} 同步失败：{exc}"
-            )
-
-            results[lottery] = {
-                "lottery": lottery,
-                "error": str(exc),
-            }
-
-    return results
-
-
 # ============================================================
-# 统计工具
-# ============================================================
-
-def flatten_numbers(
-    draws: List[Dict[str, Any]],
-) -> List[int]:
-
-    result: List[int] = []
-
-    for draw in draws:
-
-        nums = clean_numbers(
-            draw.get("numbers")
-        )
-
-        result.extend(nums)
-
-    return result
-
-
-def count_colors(
-    numbers: List[int],
-) -> Counter:
-
-    counter = Counter()
-
-    for n in numbers:
-        counter[get_color(n)] += 1
-
-    return counter
-
-
-def count_sizes(
-    numbers: List[int],
-) -> Counter:
-
-    counter = Counter()
-
-    for n in numbers:
-        counter[get_size(n)] += 1
-
-    return counter
-
-
-def count_odd_even(
-    numbers: List[int],
-) -> Counter:
-
-    counter = Counter()
-
-    for n in numbers:
-        counter[get_odd_even(n)] += 1
-
-    return counter
-
-
-def count_tails(
-    numbers: List[int],
-) -> Counter:
-
-    counter = Counter()
-
-    for n in numbers:
-        counter[get_tail(n)] += 1
-
-    return counter
-
-
-def count_zones(
-    numbers: List[int],
-) -> Counter:
-
-    counter = Counter()
-
-    for n in numbers:
-        counter[get_zone(n)] += 1
-
-    return counter
-
-
-# ============================================================
-# 最近开奖属性
-# ============================================================
-
-def latest_special(
-    draws: List[Dict[str, Any]],
-) -> Optional[int]:
-
-    if not draws:
-        return None
-
-    nums = clean_numbers(
-        draws[0].get("numbers")
-    )
-
-    if len(nums) < 7:
-        return None
-
-    return nums[-1]
-
-
-# ============================================================
-# 热冷号码
+# 频率
 # ============================================================
 
 def number_frequency(
@@ -1007,11 +761,11 @@ def number_frequency(
 
     for draw in draws:
 
-        nums = clean_numbers(
+        numbers = clean_numbers(
             draw.get("numbers")
         )
 
-        for n in nums:
+        for n in numbers:
             counter[n] += 1
 
     return counter
@@ -1026,15 +780,13 @@ def get_hot_numbers(
         draws
     )
 
-    ranked = sorted(
+    return sorted(
         range(1, 50),
         key=lambda n: (
             -counter[n],
             n,
         ),
-    )
-
-    return ranked[:count]
+    )[:count]
 
 
 def get_cold_numbers(
@@ -1046,120 +798,137 @@ def get_cold_numbers(
         draws
     )
 
-    ranked = sorted(
+    return sorted(
         range(1, 50),
         key=lambda n: (
             counter[n],
             n,
         ),
-    )
-
-    return ranked[:count]
+    )[:count]
 
 
 # ============================================================
-# 遗漏值
+# 遗漏
 # ============================================================
 
 def calculate_missing(
     draws: List[Dict[str, Any]],
 ) -> Dict[int, int]:
 
-    missing = {
-        n: 0
-        for n in range(1, 50)
-    }
+    missing = {}
 
     seen = set()
 
     for distance, draw in enumerate(draws):
 
-        nums = set(
+        numbers = set(
             clean_numbers(
                 draw.get("numbers")
             )
         )
 
-        for n in range(1, 50):
+        for n in numbers:
 
-            if n in seen:
-                continue
-
-            if n in nums:
+            if n not in seen:
 
                 seen.add(n)
                 missing[n] = distance
 
-    # 从未出现
-    max_distance = len(draws)
-
     for n in range(1, 50):
 
         if n not in seen:
-            missing[n] = max_distance
+
+            missing[n] = len(draws)
 
     return missing
 
 
 # ============================================================
-# 单期属性
+# 评分
 # ============================================================
 
-def analyze_draw(
-    draw: Dict[str, Any],
-) -> Dict[str, Any]:
+def score_numbers(
+    draws: List[Dict[str, Any]],
+) -> List[Tuple[int, float]]:
 
-    nums = clean_numbers(
-        draw.get("numbers")
+    if not draws:
+        return []
+
+    recent = draws[:100]
+
+    frequency = number_frequency(
+        recent
     )
 
-    if len(nums) < 7:
+    missing = calculate_missing(
+        recent
+    )
 
-        return {
-            "issue": draw.get("issue"),
-            "numbers": nums,
-        }
+    latest = set()
 
-    special = nums[-1]
+    if recent:
 
-    return {
-        "issue": draw.get("issue"),
-        "numbers": nums,
-        "special": special,
-        "color": get_color(special),
-        "size": get_size(special),
-        "odd_even": get_odd_even(special),
-        "tail": get_tail(special),
-        "zone": get_zone(special),
-    }
+        latest = set(
+            clean_numbers(
+                recent[0].get(
+                    "numbers"
+                )
+            )
+        )
+
+    scores = {}
+
+    for n in range(1, 50):
+
+        score = 0.0
+
+        # 历史频率
+        score += frequency.get(
+            n,
+            0,
+        ) * 1.0
+
+        # 遗漏
+        score += min(
+            missing.get(n, 0),
+            20,
+        ) * 0.15
+
+        # 最近一期适度降权
+        if n in latest:
+            score -= 0.2
+
+        scores[n] = score
+
+    return sorted(
+        scores.items(),
+        key=lambda item: (
+            -item[1],
+            item[0],
+        ),
+    )
 
 
 # ============================================================
-# 属性趋势
+# 属性分析
 # ============================================================
 
-def analyze_special_attributes(
+def analyze_attributes(
     draws: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
 
-    special_numbers: List[int] = []
+    special_numbers = []
 
     for draw in draws:
 
-        nums = clean_numbers(
+        numbers = clean_numbers(
             draw.get("numbers")
         )
 
-        if len(nums) >= 7:
+        if len(numbers) >= 7:
             special_numbers.append(
-                nums[-1]
+                numbers[-1]
             )
-
-    if not special_numbers:
-
-        return {
-            "count": 0
-        }
 
     colors = Counter(
         get_color(n)
@@ -1187,130 +956,24 @@ def analyze_special_attributes(
     )
 
     return {
-        "count": len(special_numbers),
-        "colors": colors,
-        "sizes": sizes,
-        "odd_even": odd_even,
-        "tails": tails,
-        "zones": zones,
-        "latest": special_numbers[0],
-        "latest_color": get_color(
-            special_numbers[0]
+        "sample_size": len(
+            special_numbers
         ),
-        "latest_size": get_size(
-            special_numbers[0]
-        ),
-        "latest_odd_even": get_odd_even(
-            special_numbers[0]
-        ),
+        "colors": dict(colors),
+        "sizes": dict(sizes),
+        "odd_even": dict(odd_even),
+        "tails": dict(tails),
+        "zones": dict(zones),
     }
 
 
 # ============================================================
-# 综合号码评分
+# 单期预测评分
 # ============================================================
 
-def score_numbers(
-    draws: List[Dict[str, Any]],
-) -> List[Tuple[int, float]]:
-
-    if not draws:
-        return []
-
-    recent = draws[:100]
-
-    frequency = number_frequency(
-        recent
-    )
-
-    missing = calculate_missing(
-        recent
-    )
-
-    # 最近一期
-    latest_numbers = set()
-
-    if recent:
-
-        latest_numbers = set(
-            clean_numbers(
-                recent[0].get("numbers")
-            )
-        )
-
-    scores: Dict[int, float] = {}
-
-    for n in range(1, 50):
-
-        freq = frequency.get(n, 0)
-
-        miss = missing.get(n, 0)
-
-        score = 0.0
-
-        # 历史频率
-        score += freq * 1.0
-
-        # 适度考虑遗漏
-        score += min(
-            miss,
-            20,
-        ) * 0.15
-
-        # 最近一期出现不直接淘汰
-        if n in latest_numbers:
-            score -= 0.2
-
-        scores[n] = score
-
-    ranked = sorted(
-        scores.items(),
-        key=lambda x: (
-            -x[1],
-            x[0],
-        ),
-    )
-
-    return ranked
-
-
-# ============================================================
-# 候选号码
-# ============================================================
-
-def get_candidate_numbers(
-    draws: List[Dict[str, Any]],
-    count: int = 10,
-) -> List[int]:
-
-    ranked = score_numbers(
-        draws
-    )
-
-    return [
-        number
-        for number, _score in ranked[:count]
-    ]
-
-
-# ============================================================
-# 综合预测
-# ============================================================
-
-def build_prediction(
+def predict_from_history(
     draws: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-
-    if not draws:
-
-        return {
-            "available": False,
-            "message": "没有历史开奖数据",
-        }
-
-    attributes = analyze_special_attributes(
-        draws
-    )
 
     ranked = score_numbers(
         draws
@@ -1321,80 +984,351 @@ def build_prediction(
         for n, _score in ranked[:12]
     ]
 
-    hot = get_hot_numbers(
-        draws,
-        10,
-    )
-
-    cold = get_cold_numbers(
-        draws,
-        10,
-    )
-
-    missing = calculate_missing(
-        draws
-    )
-
-    longest_missing = sorted(
-        missing.items(),
-        key=lambda x: (
-            -x[1],
-            x[0],
-        ),
-    )[:10]
-
     return {
-        "available": True,
-        "sample_size": len(draws),
-        "latest_issue": draws[0].get(
-            "issue"
-        ),
-        "latest_numbers": draws[0].get(
-            "numbers"
-        ),
         "candidates": candidates,
-        "hot_numbers": hot,
-        "cold_numbers": cold,
-        "longest_missing": [
-            n for n, _ in longest_missing
-        ],
-        "attributes": attributes,
+        "hot_numbers": get_hot_numbers(
+            draws,
+            10,
+        ),
+        "cold_numbers": get_cold_numbers(
+            draws,
+            10,
+        ),
+        "attributes": analyze_attributes(
+            draws
+        ),
     }
 
 
 # ============================================================
-# 格式化 Counter
+# Walk-Forward
 # ============================================================
 
-def format_counter(
-    counter: Counter,
-) -> str:
+def walk_forward(
+    draws: List[Dict[str, Any]],
+    window: int = 10,
+) -> Dict[str, Any]:
 
-    if not counter:
-        return "暂无"
+    if len(draws) < window + 1:
 
-    parts = []
+        return {
+            "window": window,
+            "available": False,
+            "sample_size": len(draws),
+            "message": (
+                "历史数据不足，"
+                "无法进行Walk-Forward"
+            ),
+        }
 
-    for key, value in counter.most_common():
+    # 数据按最新在前
+    chronological = list(
+        reversed(draws)
+    )
 
-        parts.append(
-            f"{key}:{value}"
+    total = 0
+    hits = 0
+
+    records = []
+
+    start = max(
+        1,
+        len(chronological) - window,
+    )
+
+    for index in range(
+        start,
+        len(chronological),
+    ):
+
+        train = chronological[
+            :index
+        ]
+
+        target = chronological[
+            index
+        ]
+
+        prediction = predict_from_history(
+            list(
+                reversed(train)
+            )
         )
 
-    return " ".join(parts)
+        candidates = prediction[
+            "candidates"
+        ]
+
+        actual = clean_numbers(
+            target.get("numbers")
+        )
+
+        if not actual:
+            continue
+
+        special = actual[-1]
+
+        hit = special in candidates
+
+        total += 1
+
+        if hit:
+            hits += 1
+
+        records.append(
+            {
+                "issue": target.get(
+                    "issue"
+                ),
+                "special": special,
+                "hit": hit,
+            }
+        )
+
+    rate = (
+        hits / total
+        if total
+        else 0.0
+    )
+
+    return {
+        "window": window,
+        "available": total > 0,
+        "sample_size": total,
+        "hits": hits,
+        "hit_rate": round(
+            rate,
+            4,
+        ),
+        "records": records,
+    }
 
 
 # ============================================================
-# 打印分析结果
+# 生成 prediction.json
 # ============================================================
 
-def print_lottery_result(
+def build_prediction_payload(
+    all_results: Dict[str, Any],
+) -> Dict[str, Any]:
+
+    lotteries = {}
+
+    for lottery, result in all_results.items():
+
+        lotteries[lottery] = {
+            "latest_issue": result.get(
+                "latest_issue"
+            ),
+            "latest_numbers": result.get(
+                "latest_numbers",
+                [],
+            ),
+            "history_size": result.get(
+                "history_size",
+                0,
+            ),
+            "candidates": result.get(
+                "candidates",
+                [],
+            ),
+            "hot_numbers": result.get(
+                "hot_numbers",
+                [],
+            ),
+            "cold_numbers": result.get(
+                "cold_numbers",
+                [],
+            ),
+            "attributes": result.get(
+                "attributes",
+                {},
+            ),
+        }
+
+    return {
+        "version": "V4.0",
+        "generated_at": datetime.now().isoformat(),
+        "note": (
+            "模型评分仅用于历史数据排序和分析，"
+            "不代表真实中奖概率。"
+        ),
+        "lotteries": lotteries,
+    }
+
+
+def save_prediction(
+    payload: Dict[str, Any],
+) -> str:
+
+    path = os.path.join(
+        OUTPUT_DIR,
+        "prediction.json",
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+
+        json.dump(
+            payload,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    return path
+
+
+# ============================================================
+# 生成 backtest.json
+# ============================================================
+
+def save_backtest(
+    all_results: Dict[str, Any],
+) -> str:
+
+    payload = {
+        "version": "V4.0",
+        "generated_at": datetime.now().isoformat(),
+        "windows": [10, 20],
+        "note": (
+            "Walk-Forward只使用目标期之前的数据。"
+        ),
+        "lotteries": {},
+    }
+
+    for lottery, result in all_results.items():
+
+        draws = result.get(
+            "draws",
+            [],
+        )
+
+        payload["lotteries"][lottery] = {
+            "recent10": walk_forward(
+                draws,
+                10,
+            ),
+            "recent20": walk_forward(
+                draws,
+                20,
+            ),
+        }
+
+    path = os.path.join(
+        OUTPUT_DIR,
+        "backtest.json",
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+
+        json.dump(
+            payload,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    return path
+
+
+# ============================================================
+# module_performance.json
+# ============================================================
+
+def save_module_performance(
+    all_results: Dict[str, Any],
+) -> str:
+
+    payload = {
+        "version": "V4.0",
+        "generated_at": datetime.now().isoformat(),
+        "modules": {
+            "frequency": {
+                "enabled": True,
+                "weight": 1.0,
+            },
+            "missing": {
+                "enabled": True,
+                "weight": 0.15,
+            },
+            "recent_penalty": {
+                "enabled": True,
+                "weight": -0.2,
+            },
+            "color": {
+                "enabled": True,
+            },
+            "size": {
+                "enabled": True,
+            },
+            "odd_even": {
+                "enabled": True,
+            },
+            "tail": {
+                "enabled": True,
+            },
+            "zone": {
+                "enabled": True,
+            },
+        },
+        "lotteries": {},
+    }
+
+    for lottery, result in all_results.items():
+
+        payload["lotteries"][lottery] = {
+            "history_size": result.get(
+                "history_size",
+                0,
+            ),
+            "status": (
+                "ok"
+                if result.get(
+                    "history_size",
+                    0,
+                ) > 0
+                else "no_data"
+            ),
+        }
+
+    path = os.path.join(
+        OUTPUT_DIR,
+        "module_performance.json",
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+
+        json.dump(
+            payload,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    return path
+
+
+# ============================================================
+# 打印结果
+# ============================================================
+
+def print_result(
     lottery: str,
-    draws: List[Dict[str, Any]],
-    prediction: Dict[str, Any],
+    result: Dict[str, Any],
 ) -> None:
 
-    log("")
     separator()
 
     log(
@@ -1402,6 +1336,11 @@ def print_lottery_result(
     )
 
     separator()
+
+    draws = result.get(
+        "draws",
+        [],
+    )
 
     if not draws:
 
@@ -1415,7 +1354,8 @@ def print_lottery_result(
     )
 
     log(
-        f"最新期号：{latest.get('issue', '-')}"
+        f"最新期号："
+        f"{latest.get('issue', '-')}"
     )
 
     log(
@@ -1423,106 +1363,111 @@ def print_lottery_result(
         f"{latest.get('numbers', [])}"
     )
 
-    special = latest.get(
-        "numbers",
-        [],
+    numbers = clean_numbers(
+        latest.get("numbers")
     )
 
-    if special and len(special) >= 7:
+    if len(numbers) >= 7:
 
-        sp = special[-1]
+        special = numbers[-1]
 
-        log("")
         log(
-            f"特码：{sp}"
+            f"特码：{special}"
         )
 
         log(
-            f"波色：{get_color(sp)}"
+            f"波色："
+            f"{get_color(special)}"
         )
 
         log(
-            f"大小：{get_size(sp)}"
+            f"大小："
+            f"{get_size(special)}"
         )
 
         log(
-            f"单双：{get_odd_even(sp)}"
+            f"单双："
+            f"{get_odd_even(special)}"
         )
 
         log(
-            f"尾数：{get_tail(sp)}"
+            f"尾数："
+            f"{get_tail(special)}"
         )
 
         log(
-            f"分区：第{get_zone(sp)}区"
+            f"分区："
+            f"第{get_zone(special)}区"
         )
 
-    attrs = prediction.get(
+    attributes = result.get(
         "attributes",
         {},
     )
 
-    if attrs:
+    log("")
 
-        log("")
-        log("近期开奖属性统计：")
+    log(
+        "近期开奖属性统计："
+    )
 
-        log(
-            "波色："
-            + format_counter(
-                attrs.get(
-                    "colors",
-                    Counter(),
-                )
+    log(
+        "波色："
+        + format_counter(
+            attributes.get(
+                "colors",
+                {},
             )
         )
+    )
 
-        log(
-            "大小："
-            + format_counter(
-                attrs.get(
-                    "sizes",
-                    Counter(),
-                )
+    log(
+        "大小："
+        + format_counter(
+            attributes.get(
+                "sizes",
+                {},
             )
         )
+    )
 
-        log(
-            "单双："
-            + format_counter(
-                attrs.get(
-                    "odd_even",
-                    Counter(),
-                )
+    log(
+        "单双："
+        + format_counter(
+            attributes.get(
+                "odd_even",
+                {},
             )
         )
+    )
 
-        log(
-            "尾数："
-            + format_counter(
-                attrs.get(
-                    "tails",
-                    Counter(),
-                )
+    log(
+        "尾数："
+        + format_counter(
+            attributes.get(
+                "tails",
+                {},
             )
         )
+    )
 
-        log(
-            "分区："
-            + format_counter(
-                attrs.get(
-                    "zones",
-                    Counter(),
-                )
+    log(
+        "分区："
+        + format_counter(
+            attributes.get(
+                "zones",
+                {},
             )
         )
+    )
 
     log("")
+
     log(
         "高频号码："
         + " ".join(
             f"{n:02d}"
-            for n in prediction.get(
+            for n in result.get(
                 "hot_numbers",
                 [],
             )
@@ -1533,7 +1478,7 @@ def print_lottery_result(
         "低频号码："
         + " ".join(
             f"{n:02d}"
-            for n in prediction.get(
+            for n in result.get(
                 "cold_numbers",
                 [],
             )
@@ -1544,22 +1489,52 @@ def print_lottery_result(
         "综合候选："
         + " ".join(
             f"{n:02d}"
-            for n in prediction.get(
+            for n in result.get(
                 "candidates",
                 [],
             )
         )
     )
 
-    log("")
-    log(
-        "说明：以上为基于历史数据的统计分析，"
-        "不代表实际开奖结果。"
-    )
+
+def format_counter(
+    value: Any,
+) -> str:
+
+    if not value:
+        return "暂无"
+
+    if isinstance(
+        value,
+        Counter,
+    ):
+        value = dict(value)
+
+    if isinstance(
+        value,
+        dict,
+    ):
+
+        return " ".join(
+            f"{k}:{v}"
+            for k, v in sorted(
+                value.items(),
+                key=lambda x: (
+                    -x[1]
+                    if isinstance(
+                        x[1],
+                        (int, float),
+                    )
+                    else 0
+                ),
+            )
+        )
+
+    return str(value)
 
 
 # ============================================================
-# 单彩种运行
+# 单彩种
 # ============================================================
 
 def run_lottery(
@@ -1571,16 +1546,14 @@ def run_lottery(
     if sync:
 
         try:
-
             sync_lottery(
                 lottery
             )
-
         except Exception as exc:
 
             log(
-                f"[WARN] {lottery} "
-                f"在线同步异常：{exc}"
+                f"[WARN] 同步异常："
+                f"{lottery}: {exc}"
             )
 
     draws = load_draws(
@@ -1588,25 +1561,60 @@ def run_lottery(
         history_limit,
     )
 
-    prediction = build_prediction(
+    prediction = predict_from_history(
         draws
     )
 
-    print_lottery_result(
-        lottery,
-        draws,
-        prediction,
-    )
+    latest_issue = ""
+    latest_numbers = []
 
-    return {
+    if draws:
+
+        latest_issue = draws[0].get(
+            "issue",
+            "",
+        )
+
+        latest_numbers = clean_numbers(
+            draws[0].get(
+                "numbers"
+            )
+        )
+
+    result = {
         "lottery": lottery,
         "draws": draws,
-        "prediction": prediction,
+        "history_size": len(draws),
+        "latest_issue": latest_issue,
+        "latest_numbers": latest_numbers,
+        "candidates": prediction.get(
+            "candidates",
+            [],
+        ),
+        "hot_numbers": prediction.get(
+            "hot_numbers",
+            [],
+        ),
+        "cold_numbers": prediction.get(
+            "cold_numbers",
+            [],
+        ),
+        "attributes": prediction.get(
+            "attributes",
+            {},
+        ),
     }
+
+    print_result(
+        lottery,
+        result,
+    )
+
+    return result
 
 
 # ============================================================
-# 主系统
+# 主入口
 # ============================================================
 
 def run_system(
@@ -1628,26 +1636,18 @@ def run_system(
     )
 
     log(
-        "真实数据 + SQLite + 统计分析版"
+        "真实数据 + SQLite + "
+        "统计分析 + 输出文件版"
     )
 
     log(
-        f"启动时间：{datetime.now().isoformat()}"
+        f"启动时间："
+        f"{datetime.now().isoformat()}"
     )
 
     separator()
 
-    # --------------------------------------------------------
-    # 初始化数据库
-    # --------------------------------------------------------
-
     init_all_databases()
-
-    # --------------------------------------------------------
-    # 三彩种
-    # --------------------------------------------------------
-
-    results: Dict[str, Any] = {}
 
     lotteries = [
         "新澳门彩",
@@ -1655,12 +1655,14 @@ def run_system(
         "香港彩",
     ]
 
+    results = {}
+
     for lottery in lotteries:
 
         try:
 
             results[lottery] = run_lottery(
-                lottery=lottery,
+                lottery,
                 sync=sync,
                 history_limit=history_limit,
             )
@@ -1669,45 +1671,123 @@ def run_system(
 
             log("")
             log(
-                f"[ERROR] {lottery} 分析失败：{exc}"
+                f"[ERROR] {lottery}："
+                f"{exc}"
             )
 
             results[lottery] = {
                 "lottery": lottery,
-                "error": str(exc),
                 "draws": [],
-                "prediction": {
-                    "available": False,
-                    "message": str(exc),
-                },
+                "history_size": 0,
+                "latest_issue": "",
+                "latest_numbers": [],
+                "candidates": [],
+                "hot_numbers": [],
+                "cold_numbers": [],
+                "attributes": {},
+                "error": str(exc),
             }
 
-    # --------------------------------------------------------
-    # 总结
-    # --------------------------------------------------------
+    # ========================================================
+    # 保存三个核心输出
+    # ========================================================
 
     log("")
     separator()
+    log("保存预测结果")
+    separator()
 
-    log(
-        "三彩种分析完成"
+    prediction_payload = (
+        build_prediction_payload(
+            results
+        )
     )
 
+    prediction_path = save_prediction(
+        prediction_payload
+    )
+
+    log(
+        f"✅ 预测结果已保存："
+        f"{prediction_path}"
+    )
+
+    log("")
+    separator()
+    log("保存 Walk-Forward 回测")
+    separator()
+
+    backtest_path = save_backtest(
+        results
+    )
+
+    log(
+        f"✅ 回测结果已保存："
+        f"{backtest_path}"
+    )
+
+    log("")
+    separator()
+    log("保存模块表现")
+    separator()
+
+    performance_path = (
+        save_module_performance(
+            results
+        )
+    )
+
+    log(
+        f"✅ 模块表现已保存："
+        f"{performance_path}"
+    )
+
+    # ========================================================
+    # 最终检查
+    # ========================================================
+
+    required_files = [
+        prediction_path,
+        backtest_path,
+        performance_path,
+    ]
+
+    log("")
+    separator()
+    log("输出文件检查")
+    separator()
+
+    for path in required_files:
+
+        if os.path.isfile(path):
+
+            size = os.path.getsize(path)
+
+            log(
+                f"✅ {path} "
+                f"({size} bytes)"
+            )
+
+        else:
+
+            log(
+                f"❌ 缺少：{path}"
+            )
+
+    # ========================================================
+    # 汇总
+    # ========================================================
+
+    log("")
+    separator()
+    log("三彩种分析完成")
     separator()
 
     for lottery in lotteries:
 
-        result = results.get(
-            lottery,
-            {},
-        )
-
-        prediction = result.get(
-            "prediction",
-            {},
-        )
-
-        candidates = prediction.get(
+        candidates = results[
+            lottery
+        ].get(
             "candidates",
             [],
         )
@@ -1726,9 +1806,7 @@ def run_system(
 
     separator()
 
-    log(
-        "系统运行结束"
-    )
+    log("系统运行结束")
 
     separator()
 
@@ -1736,36 +1814,24 @@ def run_system(
 
 
 # ============================================================
-# 兼容旧调用
+# 兼容旧入口
 # ============================================================
 
-def run(
-    *args: Any,
-    **kwargs: Any,
-) -> Dict[str, Any]:
-
+def run(*args, **kwargs):
     return run_system(
         *args,
         **kwargs,
     )
 
 
-def start(
-    *args: Any,
-    **kwargs: Any,
-) -> Dict[str, Any]:
-
+def start(*args, **kwargs):
     return run_system(
         *args,
         **kwargs,
     )
 
 
-def main(
-    *args: Any,
-    **kwargs: Any,
-) -> Dict[str, Any]:
-
+def main(*args, **kwargs):
     return run_system(
         *args,
         **kwargs,
@@ -1777,5 +1843,4 @@ def main(
 # ============================================================
 
 if __name__ == "__main__":
-
     run_system()
