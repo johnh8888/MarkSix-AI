@@ -1,32 +1,14 @@
 # -*- coding: utf-8 -*-
 
-"""
-SQLite 数据库模块
-"""
-
 from __future__ import annotations
 
 import sqlite3
-
 from pathlib import Path
+from typing import Any
 
-from typing import Iterable
 
-
-# ============================================================
-# 路径
-# ============================================================
-
-ROOT = (
-    Path(__file__)
-    .resolve()
-    .parent
-    .parent
-)
-
-DATA_DIR = (
-    ROOT / "data"
-)
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 
 DATA_DIR.mkdir(
     parents=True,
@@ -34,97 +16,48 @@ DATA_DIR.mkdir(
 )
 
 
-# ============================================================
-# 数据库
-# ============================================================
-
 DB_FILES = {
-
-    "新澳门彩":
-        DATA_DIR / "new_macau.db",
-
-    "老澳门彩":
-        DATA_DIR / "old_macau.db",
-
-    "香港彩":
-        DATA_DIR / "hk.db",
-
+    "新澳门彩": DATA_DIR / "new_macau.db",
+    "老澳门彩": DATA_DIR / "old_macau.db",
+    "香港彩": DATA_DIR / "hk.db",
 }
 
 
-# ============================================================
-# 连接数据库
-# ============================================================
+def get_connection(lottery_name: str):
 
-def connect(
-    lottery_name: str,
-) -> sqlite3.Connection:
+    db_path = DB_FILES[lottery_name]
 
-    database = DB_FILES[
-        lottery_name
-    ]
-
-    connection = sqlite3.connect(
-        database
+    conn = sqlite3.connect(
+        str(db_path)
     )
 
-    connection.row_factory = (
-        sqlite3.Row
-    )
-
-    connection.execute(
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS draws (
-
             issue TEXT PRIMARY KEY,
-
-            n1 INTEGER NOT NULL,
-
-            n2 INTEGER NOT NULL,
-
-            n3 INTEGER NOT NULL,
-
-            n4 INTEGER NOT NULL,
-
-            n5 INTEGER NOT NULL,
-
-            n6 INTEGER NOT NULL,
-
-            n7 INTEGER NOT NULL,
-
-            created_at
-                TEXT
-                DEFAULT CURRENT_TIMESTAMP
-
+            numbers TEXT NOT NULL
         )
         """
     )
 
-    connection.commit()
+    conn.commit()
 
-    return connection
+    return conn
 
-
-# ============================================================
-# 保存开奖记录
-# ============================================================
 
 def save_records(
     lottery_name: str,
-    records: Iterable[dict],
+    records: list[dict[str, Any]],
 ) -> int:
 
-    records = list(records)
-
     if not records:
-
         return 0
 
-    connection = connect(
+    conn = get_connection(
         lottery_name
     )
 
-    inserted = 0
+    added = 0
 
     try:
 
@@ -134,139 +67,111 @@ def save_records(
                 record["issue"]
             )
 
-            numbers = [
-                int(x)
-                for x in record[
-                    "numbers"
-                ]
+            numbers = record[
+                "numbers"
             ]
 
-            if len(numbers) != 7:
-
-                continue
-
-            if len(set(numbers)) != 7:
-
-                continue
-
-            if not all(
-                1 <= x <= 49
+            numbers_text = ",".join(
+                str(x)
                 for x in numbers
-            ):
+            )
 
-                continue
-
-            cursor = connection.execute(
-
+            cursor = conn.execute(
                 """
                 INSERT OR IGNORE INTO draws
                 (
                     issue,
-                    n1,
-                    n2,
-                    n3,
-                    n4,
-                    n5,
-                    n6,
-                    n7
+                    numbers
                 )
-                VALUES
-                (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?
-                )
+                VALUES (?, ?)
                 """,
-
                 (
                     issue,
-                    *numbers,
+                    numbers_text,
                 ),
-
             )
 
-            inserted += (
-                cursor.rowcount
-            )
+            if cursor.rowcount > 0:
+                added += 1
 
-        connection.commit()
+        conn.commit()
 
     finally:
 
-        connection.close()
+        conn.close()
 
-    return inserted
+    return added
 
 
-# ============================================================
-# 获取全部历史
-# ============================================================
-
-def get_history(
+def load_records(
     lottery_name: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
 
-    connection = connect(
+    conn = get_connection(
         lottery_name
     )
 
     try:
 
-        rows = connection.execute(
-
+        rows = conn.execute(
             """
             SELECT
                 issue,
-                n1,
-                n2,
-                n3,
-                n4,
-                n5,
-                n6,
-                n7
+                numbers
             FROM draws
             ORDER BY
-                CAST(issue AS INTEGER) ASC
+                CAST(issue AS INTEGER)
             """
-
         ).fetchall()
-
-        result = []
-
-        for row in rows:
-
-            result.append({
-
-                "issue":
-                    str(row["issue"]),
-
-                "numbers": [
-
-                    int(row["n1"]),
-
-                    int(row["n2"]),
-
-                    int(row["n3"]),
-
-                    int(row["n4"]),
-
-                    int(row["n5"]),
-
-                    int(row["n6"]),
-
-                    int(row["n7"]),
-
-                ],
-
-            })
-
-        return result
 
     finally:
 
-        connection.close()
+        conn.close()
+
+    result = []
+
+    for issue, numbers in rows:
+
+        try:
+
+            nums = [
+                int(x)
+                for x in numbers.split(",")
+            ]
+
+        except Exception:
+
+            continue
+
+        if len(nums) != 7:
+            continue
+
+        result.append(
+            {
+                "issue": str(issue),
+                "numbers": nums,
+            }
+        )
+
+    return result
+
+
+def count_records(
+    lottery_name: str,
+) -> int:
+
+    conn = get_connection(
+        lottery_name
+    )
+
+    try:
+
+        row = conn.execute(
+            "SELECT COUNT(*) FROM draws"
+        ).fetchone()
+
+        return int(row[0])
+
+    finally:
+
+        conn.close()
