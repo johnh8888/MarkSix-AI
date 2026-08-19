@@ -1,303 +1,40 @@
-name: I V3.0 自动预测系统
+- name: Python模块检查
 
+  env:
+    PYTHONPATH: ${{ github.workspace }}
 
-on:
+  run: |
 
+    echo "开始检查模块"
 
-  # 手动运行
+    python - <<'PY'
 
-  workflow_dispatch:
+    import os
+    import sys
 
+    sys.path.insert(
+        0,
+        os.getcwd()
+    )
 
+    print("当前目录:")
+    print(os.getcwd())
 
-  # 每小时运行一次
+    print(sys.path)
 
-  schedule:
 
-    - cron: "5 * * * *"
+    import config
 
+    print("✅ config正常")
 
 
+    from core.database import init_database
 
+    print("✅ database正常")
 
-permissions:
 
+    init_database()
 
-  contents: write
+    print("✅ 数据库初始化正常")
 
-
-
-
-
-
-jobs:
-
-
-  run-ai:
-
-
-    name: 运行六合彩AI预测
-
-
-    runs-on: ubuntu-latest
-
-
-
-    timeout-minutes: 20
-
-
-
-
-
-
-    steps:
-
-
-
-      # ==========================
-      # 下载代码
-      # ==========================
-
-
-      - name: 获取项目代码
-
-
-        uses: actions/checkout@v4
-
-
-
-
-
-
-      # ==========================
-      # Python
-      # ==========================
-
-
-      - name: 安装Python 3.11
-
-
-        uses: actions/setup-python@v5
-
-
-        with:
-
-
-          python-version: "3.11"
-
-
-
-
-
-
-
-      # ==========================
-      # 安装依赖
-      # ==========================
-
-
-      - name: 安装系统依赖
-
-
-        run: |
-
-
-          python -m pip install --upgrade pip
-
-
-          pip install -r requirements.txt
-
-
-
-
-
-
-      # ==========================
-      # Python检查
-      # ==========================
-
-
-      - name: Python模块检查
-
-
-        env:
-
-
-          PYTHONPATH: ${{ github.workspace }}
-
-
-        run: |
-
-
-          echo "开始检查模块"
-
-
-          python - <<'PY'
-
-
-          import core
-
-
-          from core.database import init_database
-
-
-          from core.engine import run_system
-
-
-
-          print("✅ core加载成功")
-
-
-          print("✅ 数据库模块正常")
-
-
-          print("✅ 引擎模块正常")
-
-
-          PY
-
-
-
-
-
-
-      # ==========================
-      # 数据库初始化
-      # ==========================
-
-
-      - name: 初始化数据库
-
-
-        env:
-
-
-          PYTHONPATH: ${{ github.workspace }}
-
-
-        run: |
-
-
-          python - <<'PY'
-
-
-          from core.database import init_database
-
-
-          init_database()
-
-
-          print("✅ SQLite数据库创建完成")
-
-
-          PY
-
-
-
-
-
-
-      # ==========================
-      # 运行AI
-      # ==========================
-
-
-      - name: 启动六合AI V3.0
-
-
-        env:
-
-
-          PYTHONPATH: ${{ github.workspace }}
-
-
-        run: |
-
-
-          python -u main.py
-
-
-
-
-
-
-      # ==========================
-      # 查看结果
-      # ==========================
-
-
-      - name: 查看预测结果
-
-
-        if: always()
-
-
-        run: |
-
-
-          echo "=================="
-
-
-          echo "预测输出"
-
-
-          echo "=================="
-
-
-          find output -type f -print || true
-
-
-
-
-
-
-      # ==========================
-      # 保存结果
-      # ==========================
-
-
-      - name: 提交预测数据
-
-
-        if: success()
-
-
-        run: |
-
-
-          git config user.name "github-actions"
-
-
-          git config user.email "github-actions@github.com"
-
-
-
-          git add output/
-
-
-          git add data/
-
-
-          git add *.db
-
-
-
-          if git diff --cached --quiet;
-
-
-          then
-
-
-              echo "没有新的数据"
-
-
-          else
-
-
-              git commit -m "更新六合AI预测结果"
-
-
-              git push
-
-
-          fi
+    PY
