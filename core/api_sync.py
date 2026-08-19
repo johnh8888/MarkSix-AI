@@ -1,18 +1,15 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.3 FINAL
+六合彩 AI V3.4 FINAL
 
 API同步模块
 
 支持:
-
-- marksix6.net API
-- SSL证书过期兼容
-- 历史同步
-- 最新同步
-- SQLite保存
-- 多种JSON结构解析
+marksix6.net
+历史数据同步
+最新数据同步
+SQLite保存
 
 """
 
@@ -20,17 +17,12 @@ API同步模块
 from __future__ import annotations
 
 
-import time
-
+import re
 import requests
-
 import urllib3
 
 
-
-urllib3.disable_warnings(
-    urllib3.exceptions.InsecureRequestWarning
-)
+urllib3.disable_warnings()
 
 
 
@@ -42,384 +34,197 @@ from .database import save_draw
 
 
 
-
-# =====================================================
-# API地址
-# =====================================================
-
-
 API_HISTORY = API_CONFIG["history"]
 
-API_HK = API_CONFIG["hk"]
-
-API_NEW_MACAU = API_CONFIG["newMacau"]
-
-API_OLD_MACAU = API_CONFIG["oldMacau"]
+API_URLS = {
 
 
+    "hk":
+
+    API_CONFIG["hk"],
 
 
-TIMEOUT = 20
+    "newMacau":
 
-RETRY = 3
-
-
+    API_CONFIG["newMacau"],
 
 
+    "oldMacau":
 
-# =====================================================
+    API_CONFIG["oldMacau"]
+
+}
+
+
+
+
+
+
+# ==================================================
 # 请求
-# =====================================================
+# ==================================================
 
 
 def request_api(url):
 
 
-    for i in range(RETRY):
+    print()
 
-        try:
+    print("正在请求API:")
 
-
-            print()
-
-            print(
-                "正在请求API:"
-            )
-
-            print(url)
+    print(url)
 
 
 
-            r=requests.get(
+    r=requests.get(
 
-                url,
+        url,
 
-                timeout=TIMEOUT,
+        verify=False,
 
-                verify=False,
+        timeout=20,
 
-                headers={
+        headers={
 
-                    "User-Agent":
+            "User-Agent":
 
-                    "Mozilla/5.0"
+            "Mozilla/5.0"
 
-                }
-
-            )
-
-
-
-            r.raise_for_status()
-
-
-
-            print(
-                "API请求成功"
-            )
-
-
-            return r.json()
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "请求失败",
-
-                i+1,
-
-                e
-
-            )
-
-
-            time.sleep(2)
-
-
-
-    raise Exception(
-
-        "API请求失败"
+        }
 
     )
 
 
+    r.raise_for_status()
 
 
 
+    print(
 
-# =====================================================
-# 数字解析
-# =====================================================
-
-
-def parse_numbers(value):
-
-
-    if value is None:
-
-        return []
-
-
-
-    if isinstance(value,list):
-
-
-        result=[]
-
-
-        for x in value:
-
-
-            try:
-
-                result.append(
-                    int(x)
-                )
-
-            except:
-
-                pass
-
-
-        return result
-
-
-
-
-
-    if isinstance(value,str):
-
-
-        for c in [
-            ",",
-            "-",
-            "|",
-            " "
-        ]:
-
-            value=value.replace(
-                c,
-                " "
-            )
-
-
-
-        return [
-
-            int(x)
-
-            for x in value.split()
-
-            if x.isdigit()
-
-        ]
-
-
-
-    return []
-
-
-
-
-
-
-
-
-# =====================================================
-# 提取一期数据
-# =====================================================
-
-
-def normalize_item(item):
-
-
-    if isinstance(item,list):
-
-        if item:
-
-            return item[0]
-
-        return {}
-
-
-
-    if isinstance(item,dict):
-
-
-        if "data" in item:
-
-            return normalize_item(
-                item["data"]
-            )
-
-
-
-    return item
-
-
-
-
-
-
-# =====================================================
-# 保存开奖
-# =====================================================
-
-
-def save_result(
-        lottery,
-        item
-):
-
-
-    item=normalize_item(
-        item
-    )
-
-
-    if not isinstance(item,dict):
-
-        return False
-
-
-
-
-    issue=(
-
-        item.get("expect")
-
-        or
-
-        item.get("issue")
-
-        or
-
-        item.get("period")
+        "API请求成功"
 
     )
 
 
-
-    code=(
-
-        item.get("openCode")
-
-        or
-
-        item.get("numbers")
-
-        or
-
-        item.get("openNumber")
-
-    )
+    return r.json()
 
 
 
-    numbers=parse_numbers(
-        code
-    )
 
 
 
-    if not issue:
-
-        return False
-
-
-
-    if not numbers:
-
-        return False
+# ==================================================
+# 解析历史字符串
+# ==================================================
 
 
-
-    special=numbers[-1]
-
+def parse_history_line(text):
 
 
-    result=save_draw(
+    """
+    例如:
 
-        lottery,
+    2026090 期：39,41,08,09,07,14,49
 
-        str(issue),
+    """
 
-        numbers,
 
-        special,
+    if not isinstance(
+        text,
+        str
+    ):
 
-        "api"
+        return None
+
+
+
+    m=re.search(
+
+        r"(\d+).*?([\d,]+)",
+
+        text
 
     )
 
 
+    if not m:
 
-    return result.get(
-        "status"
-    )
-
+        return None
 
 
 
+    issue=m.group(1)
+
+
+    nums=[
+
+
+        int(x)
+
+
+        for x in m.group(2).split(",")
+
+
+    ]
+
+
+
+    if len(nums)!=7:
+
+        return None
+
+
+
+    return {
+
+
+        "issue":
+
+        issue,
+
+
+        "numbers":
+
+        nums,
+
+
+        "special":
+
+        nums[-1]
+
+    }
 
 
 
 
-# =====================================================
+
+
+
+# ==================================================
 # 历史同步
-# =====================================================
+# ==================================================
 
 
 def sync_history():
 
 
-    print()
-
     print("="*70)
 
-    print(
-        "正在同步历史开奖"
-    )
+    print("正在同步历史开奖")
 
     print("="*70)
 
 
 
     data=request_api(
+
         API_HISTORY
+
     )
 
 
 
-    result={
-
-
-
-    }
-
-
-
-    names={
-
-
-        "hk":
-        "香港六合彩",
-
-
-        "newMacau":
-        "新澳门六合彩",
-
-
-        "oldMacau":
-        "老澳门六合彩"
-
-    }
-
+    result={}
 
 
 
@@ -433,123 +238,35 @@ def sync_history():
 
 
 
-    groups={
 
-        "hk":[],
+    for item in lottery_data:
 
-        "newMacau":[],
 
-        "oldMacau":[]
+        code=item.get(
 
-    }
+            "code"
 
+        )
 
 
+        if code not in [
 
-    # ==================================
-    # API返回list
-    # ==================================
+            "hk",
 
+            "newMacau",
 
-    if isinstance(
-        lottery_data,
-        list
-    ):
+            "oldMacau"
 
+        ]:
 
-        for block in lottery_data:
+            continue
 
 
-            if not isinstance(
-                block,
-                dict
-            ):
 
-                continue
 
+        history=item.get(
 
-
-            name=str(
-
-                block.get(
-                    "name",
-                    ""
-                )
-
-            )
-
-
-
-            rows=(
-
-                block.get(
-                    "history"
-                )
-
-                or
-
-                block.get(
-                    "data"
-                )
-
-                or []
-
-            )
-
-
-
-            if "香港" in name:
-
-
-                groups["hk"]=rows
-
-
-
-            elif "新澳门" in name:
-
-
-                groups["newMacau"]=rows
-
-
-
-            elif "老澳门" in name:
-
-
-                groups["oldMacau"]=rows
-
-
-
-
-
-
-    # ==================================
-    # API返回dict
-    # ==================================
-
-
-    elif isinstance(
-        lottery_data,
-        dict
-    ):
-
-
-        groups=lottery_data
-
-
-
-
-
-
-    for key,name in names.items():
-
-
-        count=0
-
-
-
-        rows=groups.get(
-
-            key,
+            "history",
 
             []
 
@@ -557,30 +274,60 @@ def sync_history():
 
 
 
-        for item in rows:
+        count=0
 
 
-            if save_result(
 
-                key,
+        for row in history:
 
-                item
 
-            ):
+            info=parse_history_line(
 
+                row
+
+            )
+
+
+            if not info:
+
+                continue
+
+
+
+            save=save_draw(
+
+                code,
+
+                info["issue"],
+
+                info["numbers"],
+
+                info["special"],
+
+                "api"
+
+            )
+
+
+
+            if save.get(
+
+                "status"
+
+            )=="new":
 
                 count+=1
 
 
 
 
-        result[key]=count
+        result[code]=count
 
 
 
         print(
 
-            name,
+            item.get("name"),
 
             "新增:",
 
@@ -599,47 +346,19 @@ def sync_history():
 
 
 
-
-# =====================================================
+# ==================================================
 # 最新同步
-# =====================================================
+# ==================================================
 
 
 def sync_latest():
 
 
-    print()
-
     print("="*70)
 
-    print(
-        "正在同步最新开奖"
-    )
+    print("正在同步最新开奖")
 
     print("="*70)
-
-
-
-
-    urls={
-
-
-        "hk":
-
-        API_HK,
-
-
-        "newMacau":
-
-        API_NEW_MACAU,
-
-
-        "oldMacau":
-
-        API_OLD_MACAU
-
-    }
-
 
 
 
@@ -647,107 +366,107 @@ def sync_latest():
 
 
 
+    for code,url in API_URLS.items():
 
 
-    for key,url in urls.items():
+        data=request_api(
 
+            url
 
-        try:
-
-
-            data=request_api(
-                url
-            )
+        )
 
 
 
-            item=normalize_item(
-                data
-            )
+        item=data.get(
+
+            "lottery_data"
+
+        )
 
 
 
-            status=save_result(
+        if isinstance(
 
-                key,
+            item,
 
-                item
+            list
 
-            )
+        ):
 
-
-
-            issue=""
+            item=item[0]
 
 
 
-            if isinstance(
-                item,
-                dict
-            ):
+        issue=item.get(
 
+            "expect"
 
-                issue=(
-
-                    item.get(
-                        "expect",
-                        ""
-                    )
-
-                    or
-
-                    item.get(
-                        "issue",
-                        ""
-                    )
-
-                )
+        )
 
 
 
-            print(
+        numbers=item.get(
 
-                key,
+            "numbers"
 
-                "最新期:",
-
-                issue,
-
-                "状态:",
-
-                status
-
-            )
+        )
 
 
 
-            result[key]={
+        numbers=[
 
-                "status":
+            int(x)
 
-                status,
+            for x in numbers
 
-
-                "issue":
-
-                issue
-
-            }
+        ]
 
 
 
-        except Exception as e:
+        save=save_draw(
+
+            code,
+
+            issue,
+
+            numbers,
+
+            numbers[-1],
+
+            "api"
+
+        )
 
 
 
-            result[key]={
+        print(
 
-                "error":
+            code,
 
-                str(e)
+            "最新期:",
 
-            }
+            issue,
 
+            "状态:",
+
+            save.get("status")
+
+        )
+
+
+
+        result[code]={
+
+            "issue":
+
+            issue,
+
+
+            "status":
+
+            save.get("status")
+
+        }
 
 
 
@@ -759,21 +478,17 @@ def sync_latest():
 
 
 
-# =====================================================
-# 总入口
-# =====================================================
+# ==================================================
+# 总同步
+# ==================================================
 
 
 def sync_all():
 
 
-    print()
-
     print("="*70)
 
-    print(
-        "开始API同步"
-    )
+    print("开始API同步")
 
     print("="*70)
 
@@ -811,7 +526,9 @@ def sync_all():
     print()
 
     print(
+
         "API同步结果:"
+
     )
 
     print(result)
