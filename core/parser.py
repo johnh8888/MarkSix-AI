@@ -1,158 +1,459 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.1 FINAL
 
-数据解析工具
+API 数据解析模块
+
+功能:
+
+1. 解析开奖号码
+2. 解析期号
+3. 解析彩种
+4. 统一数据格式
+
 """
 
 from __future__ import annotations
 
+
 import re
 
 
+
+# =====================================================
+# 号码解析
+# =====================================================
+
+
 def parse_numbers(value):
+
     """
-    从任意输入中提取 1~49 的号码。
+    任意格式解析号码
+
+    支持:
+
+    [
+        1,2,3
+    ]
+
+    "01 02 03"
+
+    "01,02,03"
+
+    {
+        numbers:[]
+    }
+
     """
+
+
 
     if value is None:
+
         return []
 
-    if isinstance(value, list):
-        values = value
-    else:
-        values = [value]
 
-    result = []
 
-    for item in values:
+    # -----------------------------
+    # list
+    # -----------------------------
 
-        matches = re.findall(
-            r"(?<!\d)(\d{1,2})(?!\d)",
-            str(item)
+    if isinstance(
+        value,
+        list
+    ):
+
+
+        result=[]
+
+
+        for x in value:
+
+
+            nums=parse_numbers(x)
+
+
+            result.extend(nums)
+
+
+
+        return clean_numbers(
+            result
         )
 
-        for x in matches:
 
-            n = int(x)
 
-            if 1 <= n <= 49:
-                result.append(n)
+    # -----------------------------
+    # dict
+    # -----------------------------
 
-    return result
+    if isinstance(
+        value,
+        dict
+    ):
+
+
+        for key in [
+
+            "numbers",
+
+            "openCode",
+
+            "code",
+
+            "special"
+
+        ]:
+
+
+            if key in value:
+
+
+                return parse_numbers(
+                    value[key]
+                )
+
+
+
+        return []
+
+
+
+    # -----------------------------
+    # 字符串
+    # -----------------------------
+
+
+    nums=re.findall(
+
+        r"\d+",
+
+        str(value)
+
+    )
+
+
+
+    return clean_numbers(
+
+        [
+
+            int(x)
+
+            for x in nums
+
+        ]
+
+    )
+
+
+
+# =====================================================
+# 清洗号码
+# =====================================================
 
 
 def clean_numbers(numbers):
-    """
-    清洗号码。
-    """
-
-    result = []
-
-    for x in numbers:
-
-        try:
-            n = int(x)
-        except Exception:
-            continue
-
-        if 1 <= n <= 49:
-            result.append(n)
-
-    return result
 
 
-def extract_specials(history):
-    """
-    从数据库历史记录提取特码。
-    """
+    result=[]
 
-    result = []
 
-    if not history:
-        return result
+    for n in numbers:
 
-    for row in history:
-
-        if not isinstance(row, dict):
-            continue
-
-        value = row.get("special")
 
         try:
 
-            n = int(value)
 
-        except Exception:
+            n=int(n)
+
+
+
+        except:
+
 
             continue
+
+
 
         if 1 <= n <= 49:
+
+
             result.append(n)
 
-    return result
 
-
-def extract_numbers(history):
-    """
-    提取全部正码。
-    """
-
-    result = []
-
-    if not history:
-        return result
-
-    for row in history:
-
-        if not isinstance(row, dict):
-            continue
-
-        numbers = row.get(
-            "numbers",
-            []
-        )
-
-        if isinstance(numbers, list):
-
-            for n in numbers:
-
-                try:
-                    n = int(n)
-                except Exception:
-                    continue
-
-                if 1 <= n <= 49:
-                    result.append(n)
 
     return result
 
 
-def get_issue(row):
-    """
-    获取期号。
-    """
 
-    if not isinstance(row, dict):
-        return None
+# =====================================================
+# 提取特码
+# =====================================================
 
-    value = (
-        row.get("issue")
-        or row.get("expect")
-        or row.get("period")
+
+def extract_special(numbers):
+
+
+    nums=parse_numbers(
+        numbers
     )
 
-    if value is None:
+
+    if len(nums)>=7:
+
+
+        return nums[6]
+
+
+    return None
+
+
+
+# =====================================================
+# 提取前六正码
+# =====================================================
+
+
+def extract_main_numbers(numbers):
+
+
+    nums=parse_numbers(
+        numbers
+    )
+
+
+    if len(nums)>=7:
+
+
+        return nums[:6]
+
+
+    return nums
+
+
+
+# =====================================================
+# 期号解析
+# =====================================================
+
+
+def parse_issue(item):
+
+
+    if not isinstance(
+        item,
+        dict
+    ):
+
+
         return None
 
-    return str(value)
 
 
-__all__ = [
+    for key in [
+
+        "expect",
+
+        "issue",
+
+        "period",
+
+        "no"
+
+    ]:
+
+
+        if key in item:
+
+
+            return str(
+                item[key]
+            )
+
+
+
+    return None
+
+
+
+# =====================================================
+# 彩种解析
+# =====================================================
+
+
+def parse_lottery_name(item):
+
+
+    if not isinstance(
+        item,
+        dict
+    ):
+
+
+        return ""
+
+
+
+    return str(
+
+        item.get(
+
+            "name",
+
+            ""
+
+        )
+
+    )
+
+
+
+# =====================================================
+# 单条开奖解析
+# =====================================================
+
+
+def parse_draw(item):
+
+
+    if not isinstance(
+        item,
+        dict
+    ):
+
+
+        return None
+
+
+
+    numbers=[]
+
+
+
+    for key in [
+
+        "numbers",
+
+        "openCode",
+
+        "code",
+
+        "result"
+
+    ]:
+
+
+        if key in item:
+
+
+            numbers=parse_numbers(
+
+                item[key]
+
+            )
+
+            break
+
+
+
+    if len(numbers)<7:
+
+
+        return None
+
+
+
+    return {
+
+
+        "issue":
+
+            parse_issue(
+                item
+            ),
+
+
+        "numbers":
+
+            numbers[:6],
+
+
+        "special":
+
+            numbers[6]
+
+    }
+
+
+
+# =====================================================
+# 历史解析
+# =====================================================
+
+
+def parse_history(history):
+
+
+    result=[]
+
+
+
+    if not isinstance(
+        history,
+        list
+    ):
+
+
+        return result
+
+
+
+    for row in history:
+
+
+        data=parse_draw(
+
+            row
+
+        )
+
+
+        if data:
+
+
+            result.append(
+                data
+            )
+
+
+
+    return result
+
+
+
+# =====================================================
+# 导出
+# =====================================================
+
+
+__all__=[
+
     "parse_numbers",
+
     "clean_numbers",
-    "extract_specials",
-    "extract_numbers",
-    "get_issue"
+
+    "extract_special",
+
+    "extract_main_numbers",
+
+    "parse_issue",
+
+    "parse_lottery_name",
+
+    "parse_draw",
+
+    "parse_history"
+
 ]
