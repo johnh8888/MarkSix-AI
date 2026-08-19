@@ -1,69 +1,88 @@
 # -*- coding: utf-8 -*-
 
+"""
+六合彩数据库模块
+
+统一使用单一 SQLite 数据库（config.DATABASE_FILE），
+三个彩种共用一张表，用 lottery 字段区分。
+
+对外接口（与 core/engine.py 的调用方式保持一致）：
+
+    init_db()
+    save_records(lottery_name, records) -> int   新增条数
+    load_records(lottery_name) -> list[dict]
+    count_records(lottery_name) -> int
+"""
+
 from __future__ import annotations
 
-import os
-import sqlite3
 import json
+import sqlite3
 from typing import Any
+
+import config
+
+
+def _connect() -> sqlite3.Connection:
+
+    config.DATA_DIR.mkdir(
+        exist_ok=True,
+    )
+
+    conn = sqlite3.connect(
+        str(config.DATABASE_FILE)
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS draws (
+            issue TEXT NOT NULL,
+            lottery TEXT NOT NULL,
+            numbers TEXT NOT NULL,
+            special_number INTEGER,
+            open_time TEXT,
+            source TEXT,
+            PRIMARY KEY (issue, lottery)
+        )
+        """
+    )
+
+    return conn
 
 
 def init_db() -> None:
 
-    os.makedirs(
-        "data",
-        exist_ok=True,
-    )
+    conn = _connect()
+
+    conn.commit()
+
+    conn.close()
 
 
 def save_records(
-    db_path: str,
+    lottery_name: str,
     records: list[dict[str, Any]],
 ) -> int:
 
     if not records:
         return 0
 
-    os.makedirs(
-        os.path.dirname(db_path),
-        exist_ok=True,
-    )
-
-    connection = sqlite3.connect(
-        db_path
-    )
+    conn = _connect()
 
     try:
 
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS draws (
-                issue TEXT PRIMARY KEY,
-                numbers TEXT NOT NULL,
-                special_number INTEGER,
-                open_time TEXT,
-                lottery TEXT,
-                source TEXT
-            )
-            """
-        )
+        cursor = conn.cursor()
 
         inserted = 0
 
         for row in records:
 
             issue = str(
-                row.get(
-                    "issue",
-                    "",
-                )
+                row.get("issue", "")
             )
 
             numbers = row.get(
-                "numbers",
-                [],
+                "numbers", []
             )
 
             if not issue:
@@ -75,148 +94,108 @@ def save_records(
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO draws
-                (
-                    issue,
-                    numbers,
-                    special_number,
-                    open_time,
-                    lottery,
-                    source
-                )
+                (issue, lottery, numbers, special_number, open_time, source)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     issue,
+                    lottery_name,
                     json.dumps(
                         numbers,
                         ensure_ascii=False,
                     ),
-                    int(
-                        numbers[6]
-                    ),
-                    row.get(
-                        "open_time",
-                        "",
-                    ),
-                    row.get(
-                        "lottery",
-                        "",
-                    ),
-                    row.get(
-                        "source",
-                        "",
-                    ),
+                    int(numbers[6]),
+                    row.get("open_time", ""),
+                    row.get("source", ""),
                 ),
             )
 
             inserted += 1
 
-        connection.commit()
+        conn.commit()
 
         return inserted
 
     finally:
 
-        connection.close()
+        conn.close()
 
 
 def load_records(
-    db_path: str,
+    lottery_name: str,
 ) -> list[dict[str, Any]]:
 
-    if not os.path.isfile(
-        db_path
-    ):
-        return []
-
-    connection = sqlite3.connect(
-        db_path
-    )
+    conn = _connect()
 
     try:
 
-        cursor = connection.cursor()
+        cursor = conn.cursor()
 
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS draws (
-                issue TEXT PRIMARY KEY,
-                numbers TEXT NOT NULL,
-                special_number INTEGER,
-                open_time TEXT,
-                lottery TEXT,
-                source TEXT
-            )
-            """
-        )
-
-        cursor.execute(
-            """
-            SELECT
-                issue,
-                numbers,
-                special_number,
-                open_time,
-                lottery,
-                source
+            SELECT issue, numbers, special_number, open_time, source
             FROM draws
-            """
+            WHERE lottery = ?
+            """,
+            (lottery_name,),
         )
 
         rows = cursor.fetchall()
 
-        result = []
+    finally:
 
-        for row in rows:
+        conn.close()
 
-            try:
+    result = []
 
-                numbers = json.loads(
-                    row[1]
-                )
+    for issue, numbers, special, open_time, source in rows:
 
-            except Exception:
+        try:
+            parsed = json.loads(numbers)
+        except Exception:
+            continue
 
-                continue
+        if not isinstance(parsed, list):
+            continue
 
-            if not isinstance(
-                numbers,
-                list,
-            ):
-                continue
+        if len(parsed) != 7:
+            continue
 
-            if len(numbers) != 7:
-                continue
-
-            result.append(
-                {
-                    "issue": row[0],
-                    "numbers": [
-                        int(x)
-                        for x in numbers
-                    ],
-                    "special_number":
-                        int(
-                            row[2]
-                            or numbers[6]
-                        ),
-                    "open_time":
-                        row[3] or "",
-                    "lottery":
-                        row[4] or "",
-                    "source":
-                        row[5] or "",
-                }
-            )
-
-        result.sort(
-            key=lambda x: int(
-                x["issue"]
-            )
+        result.append(
+            {
+                "issue": issue,
+                "lottery": lottery_name,
+                "numbers": [int(x) for x in parsed],
+                "special_number": int(
+                    special or parsed[6]
+                ),
+                "open_time": open_time or "",
+                "source": source or "",
+            }
         )
 
-        return result
+    result.sort(
+        key=lambda x: int(x["issue"])
+    )
+
+    return result
+
+
+def count_records(
+    lottery_name: str,
+) -> int:
+
+    conn = _connect()
+
+    try:
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM draws WHERE lottery = ?",
+            (lottery_name,),
+        ).fetchone()[0]
 
     finally:
 
-        connection.close()
+        conn.close()
+
+    return count
