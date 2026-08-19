@@ -1,5 +1,6 @@
 name: 六合AI V3.3 FINAL
 
+
 on:
   workflow_dispatch:
 
@@ -7,7 +8,9 @@ on:
     - cron: "0 */6 * * *"
 
 
+
 jobs:
+
   run:
 
     runs-on: ubuntu-latest
@@ -15,56 +18,332 @@ jobs:
 
     steps:
 
+
+      # ==============================
+      # 拉取代码
+      # ==============================
+
       - name: 拉取项目代码
         uses: actions/checkout@v4
 
 
-      - name: 设置 Python
+
+      # ==============================
+      # Python环境
+      # ==============================
+
+      - name: 设置 Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
 
+
+      # ==============================
+      # 安装依赖
+      # ==============================
+
       - name: 安装依赖
         run: |
+
           python -m pip install --upgrade pip
 
           if [ -f requirements.txt ]; then
+
             pip install -r requirements.txt
+
           fi
 
 
-      - name: 检查配置
+
+      # ==============================
+      # 项目检查
+      # ==============================
+
+      - name: 检查项目结构
         run: |
+
+          echo "================================"
+          echo "检查项目结构"
+          echo "================================"
+
+
+          test -f main.py
+
+          test -f config.py
+
+
+          test -f core/__init__.py
+
+          test -f core/database.py
+
+          test -f core/api_sync.py
+
+          test -f core/engine.py
+
+          test -f core/predictor.py
+
+          test -f core/wave.py
+
+          test -f core/markov.py
+
+          test -f core/hmm.py
+
+          test -f core/zodiac.py
+
+
+          echo "项目结构正常"
+
+
+
+      # ==============================
+      # Python语法
+      # ==============================
+
+      - name: Python语法检查
+        run: |
+
+          python -m compileall -q .
+
+          echo "Python语法正常"
+
+
+
+      # ==============================
+      # 模块导入
+      # ==============================
+
+      - name: 核心模块检查
+        run: |
+
           python - <<'PY'
-          import config
 
-          print("版本:", config.VERSION)
+          import core
 
-          assert config.VERSION == "V3.3 FINAL"
+          import core.database
 
-          print("配置正常")
+          import core.api_sync
+
+          import core.engine
+
+          import core.predictor
+
+          import core.wave
+
+          import core.markov
+
+          import core.hmm
+
+          import core.zodiac
+
+
+          print("==============================")
+          print("所有核心模块导入成功")
+          print("==============================")
+
+
           PY
 
 
-      - name: 运行 AI
+
+      # ==============================
+      # 配置检查
+      # ==============================
+
+      - name: 系统配置检查
         run: |
+
+          python - <<'PY'
+
+          import config
+
+
+          print("==============================")
+          print("系统版本:", config.VERSION)
+          print("数据库:", config.DATABASE_FILE)
+          print("输出目录:", config.OUTPUT_DIR)
+
+
+          for key,name in config.LOTTERIES.items():
+
+              print(
+                  key,
+                  "=",
+                  name
+              )
+
+
+          assert config.VERSION == "V3.3 FINAL"
+
+
+          print("==============================")
+          print("配置检查通过")
+
+
+          PY
+
+
+
+
+      # ==============================
+      # 数据库初始化
+      # ==============================
+
+      - name: 初始化数据库
+        run: |
+
+          python - <<'PY'
+
+          from core.database import init_database
+
+
+          init_database()
+
+
+          print(
+              "数据库初始化完成"
+          )
+
+
+          PY
+
+
+
+
+      # ==============================
+      # API同步
+      # ==============================
+
+      - name: 同步开奖数据
+        run: |
+
+          echo "================================"
+          echo "开始API同步"
+          echo "================================"
+
+
+          python - <<'PY'
+
+
+          from core.api_sync import sync_all
+
+
+          result = sync_all()
+
+
+          print()
+
+          print("同步结果:")
+
+          print(result)
+
+
+          PY
+
+
+
+
+      # ==============================
+      # AI预测
+      # ==============================
+
+      - name: 运行六合AI V3.3
+        run: |
+
+          echo "================================"
+          echo "运行六合AI V3.3 FINAL"
+          echo "================================"
+
+
           python -u main.py
 
 
-      - name: 查看预测结果
+
+
+      # ==============================
+      # 显示预测
+      # ==============================
+
+      - name: 显示AI预测结果
         run: |
-          echo "=============================="
-          echo "AI预测结果"
-          echo "=============================="
 
-          cat output/prediction.json
+          echo "================================"
+          echo "最终预测结果"
+          echo "================================"
 
 
-      - name: 上传结果
+          python - <<'PY'
+
+
+          import json
+
+
+          with open(
+              "output/prediction.json",
+              encoding="utf-8"
+          ) as f:
+
+              data=json.load(f)
+
+
+
+          print(
+              json.dumps(
+                  data,
+                  ensure_ascii=False,
+                  indent=2
+              )
+          )
+
+
+          PY
+
+
+
+
+      # ==============================
+      # 文件检查
+      # ==============================
+
+      - name: 检查输出文件
+        run: |
+
+
+          test -f output/prediction.json
+
+
+          echo "prediction.json存在"
+
+
+
+      # ==============================
+      # 保存结果
+      # ==============================
+
+      - name: 保存预测结果
         uses: actions/upload-artifact@v4
+
         with:
+
           name: marksix-ai-v3.3-result
+
           path: |
+
             output/prediction.json
+
             data/marksix_v3.db
+
+
+
+
+      # ==============================
+      # 完成
+      # ==============================
+
+      - name: 完成
+        run: |
+
+          echo ""
+          echo "================================"
+          echo "六合AI V3.3 FINAL运行完成"
+          echo "================================"
