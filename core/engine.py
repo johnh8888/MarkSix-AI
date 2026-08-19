@@ -1,136 +1,204 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
-六合AI V10.0 FINAL
+六合彩 AI V3.0 FINAL
 
-系统引擎
+系统总控制引擎
+
+
+流程:
+
+main.py
+
+ ↓
+
+engine
+
+ ↓
+
+数据库初始化
+
+ ↓
+
+API同步
+
+ ↓
+
+读取历史
+
+ ↓
+
+预测
+
+ ↓
+
+回测
+
+ ↓
+
+JSON输出
+
 """
 
-import os
-import json
+
 from datetime import datetime
 
+import json
 
-from .api import (
-    get_realtime
+
+
+from config import (
+
+    LOTTERIES,
+
+    OUTPUT_DIR,
+
+    VERSION
+
 )
+
+
 
 from .database import (
-    init_db,
-    save_draw,
-    get_history,
-    count_history
+
+    init_database,
+
+    load_history
+
 )
+
+
+
+from .api_sync import (
+
+    sync_all
+
+)
+
+
 
 from .predictor import (
-    predict_next
+
+    predict
+
 )
 
 
 
-LOTTERIES={
+from .backtest import (
 
-    "hk":
-    "香港六合彩",
+    walk_forward
 
-    "newMacau":
-    "新澳门六合彩",
-
-    "oldMacau":
-    "老澳门六合彩"
-
-}
-
-
-
-
-# ==========================
-# 同步API
-# ==========================
-
-def sync_api():
-
-
-    result={}
-
-
-    for key in LOTTERIES:
-
-
-        print(
-            "实时同步:",
-            key
-        )
-
-
-        data=get_realtime(
-            key
-        )
-
-
-        if data:
-
-
-            ok=save_draw(
-
-                key,
-
-                data.get(
-                    "issue",
-                    ""
-                ),
-
-                data.get(
-                    "numbers",
-                    []
-                )
-
-            )
-
-
-            result[key]=ok
-
-
-        else:
-
-            result[key]=False
-
-
-
-    return result
+)
 
 
 
 
 
-# ==========================
-# 分析单个彩种
-# ==========================
-
-def analyze(
-    key
-):
 
 
-    name=LOTTERIES[key]
+# =====================================================
+# 保存结果
+# =====================================================
+
+
+def save_output(data):
+
+
+    file = OUTPUT_DIR / "prediction.json"
+
+
+
+    file.write_text(
+
+        json.dumps(
+
+            data,
+
+            ensure_ascii=False,
+
+            indent=2
+
+        ),
+
+        encoding="utf-8"
+
+    )
+
+
+    print()
+
+    print(
+
+        "输出文件:",
+
+        file
+
+    )
+
+
+
+    return file
+
+
+
+
+
+
+
+# =====================================================
+# 单彩种分析
+# =====================================================
+
+
+def analyze_lottery(key):
+
+
+    name = LOTTERIES[key]
+
+
+
+    print()
+
+    print(
+
+        "="*60
+
+    )
+
+
+    print(
+
+        "分析:",
+
+        name
+
+    )
+
+
+    print(
+
+        "="*60
+
+    )
+
+
+
+
+    history = load_history(
+
+        key
+
+    )
 
 
 
     print(
-        "分析:",
-        name
-    )
 
+        "历史数量:",
 
+        len(history)
 
-    history=get_history(
-        key
-    )
-
-
-
-    total=count_history(
-        key
     )
 
 
@@ -140,114 +208,171 @@ def analyze(
 
         return {
 
-            "彩种":name,
 
-            "error":
-            "没有读取到历史号码"
+            "彩种":
+
+            name,
+
+
+            "错误":
+
+            "没有历史数据"
 
         }
 
 
 
-    prediction=predict_next(
 
-        history,
 
-        key
+    result = predict(
+
+        history
 
     )
 
 
 
-    return {
+    result["彩种"]=name
 
 
-        "彩种":
 
-        name,
-
-
-        "历史数量":
-
-        total,
+    result["历史数量"]=len(history)
 
 
-        "预测":
 
-        prediction,
+    result["回测"]=walk_forward(
 
+        history
 
-        "时间":
-
-        datetime.now().isoformat()
+    )
 
 
-    }
+
+    return result
 
 
 
 
 
-# ==========================
-# 主运行
-# ==========================
-
-def run():
 
 
-    print("="*60)
+# =====================================================
+# 主流程
+# =====================================================
+
+
+def run_system():
+
+
+    print()
 
     print(
-        "六合彩 AI 智能预测系统 V10.0 FINAL"
+
+        "启动六合AI V3.0系统"
+
     )
+
+
+
+    # ----------------------------
+
+    # 1 数据库
+
+    # ----------------------------
+
+
+    print()
 
     print(
-        datetime.now()
+
+        "【1】初始化数据库"
+
     )
 
-    print("="*60)
+
+
+    init_database()
 
 
 
     print(
-        "初始化数据库"
+
+        "数据库完成"
+
     )
 
 
-    init_db()
 
 
+
+    # ----------------------------
+
+    # 2 API
+
+    # ----------------------------
+
+
+    print()
 
     print(
-        "开始API同步"
+
+        "【2】同步在线数据"
+
     )
 
 
-    sync=sync_api()
+
+    try:
+
+
+        sync_result = sync_all()
 
 
 
-    output={
-
-        "version":
-
-        "V10.0 FINAL",
+    except Exception as e:
 
 
-        "time":
+        print(
 
-        datetime.now().isoformat(),
+            "同步失败:",
+
+            e
+
+        )
 
 
-        "sync":
+        sync_result={
 
-        sync,
+            "error":
+
+            str(e)
+
+        }
 
 
-        "lotteries":{}
 
-    }
 
+
+
+
+    # ----------------------------
+
+    # 3预测
+
+    # ----------------------------
+
+
+    print()
+
+    print(
+
+        "【3】开始智能预测"
+
+    )
+
+
+
+    results={}
 
 
 
@@ -257,17 +382,33 @@ def run():
         try:
 
 
-            output["lotteries"][key]=analyze(
+            results[key]=analyze_lottery(
+
                 key
+
             )
+
 
 
         except Exception as e:
 
 
-            output["lotteries"][key]={
+            print(
+
+                key,
+
+                "错误:",
+
+                e
+
+            )
+
+
+
+            results[key]={
 
                 "error":
+
                 str(e)
 
             }
@@ -275,46 +416,71 @@ def run():
 
 
 
-    os.makedirs(
 
-        "output",
+    # ----------------------------
 
-        exist_ok=True
+    # 总输出
+
+    # ----------------------------
+
+
+    final={
+
+
+        "版本":
+
+        VERSION,
+
+
+
+        "运行时间":
+
+        datetime.now().isoformat(),
+
+
+
+        "同步":
+
+        sync_result,
+
+
+
+        "预测":
+
+        results
+
+    }
+
+
+
+
+
+    save_output(
+
+        final
 
     )
 
 
 
-    with open(
-
-        "output/prediction.json",
-
-        "w",
-
-        encoding="utf-8"
-
-    ) as f:
-
-
-        json.dump(
-
-            output,
-
-            f,
-
-            ensure_ascii=False,
-
-            indent=2
-
-        )
-
-
+    print()
 
     print(
 
-        "输出完成: output/prediction.json"
+        "V3.0 FINAL运行完成"
 
     )
 
 
-    return output
+
+    return final
+
+
+
+
+
+__all__=[
+
+    "run_system"
+
+]
