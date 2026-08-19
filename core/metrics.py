@@ -1,23 +1,20 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩综合预测系统 V7.2
+六合彩 V7.2 命中率统计模块
 
-命中率统计模块
+核心规则：
 
-功能：
-
-1. 号码 Top5 / Top10 / Top12
-2. 号码平均命中数
-3. 至少命中1/2/3个
-4. 最大命中数
-5. 生肖主推/次推/双推
-6. 单双主推/次推/双推
-7. 大小主推/次推/双推
-8. 波色主推/次推/双色
-9. 全历史命中率
-10. 最近50期命中率
-11. 最近20期命中率
+1. 号码只针对第7个特别号码
+2. 每期开奖最多命中1个特别号码
+3. 生肖针对特别号码推荐5个
+4. 单双只推荐1个
+5. 大小只推荐1个
+6. 波色：
+   - 主推1个
+   - 次推1个
+   - 双色2个
+7. Walk-Forward 使用历史数据逐期验证
 """
 
 from __future__ import annotations
@@ -129,92 +126,174 @@ def get_zodiac(
         year = 2026
 
     return zodiac_by_year(
-        number,
+        int(number),
         year,
     )
 
 
 # ============================================================
-# 历史属性统计
+# 特别号码
+# ============================================================
+
+def get_special_number(
+    record: dict[str, Any],
+) -> int | None:
+
+    numbers = record.get(
+        "numbers",
+        [],
+    )
+
+    if not isinstance(
+        numbers,
+        (list, tuple),
+    ):
+        return None
+
+    if len(numbers) != 7:
+        return None
+
+    try:
+
+        number = int(
+            numbers[6]
+        )
+
+    except Exception:
+
+        return None
+
+    if not 1 <= number <= 49:
+        return None
+
+    return number
+
+
+# ============================================================
+# 历史特别号码属性统计
 # ============================================================
 
 def latest_attribute(
     history: list[dict[str, Any]],
     field: str,
-    limit: int = 20,
+    limit: int = 50,
 ) -> Counter:
 
     counter = Counter()
 
-    if not history:
-        return counter
-
     for row in history[-limit:]:
 
-        numbers = row.get(
-            "numbers",
-            [],
+        special = get_special_number(
+            row
         )
 
-        issue = row.get(
-            "issue",
-            "",
+        if special is None:
+            continue
+
+        issue = str(
+            row.get(
+                "issue",
+                "",
+            )
         )
 
-        for number in numbers:
+        if field == "wave":
 
-            try:
-                number = int(number)
-            except Exception:
-                continue
+            value = get_wave(
+                special
+            )
 
-            if field == "wave":
+        elif field == "size":
 
-                value = get_wave(
-                    number
-                )
+            value = get_size(
+                special
+            )
 
-            elif field == "size":
+        elif field == "odd_even":
 
-                value = get_size(
-                    number
-                )
+            value = get_odd_even(
+                special
+            )
 
-            elif field == "odd_even":
+        elif field == "zodiac":
 
-                value = get_odd_even(
-                    number
-                )
+            value = get_zodiac(
+                special,
+                issue,
+            )
 
-            elif field == "zodiac":
+        else:
 
-                value = get_zodiac(
-                    number,
-                    issue,
-                )
+            continue
 
-            else:
-
-                value = ""
-
-            if value:
-                counter[value] += 1
+        if value:
+            counter[value] += 1
 
     return counter
 
 
 # ============================================================
-# 属性预测
+# 生肖预测：5个
 # ============================================================
 
-def predict_attribute(
+def predict_zodiac(
     history: list[dict[str, Any]],
-    field: str,
 ) -> dict[str, Any]:
 
     counter = latest_attribute(
         history,
-        field,
+        "zodiac",
+        50,
+    )
+
+    animals = [
+        "鼠",
+        "牛",
+        "虎",
+        "兔",
+        "龙",
+        "蛇",
+        "马",
+        "羊",
+        "猴",
+        "鸡",
+        "狗",
+        "猪",
+    ]
+
+    ranking = sorted(
+        animals,
+        key=lambda x: (
+            -counter.get(x, 0),
+            animals.index(x),
+        ),
+    )
+
+    top5 = ranking[:5]
+
+    return {
+        "main": top5[0] if top5 else "",
+        "secondary": (
+            top5[1]
+            if len(top5) > 1
+            else ""
+        ),
+        "top5": top5,
+        "double": top5,
+    }
+
+
+# ============================================================
+# 单双预测：只推一个
+# ============================================================
+
+def predict_odd_even(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = latest_attribute(
+        history,
+        "odd_even",
         50,
     )
 
@@ -222,16 +301,81 @@ def predict_attribute(
 
         return {
             "main": "",
-            "secondary": "",
-            "double": [],
-            "ranking": [],
-            "scores": {},
         }
 
-    ranking = [
-        item[0]
-        for item in counter.most_common()
+    main = sorted(
+        ["单", "双"],
+        key=lambda x: (
+            -counter.get(x, 0),
+            x,
+        ),
+    )[0]
+
+    return {
+        "main": main,
+    }
+
+
+# ============================================================
+# 大小预测：只推一个
+# ============================================================
+
+def predict_size(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = latest_attribute(
+        history,
+        "size",
+        50,
+    )
+
+    if not counter:
+
+        return {
+            "main": "",
+        }
+
+    main = sorted(
+        ["大", "小"],
+        key=lambda x: (
+            -counter.get(x, 0),
+            x,
+        ),
+    )[0]
+
+    return {
+        "main": main,
+    }
+
+
+# ============================================================
+# 波色预测
+# ============================================================
+
+def predict_wave(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = latest_attribute(
+        history,
+        "wave",
+        50,
+    )
+
+    colors = [
+        "红",
+        "蓝",
+        "绿",
     ]
+
+    ranking = sorted(
+        colors,
+        key=lambda x: (
+            -counter.get(x, 0),
+            colors.index(x),
+        ),
+    )
 
     main = ranking[0]
 
@@ -245,15 +389,47 @@ def predict_attribute(
         "main": main,
         "secondary": secondary,
         "double": [
-            x
-            for x in (
-                main,
-                secondary,
-            )
-            if x
+            main,
+            secondary,
         ],
-        "ranking": ranking,
-        "scores": dict(counter),
+    }
+
+
+# ============================================================
+# 统一属性预测
+# ============================================================
+
+def predict_attribute(
+    history: list[dict[str, Any]],
+    field: str,
+) -> dict[str, Any]:
+
+    if field == "zodiac":
+
+        return predict_zodiac(
+            history
+        )
+
+    if field == "odd_even":
+
+        return predict_odd_even(
+            history
+        )
+
+    if field == "size":
+
+        return predict_size(
+            history
+        )
+
+    if field == "wave":
+
+        return predict_wave(
+            history
+        )
+
+    return {
+        "main": "",
     }
 
 
@@ -276,152 +452,198 @@ def hit_rate(
 
 
 # ============================================================
-# 计算号码命中
+# Walk-Forward 单期评估
 # ============================================================
 
-def calculate_number_stats(
-    evaluations: list[dict[str, Any]],
-    key: str,
+def evaluate_prediction(
+    prediction: dict[str, Any],
+    actual: dict[str, Any],
 ) -> dict[str, Any]:
 
-    total = len(evaluations)
+    special = get_special_number(
+        actual
+    )
 
-    if total <= 0:
+    if special is None:
+        return {}
 
-        return {
-            "hit_rate": 0.0,
-            "at_least_1": 0.0,
-            "at_least_2": 0.0,
-            "at_least_3": 0.0,
-            "average_hits": 0.0,
-            "max_hits": 0,
-        }
-
-    hit_counts = []
-
-    for item in evaluations:
-
-        value = item.get(
-            key,
-            0,
+    issue = str(
+        actual.get(
+            "issue",
+            "",
         )
+    )
 
-        try:
-            value = int(value)
-        except Exception:
-            value = 0
+    # --------------------------------------------------------
+    # 号码
+    # --------------------------------------------------------
 
-        hit_counts.append(
-            value
+    top5 = set(
+        prediction.get(
+            "top5",
+            [],
         )
+    )
 
-    return {
-        "hit_rate": hit_rate(
-            sum(
-                1
-                for x in hit_counts
-                if x > 0
-            ),
-            total,
-        ),
+    top10 = set(
+        prediction.get(
+            "top10",
+            [],
+        )
+    )
 
-        "at_least_1": hit_rate(
-            sum(
-                1
-                for x in hit_counts
-                if x >= 1
-            ),
-            total,
-        ),
+    top12 = set(
+        prediction.get(
+            "top12",
+            [],
+        )
+    )
 
-        "at_least_2": hit_rate(
-            sum(
-                1
-                for x in hit_counts
-                if x >= 2
-            ),
-            total,
-        ),
+    result = {
 
-        "at_least_3": hit_rate(
-            sum(
-                1
-                for x in hit_counts
-                if x >= 3
-            ),
-            total,
-        ),
+        # 特别号码只能命中一次
+        "number_top5":
+            special in top5,
 
-        "average_hits": round(
-            sum(hit_counts)
-            / total,
-            2,
-        ),
+        "number_top10":
+            special in top10,
 
-        "max_hits": max(
-            hit_counts
-        ),
+        "number_top12":
+            special in top12,
     }
 
+    # --------------------------------------------------------
+    # 生肖
+    # --------------------------------------------------------
+
+    actual_zodiac = get_zodiac(
+        special,
+        issue,
+    )
+
+    zodiac_prediction = prediction.get(
+        "attributes",
+        {},
+    ).get(
+        "zodiac",
+        {},
+    )
+
+    zodiac_top5 = zodiac_prediction.get(
+        "top5",
+        [],
+    )
+
+    result[
+        "zodiac_top5"
+    ] = (
+        actual_zodiac
+        in zodiac_top5
+    )
+
+    # --------------------------------------------------------
+    # 单双
+    # --------------------------------------------------------
+
+    actual_odd_even = get_odd_even(
+        special
+    )
+
+    odd_prediction = prediction.get(
+        "attributes",
+        {},
+    ).get(
+        "odd_even",
+        {},
+    )
+
+    result[
+        "odd_even_main"
+    ] = (
+        actual_odd_even
+        == odd_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    # --------------------------------------------------------
+    # 大小
+    # --------------------------------------------------------
+
+    actual_size = get_size(
+        special
+    )
+
+    size_prediction = prediction.get(
+        "attributes",
+        {},
+    ).get(
+        "size",
+        {},
+    )
+
+    result[
+        "size_main"
+    ] = (
+        actual_size
+        == size_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    # --------------------------------------------------------
+    # 波色
+    # --------------------------------------------------------
+
+    actual_wave = get_wave(
+        special
+    )
+
+    wave_prediction = prediction.get(
+        "attributes",
+        {},
+    ).get(
+        "wave",
+        {},
+    )
+
+    result[
+        "wave_main"
+    ] = (
+        actual_wave
+        == wave_prediction.get(
+            "main",
+            "",
+        )
+    )
+
+    result[
+        "wave_secondary"
+    ] = (
+        actual_wave
+        == wave_prediction.get(
+            "secondary",
+            "",
+        )
+    )
+
+    result[
+        "wave_double"
+    ] = (
+        actual_wave
+        in wave_prediction.get(
+            "double",
+            [],
+        )
+    )
+
+    return result
+
 
 # ============================================================
-# 属性命中
-# ============================================================
-
-def calculate_attribute_stats(
-    evaluations: list[dict[str, Any]],
-    main_key: str,
-    secondary_key: str,
-    double_key: str,
-) -> dict[str, float]:
-
-    total = len(evaluations)
-
-    if total <= 0:
-
-        return {
-            "main": 0.0,
-            "secondary": 0.0,
-            "double": 0.0,
-        }
-
-    return {
-
-        "main": hit_rate(
-            sum(
-                1
-                for item in evaluations
-                if item.get(main_key)
-            ),
-            total,
-        ),
-
-        "secondary": hit_rate(
-            sum(
-                1
-                for item in evaluations
-                if item.get(
-                    secondary_key
-                )
-            ),
-            total,
-        ),
-
-        "double": hit_rate(
-            sum(
-                1
-                for item in evaluations
-                if item.get(
-                    double_key
-                )
-            ),
-            total,
-        ),
-    }
-
-
-# ============================================================
-# 主函数
+# Walk-Forward 性能汇总
 # ============================================================
 
 def calculate_performance(
@@ -439,82 +661,127 @@ def calculate_performance(
             "status": "历史数据不足",
         }
 
-    # --------------------------------------------------------
-    # 号码
-    # --------------------------------------------------------
+    def count(
+        key: str,
+    ) -> int:
 
-    number_stats = {
-
-        "top5":
-            calculate_number_stats(
-                evaluations,
-                "top5_hits",
-            ),
-
-        "top10":
-            calculate_number_stats(
-                evaluations,
-                "top10_hits",
-            ),
-
-        "top12":
-            calculate_number_stats(
-                evaluations,
-                "top12_hits",
-            ),
-    }
-
-    # --------------------------------------------------------
-    # 属性
-    # --------------------------------------------------------
-
-    zodiac = calculate_attribute_stats(
-        evaluations,
-        "zodiac_main",
-        "zodiac_secondary",
-        "zodiac_double",
-    )
-
-    odd_even = calculate_attribute_stats(
-        evaluations,
-        "odd_even_main",
-        "odd_even_secondary",
-        "odd_even_double",
-    )
-
-    size = calculate_attribute_stats(
-        evaluations,
-        "size_main",
-        "size_secondary",
-        "size_double",
-    )
-
-    wave = calculate_attribute_stats(
-        evaluations,
-        "wave_main",
-        "wave_secondary",
-        "wave_double",
-    )
+        return sum(
+            1
+            for item in evaluations
+            if item.get(key)
+        )
 
     return {
 
         "samples":
             total,
 
-        "numbers":
-            number_stats,
+        # ----------------------------------------------------
+        # 特别号码
+        # ----------------------------------------------------
 
-        "zodiac":
-            zodiac,
+        "numbers": {
 
-        "odd_even":
-            odd_even,
+            "top5":
+                hit_rate(
+                    count(
+                        "number_top5"
+                    ),
+                    total,
+                ),
 
-        "size":
-            size,
+            "top10":
+                hit_rate(
+                    count(
+                        "number_top10"
+                    ),
+                    total,
+                ),
 
-        "wave":
-            wave,
+            "top12":
+                hit_rate(
+                    count(
+                        "number_top12"
+                    ),
+                    total,
+                ),
+        },
+
+        # ----------------------------------------------------
+        # 生肖5推
+        # ----------------------------------------------------
+
+        "zodiac": {
+
+            "top5":
+                hit_rate(
+                    count(
+                        "zodiac_top5"
+                    ),
+                    total,
+                ),
+        },
+
+        # ----------------------------------------------------
+        # 单双单推
+        # ----------------------------------------------------
+
+        "odd_even": {
+
+            "main":
+                hit_rate(
+                    count(
+                        "odd_even_main"
+                    ),
+                    total,
+                ),
+        },
+
+        # ----------------------------------------------------
+        # 大小单推
+        # ----------------------------------------------------
+
+        "size": {
+
+            "main":
+                hit_rate(
+                    count(
+                        "size_main"
+                    ),
+                    total,
+                ),
+        },
+
+        # ----------------------------------------------------
+        # 波色
+        # ----------------------------------------------------
+
+        "wave": {
+
+            "main":
+                hit_rate(
+                    count(
+                        "wave_main"
+                    ),
+                    total,
+                ),
+
+            "secondary":
+                hit_rate(
+                    count(
+                        "wave_secondary"
+                    ),
+                    total,
+                ),
+
+            "double":
+                hit_rate(
+                    count(
+                        "wave_double"
+                    ),
+                    total,
+                ),
+        },
 
         "status":
             "正常",
