@@ -1,15 +1,22 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.4 FINAL
+六合彩 AI V3.6 FINAL
 
-报告输出模块
+预测报告模块
 
-功能:
+输出:
 
-1. 简洁文字报告
-2. HTML报告
-3. 人类可读格式
+1. TXT文字报告
+2. HTML网页报告
+
+显示:
+
+🎯 推荐
+🔥 热号
+❄ 冷号
+📈 趋势
+🎯 推荐理由
 
 """
 
@@ -20,185 +27,295 @@ from config import OUTPUT_DIR
 
 
 
+
+
 # =====================================================
-# 风险显示
+# 安全读取
 # =====================================================
 
 
-def risk_text(value):
+def get(data,key,default=None):
 
-    if value >= 0.7:
-        return "低风险"
 
-    elif value >= 0.4:
-        return "中风险"
+    return data.get(
+
+        key,
+
+        default
+
+    )
+
+
+
+
+
+# =====================================================
+# 单彩种报告
+# =====================================================
+
+
+def lottery_report(
+
+        name,
+
+        data
+
+):
+
+
+    lines=[]
+
+
+    lines.append(
+
+        f"🎲 {name}"
+
+    )
+
+
+    lines.append(
+
+        "-"*40
+
+    )
+
+
+
+
+    # 推荐号码
+
+    lines.append(
+
+        "🎯 推荐3码: "
+
+        +
+
+        str(
+
+            get(
+
+                data,
+
+                "🎯推荐3码",
+
+                []
+
+            )
+
+        )
+
+    )
+
+
+
+
+    lines.append(
+
+        "⭐ 10码范围: "
+
+        +
+
+        str(
+
+            get(
+
+                data,
+
+                "⭐10码范围",
+
+                []
+
+            )
+
+        )
+
+    )
+
+
+
+
+    lines.append("")
+
+
+
+
+
+    # 热号
+
+    lines.append(
+
+        "🔥 热号: "
+
+        +
+
+        str(
+
+            get(
+
+                data,
+
+                "🔥热号",
+
+                []
+
+            )
+
+        )
+
+    )
+
+
+
+
+    # 冷号
+
+    lines.append(
+
+        "❄ 冷号: "
+
+        +
+
+        str(
+
+            get(
+
+                data,
+
+                "❄冷号",
+
+                []
+
+            )
+
+        )
+
+    )
+
+
+
+
+
+    lines.append("")
+
+
+
+
+    # 趋势
+
+    lines.append(
+
+        "📈 趋势:"
+
+    )
+
+
+
+    trend=get(
+
+        data,
+
+        "📈趋势",
+
+        {}
+
+    )
+
+
+
+    if isinstance(
+
+        trend,
+
+        dict
+
+    ):
+
+
+        for k,v in trend.items():
+
+
+            lines.append(
+
+                f"  {k}: {v}"
+
+            )
+
 
     else:
-        return "高风险"
 
-
-
-
-
-# =====================================================
-# 波色格式
-# =====================================================
-
-
-def wave_icon(wave):
-
-    if wave=="红":
-        return "🔴 红波"
-
-    if wave=="蓝":
-        return "🔵 蓝波"
-
-    if wave=="绿":
-        return "🟢 绿波"
-
-    return wave
-
-
-
-
-
-# =====================================================
-# 单个彩种报告
-# =====================================================
-
-
-def lottery_report(name,data):
-
-
-    lines=[]
-
-
-    lines.append("")
-    lines.append("="*55)
-
-    lines.append(
-        f"【{name}】"
-    )
-
-    lines.append("="*55)
-
-
-
-    if "error" in data:
 
         lines.append(
-            "错误:"
-            +
-            str(data["error"])
+
+            str(trend)
+
         )
 
-        return lines
 
 
-
-
-    lines.append(
-        f"历史数据: {data.get('历史数量',0)}期"
-    )
 
 
     lines.append("")
 
 
 
-    lines.append(
-        "🎯 特码推荐"
-    )
 
+    # 理由
 
     lines.append(
-        "第一推荐: "
-        +
-        str(
-            data.get(
-                "第一推荐",
-                "-"
-            )
-        )
-        +
-        "号"
+
+        "🎯 推荐理由:"
+
     )
 
 
 
-    lines.append(
-        "精选3码: "
-        +
-        " ".join(
-            map(
-                str,
-                data.get(
-                    "重点3码",
-                    []
+    reasons=get(
+
+        data,
+
+        "🎯推荐理由",
+
+        []
+
+    )
+
+
+
+    for r in reasons:
+
+
+        if isinstance(r,dict):
+
+
+            lines.append(
+
+                f"  {r.get('号码')} : "
+
+                +
+
+                " / ".join(
+
+                    r.get(
+
+                        "理由",
+
+                        []
+
+                    )
+
                 )
+
             )
-        )
-    )
 
 
+        else:
 
-    lines.append(
-        "10码候选: "
-        +
-        " ".join(
-            map(
-                str,
-                data.get(
-                    "特码10码",
-                    []
-                )
+
+            lines.append(
+
+                str(r)
+
             )
-        )
-    )
-
-
-
-
-    lines.append("")
-
-    lines.append(
-        "🎨 波色预测"
-    )
-
-
-    wave=data.get(
-        "波色",
-        {}
-    )
-
-
-    lines.append(
-        "推荐: "
-        +
-        wave_icon(
-            wave.get(
-                "推荐波色",
-                ""
-            )
-        )
-    )
-
-
-    lines.append(
-        "概率: "
-        +
-        str(
-            round(
-                wave.get(
-                    "概率",
-                    0
-                )*100,
-                1
-            )
-        )
-        +
-        "%"
-    )
 
 
 
@@ -208,139 +325,8 @@ def lottery_report(name,data):
 
 
 
-    size=data.get(
-        "大小",
-        {}
-    )
+    return "\n".join(lines)
 
-
-    lines.append(
-        "大小: "
-        +
-        str(
-            size.get(
-                "推荐",
-                "-"
-            )
-        )
-    )
-
-
-
-    lines.append(
-        "大小概率: "
-        +
-        str(
-            round(
-                size.get(
-                    "大概率",
-                    0
-                )*100
-            )
-        )
-        +
-        "% / "
-        +
-        str(
-            round(
-                size.get(
-                    "小概率",
-                    0
-                )*100
-            )
-        )
-        +
-        "%"
-    )
-
-
-
-
-    odd=data.get(
-        "单双",
-        {}
-    )
-
-
-    lines.append(
-        "单双: "
-        +
-        str(
-            odd.get(
-                "推荐",
-                "-"
-            )
-        )
-    )
-
-
-
-    lines.append(
-        "单双概率: "
-        +
-        str(
-            round(
-                odd.get(
-                    "单概率",
-                    0
-                )*100
-            )
-        )
-        +
-        "% / "
-        +
-        str(
-            round(
-                odd.get(
-                    "双概率",
-                    0
-                )*100
-            )
-        )
-        +
-        "%"
-    )
-
-
-
-
-
-    confidence=data.get(
-        "置信度",
-        0
-    )
-
-
-
-    lines.append("")
-
-    lines.append(
-        "AI置信度: "
-        +
-        str(
-            round(
-                confidence*100,
-                1
-            )
-        )
-        +
-        "%"
-    )
-
-
-    lines.append(
-        "风险:"
-        +
-        data.get(
-            "风险等级",
-            risk_text(
-                confidence
-            )
-        )
-    )
-
-
-    return lines
 
 
 
@@ -349,59 +335,159 @@ def lottery_report(name,data):
 
 
 # =====================================================
-# TXT报告
+# 总报告
 # =====================================================
 
 
-def create_txt_report(result):
+def build_report(
+
+        result
+
+):
 
 
     lines=[]
 
 
+
     lines.append(
-        "六合彩 AI V3.4 FINAL"
+
+        "="*40
+
     )
 
 
     lines.append(
-        datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
+
+        "六合彩 AI V3.6 FINAL"
+
+    )
+
+
+    lines.append(
+
+        str(
+
+            datetime.now()
+
         )
+
+    )
+
+
+    lines.append(
+
+        "="*40
+
+    )
+
+
+    lines.append("")
+
+
+
+
+
+    predictions=result.get(
+
+        "预测",
+
+        {}
+
     )
 
 
 
-    for key,data in result.items():
+    for key,data in predictions.items():
+
+
+        if "error" in data:
+
+            continue
+
+
 
         name=data.get(
+
             "彩种",
+
             key
+
         )
 
-        lines.extend(
+
+
+        lines.append(
+
             lottery_report(
+
                 name,
+
                 data
+
             )
+
         )
 
 
 
-    text="\n".join(
-        lines
-    )
+        lines.append(
 
+            "="*40
+
+        )
+
+
+
+
+
+    return "\n".join(lines)
+
+
+
+
+
+
+
+
+# =====================================================
+# 保存TXT
+# =====================================================
+
+
+def save_txt(
+
+        result
+
+):
+
+
+    text=build_report(
+
+        result
+
+    )
 
 
     file=OUTPUT_DIR / "report.txt"
 
 
     file.write_text(
+
         text,
+
         encoding="utf-8"
+
     )
 
+
+    print(
+
+        "文字报告:",
+
+        file
+
+    )
 
 
     return file
@@ -412,64 +498,68 @@ def create_txt_report(result):
 
 
 
+
 # =====================================================
-# HTML报告
+# 保存HTML
 # =====================================================
 
 
-def create_html_report(result):
+def save_html(
+
+        result
+
+):
 
 
-    txt=[]
+    text=build_report(
+
+        result
+
+    )
 
 
-    txt.append(
-        """
+
+    html=f"""
+
+<!DOCTYPE html>
+
 <html>
+
 <head>
 
 <meta charset="utf-8">
 
 <title>六合彩AI预测</title>
 
+
 <style>
 
-body{
+body{{
 
 font-family:
-Microsoft YaHei;
+Arial,
+"Microsoft YaHei";
 
 background:#f5f5f5;
 
-padding:30px;
+padding:20px;
 
-}
+}}
 
 
-.card{
+.box{{
 
 background:white;
 
 padding:20px;
 
-margin-bottom:20px;
-
 border-radius:10px;
 
-box-shadow:
-0 2px 8px #ccc;
+white-space:pre-line;
 
-}
+font-size:18px;
 
-
-.title{
-
-font-size:26px;
-
-font-weight:bold;
-
-}
-
+}}
 
 </style>
 
@@ -479,69 +569,20 @@ font-weight:bold;
 
 <body>
 
-<div class="title">
 
-六合彩 AI V3.4 FINAL
+<div class="box">
+
+{text}
 
 </div>
 
+
+</body>
+
+
+</html>
+
 """
-    )
-
-
-
-    for key,data in result.items():
-
-
-        name=data.get(
-            "彩种",
-            key
-        )
-
-
-        txt.append(
-            "<div class='card'>"
-        )
-
-
-        txt.append(
-            "<h2>"
-            +
-            name
-            +
-            "</h2>"
-        )
-
-
-        txt.append(
-            "<pre>"
-        )
-
-
-        txt.append(
-            "\n".join(
-                lottery_report(
-                    name,
-                    data
-                )
-            )
-        )
-
-
-        txt.append(
-            "</pre>"
-        )
-
-
-        txt.append(
-            "</div>"
-        )
-
-
-
-    txt.append(
-        "</body></html>"
-    )
 
 
 
@@ -550,8 +591,21 @@ font-weight:bold;
 
 
     file.write_text(
-        "\n".join(txt),
+
+        html,
+
         encoding="utf-8"
+
+    )
+
+
+
+    print(
+
+        "网页报告:",
+
+        file
+
     )
 
 
@@ -559,10 +613,43 @@ font-weight:bold;
 
 
 
+
+
+
+
+# =====================================================
+# 一键输出
+# =====================================================
+
+
+def generate_reports(
+
+        result
+
+):
+
+
+    save_txt(
+
+        result
+
+    )
+
+
+    save_html(
+
+        result
+
+    )
+
+
+
 __all__=[
 
-    "create_txt_report",
+    "generate_reports",
 
-    "create_html_report"
+    "save_txt",
+
+    "save_html"
 
 ]
