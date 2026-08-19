@@ -6,136 +6,121 @@
 全局配置
 """
 
-
 from pathlib import Path
-
 
 
 # =====================================================
 # 项目路径
 # =====================================================
 
-
-BASE_DIR = Path(__file__).resolve().parent
-
-
-
-# =====================================================
-# 版本
-# =====================================================
+BASE_DIR = Path(
+    __file__
+).resolve().parent
 
 
-VERSION = "MarkSix AI V3.0 FINAL"
-
-
-
-# =====================================================
-# 输出
-# =====================================================
+CORE_DIR = BASE_DIR / "core"
 
 
 OUTPUT_DIR = BASE_DIR / "output"
 
 
+DATA_DIR = BASE_DIR / "data"
+
+
 OUTPUT_DIR.mkdir(
+    parents=True,
     exist_ok=True
 )
 
+
+DATA_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
 
 # =====================================================
 # 数据库
 # =====================================================
 
-
 DATABASE_FILE = (
-    BASE_DIR /
-    "marksix.db"
+    DATA_DIR / "marksix_v3.db"
 )
-
 
 
 # =====================================================
-# API
+# 系统版本
 # =====================================================
 
-
-API_HISTORY = (
-
-    "https://marksix6.net/index.php?api=1"
-
-)
+VERSION = "V3.0 FINAL"
 
 
-API_REALTIME = (
+# =====================================================
+# 历史数据
+# =====================================================
 
-    "https://marksix6.net/api/lottery_api.php"
-
-)
-
+HISTORY_LIMIT = 500
 
 
 # =====================================================
 # 彩种
 # =====================================================
 
-
 LOTTERIES = {
 
-
     "hk":
-
-    "香港六合彩",
-
-
+        "香港六合彩",
 
     "newMacau":
-
-    "新澳门六合彩",
-
-
+        "新澳门六合彩",
 
     "oldMacau":
-
-    "老澳门六合彩"
-
+        "老澳门六合彩"
 }
 
 
+# =====================================================
+# API
+# =====================================================
+
+API_HISTORY = (
+    "https://marksix6.net/index.php?api=1"
+)
+
+
+API_REALTIME = (
+    "https://marksix6.net/api/lottery_api.php"
+)
+
 
 # =====================================================
-# 模型参数
+# 预测参数
 # =====================================================
-
-
-HISTORY_LIMIT = 500
-
 
 TOP10 = 10
-
 
 TOP3 = 3
 
 
+# =====================================================
+# 回测参数
+# =====================================================
+
+BACKTEST_MIN_TRAIN = 30
+
 
 __all__ = [
-
-    "VERSION",
-
+    "BASE_DIR",
+    "CORE_DIR",
     "OUTPUT_DIR",
-
+    "DATA_DIR",
     "DATABASE_FILE",
-
-    "API_HISTORY",
-
-    "API_REALTIME",
-
-    "LOTTERIES",
-
+    "VERSION",
     "HISTORY_LIMIT",
-
+    "LOTTERIES",
+    "API_HISTORY",
+    "API_REALTIME",
     "TOP10",
-
-    "TOP3"
-
+    "TOP3",
+    "BACKTEST_MIN_TRAIN"
 ]
