@@ -20,6 +20,20 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 
+# =====================================================
+# 版本
+# =====================================================
+
+
+VERSION = "MarkSix AI V3.0 FINAL"
+
+
+
+# =====================================================
+# 输出
+# =====================================================
+
+
 OUTPUT_DIR = BASE_DIR / "output"
 
 
@@ -38,15 +52,6 @@ DATABASE_FILE = (
     BASE_DIR /
     "marksix.db"
 )
-
-
-
-# =====================================================
-# 版本
-# =====================================================
-
-
-VERSION = "MarkSix AI V3.0 FINAL"
 
 
 
@@ -103,23 +108,23 @@ LOTTERIES = {
 # =====================================================
 
 
-MAX_HISTORY = 500
+HISTORY_LIMIT = 500
 
 
-TOP_NUMBER = 10
+TOP10 = 10
 
 
-TOP_FOCUS = 3
+TOP3 = 3
 
 
 
-__all__=[
+__all__ = [
 
-    "DATABASE_FILE",
+    "VERSION",
 
     "OUTPUT_DIR",
 
-    "VERSION",
+    "DATABASE_FILE",
 
     "API_HISTORY",
 
@@ -127,10 +132,10 @@ __all__=[
 
     "LOTTERIES",
 
-    "MAX_HISTORY",
+    "HISTORY_LIMIT",
 
-    "TOP_NUMBER",
+    "TOP10",
 
-    "TOP_FOCUS"
+    "TOP3"
 
 ]
