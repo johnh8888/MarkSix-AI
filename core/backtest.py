@@ -1,80 +1,72 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.2 FINAL
+六合彩 AI V4.1 QUANT FINAL
 
 Walk Forward 回测模块
 
-功能:
 
-历史滚动验证
-预测命中统计
-模型评估
+规则:
+
+使用历史数据预测下一期
+
+禁止偷看未来数据
+
+
+输出:
+
+预测次数
+命中次数
+命中率
+模型评分
+
 
 """
 
 
-from .predictor import predict
+from .quant import bayesian_fusion
 
 
 
 
 
 # =====================================================
-# 单次命中
+# 单次预测
 # =====================================================
 
 
-def check_hit(prediction, actual):
+def predict_once(history):
 
 
-    result={}
+    scores=bayesian_fusion(
 
-
-    top10 = prediction.get(
-
-        "特码10码",
-
-        []
+        history
 
     )
 
 
-    top3 = prediction.get(
+    ranking=sorted(
 
-        "重点3码",
+        scores.items(),
 
-        []
+        key=lambda x:x[1],
 
-    )
-
-
-
-    special = actual.get(
-
-        "special"
+        reverse=True
 
     )
 
 
 
-    result["特码10码命中"] = (
-
-        special in top10
-
-    )
+    return [
 
 
+        x[0]
 
-    result["重点3码命中"] = (
+        for x in ranking[:10]
 
-        special in top3
-
-    )
-
+    ]
 
 
-    return result
 
 
 
@@ -85,22 +77,14 @@ def check_hit(prediction, actual):
 # =====================================================
 
 
-def walk_forward(
-
-        history,
-
-        min_train=30,
-
-        step=1
-
-):
+def walk_forward(history):
 
 
     total=len(history)
 
 
 
-    if total < min_train + 1:
+    if total<50:
 
 
         return {
@@ -115,117 +99,132 @@ def walk_forward(
 
             total
 
+
         }
 
 
 
 
 
-    total_test=0
+    test_count=0
 
 
-    hit10=0
-
-
-    hit3=0
+    hit_count=0
 
 
 
-
-    start=min_train
+    records=[]
 
 
 
 
-    while start < total:
+
+    # 保留最后100期测试
+
+    start=max(
+
+        50,
+
+        total-100
+
+    )
 
 
 
-        train=history[:start]
+
+    for i in range(
+
+        start,
+
+        total
+
+    ):
 
 
-        test=history[start]
+        train=history[:i]
 
 
-
-
-        try:
-
-
-            prediction=predict(
-
-                train
-
-            )
+        real=history[i]["special"]
 
 
 
-            hit=check_hit(
+        prediction=predict_once(
+
+            train
+
+        )
+
+
+
+        hit=real in prediction
+
+
+
+        test_count+=1
+
+
+
+        if hit:
+
+            hit_count+=1
+
+
+
+
+
+        records.append(
+
+
+            {
+
+
+                "期":
+
+                history[i]["issue"],
+
+
+                "实际":
+
+                real,
+
+
+                "预测":
 
                 prediction,
 
-                test
 
-            )
+                "命中":
 
-
-
-            total_test +=1
+                hit
 
 
-
-            if hit["特码10码命中"]:
-
-
-                hit10 +=1
+            }
 
 
-
-            if hit["重点3码命中"]:
-
-
-                hit3 +=1
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "回测错误:",
-
-                e
-
-            )
-
-
-
-        start += step
+        )
 
 
 
 
 
 
-    if total_test==0:
 
+    rate=round(
 
-        return {
+        hit_count/
 
+        max(test_count,1),
 
-            "状态":
+        3
 
-            "无测试数据"
+    )
 
-        }
 
 
 
 
     return {
+
 
 
         "状态":
@@ -234,47 +233,81 @@ def walk_forward(
 
 
 
-        "测试次数":
+        "测试期数":
 
-        total_test,
-
-
-
-        "特码10码命中":
-
-        hit10,
+        test_count,
 
 
 
-        "重点3码命中":
+        "命中次数":
 
-        hit3,
+        hit_count,
 
 
 
-        "特码10码准确率":
+        "命中率":
 
-        round(
+        rate,
 
-            hit10 / total_test,
 
-            4
+
+        "模型评级":
+
+        model_level(
+
+            rate
 
         ),
 
 
 
-        "重点3码准确率":
+        "记录":
 
-        round(
-
-            hit3 / total_test,
-
-            4
-
-        )
+        records[-20:]
 
     }
+
+
+
+
+
+
+
+
+# =====================================================
+# 模型评级
+# =====================================================
+
+
+def model_level(rate):
+
+
+    if rate>=0.5:
+
+
+        return "优秀"
+
+
+
+    elif rate>=0.35:
+
+
+        return "良好"
+
+
+
+    elif rate>=0.2:
+
+
+        return "一般"
+
+
+
+    else:
+
+
+        return "需要优化"
+
 
 
 
