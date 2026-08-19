@@ -1,25 +1,32 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.3 FINAL
+六合彩 AI V3.4 QUANT FINAL
 
 智能预测核心
 
-功能:
 
-1. 历史评分
-2. 热冷分析
-3. 遗漏补偿
-4. Markov预测
-5. HMM状态
-6. 波色预测
-7. 生肖预测
-8. 大小预测
-9. 单双预测
-10. 置信度分析
-11. 风险等级
+模型:
+
+1. 历史频率
+2. 遗漏补偿
+3. 最近趋势
+4. 热冷平衡
+5. 波色趋势
+6. Markov
+7. HMM状态
+
+
+输出:
+
+第一推荐
+重点3码
+特码10码
+置信度
+AI评分
 
 """
+
 
 from collections import Counter
 
@@ -52,12 +59,12 @@ def data_quality(history):
         level="优秀"
 
 
-    elif count>=100:
+    elif count>=200:
 
         level="良好"
 
 
-    elif count>=30:
+    elif count>=50:
 
         level="一般"
 
@@ -71,14 +78,13 @@ def data_quality(history):
     return {
 
 
-        "数量":
-
+        "历史数量":
             count,
 
 
         "等级":
-
             level
+
 
     }
 
@@ -97,36 +103,23 @@ def score_numbers(history):
     scores={}
 
 
-
-    freq=Counter(
+    values=[
 
         x["special"]
 
         for x in history
 
-    )
-
-
-
-    recent30=[
-
-        x["special"]
-
-        for x in history[-30:]
-
     ]
 
 
-
-    recent10=[
-
-        x["special"]
-
-        for x in history[-10:]
-
-    ]
+    freq=Counter(values)
 
 
+
+    recent30=set(values[-30:])
+
+
+    recent10=set(values[-10:])
 
 
 
@@ -137,30 +130,42 @@ def score_numbers(history):
 
 
 
-        # 历史频率
+        # 历史热度
 
-        score += freq[n]
+        score += freq[n]*0.8
 
 
 
-        # 遗漏补偿
+        # 最近出现
+
+        if n in recent10:
+
+            score += 4
+
+
+        elif n in recent30:
+
+            score += 2
+
+
+
+        # 遗漏
 
         if n not in recent30:
 
             score += 2
 
 
-        else:
 
-            score -= 0.5
+        # 频率修正
+
+        avg=len(values)/49
 
 
 
-        # 最近热度
+        if freq[n] < avg:
 
-        if n in recent10:
-
-            score += 3
+            score += 1
 
 
 
@@ -177,72 +182,79 @@ def score_numbers(history):
 
 
 
+
 # =====================================================
-# 模型状态
+# 置信度计算
 # =====================================================
 
 
-def model_status(history):
+def confidence_score(history,ranking):
 
 
     size=len(history)
 
 
+    if size<50:
 
-    return {
-
-
-        "历史数据":
-
-            size,
+        base=0.15
 
 
-        "Markov":
+    elif size<200:
 
-            "启用"
+        base=0.35
 
-            if size>=20
 
-            else
+    else:
 
-            "等待",
+        base=0.5
 
 
 
-        "HMM":
-
-            "启用"
-
-            if size>=50
-
-            else
-
-            "等待",
+    if ranking:
 
 
+        diff=(
 
-        "高级模型":
+            ranking[0][1]
 
-            "启用"
+            -
 
-            if size>=100
+            ranking[1][1]
 
-            else
+        )
 
-            "等待"
 
-    }
+        base += min(
+
+            diff/20,
+
+            0.25
+
+        )
+
+
+
+    if base>0.85:
+
+        base=0.85
+
+
+    return round(
+        base,
+        2
+    )
+
 
 
 
 
 
 # =====================================================
-# 大小预测
+# 大小分析
 # =====================================================
 
 
-def predict_size(numbers):
+def predict_size(history):
 
 
     big=0
@@ -251,13 +263,15 @@ def predict_size(numbers):
 
 
 
-    for n in numbers:
+    for row in history:
+
+
+        n=row["special"]
 
 
         if n>=25:
 
             big+=1
-
 
         else:
 
@@ -265,7 +279,7 @@ def predict_size(numbers):
 
 
 
-    total=len(numbers)
+    total=big+small
 
 
 
@@ -275,32 +289,28 @@ def predict_size(numbers):
 
 
 
+    bp=big/total
+
+    sp=small/total
+
+
+
     return {
 
 
         "大概率":
-
-            round(
-                big/total,
-                3
-            ),
-
+            round(bp,3),
 
 
         "小概率":
-
-            round(
-                small/total,
-                3
-            ),
-
+            round(sp,3),
 
 
         "推荐":
 
             "大"
 
-            if big>=small
+            if bp>sp
 
             else
 
@@ -312,12 +322,14 @@ def predict_size(numbers):
 
 
 
+
+
 # =====================================================
-# 单双预测
+# 单双分析
 # =====================================================
 
 
-def predict_odd_even(numbers):
+def predict_odd_even(history):
 
 
     odd=0
@@ -326,10 +338,10 @@ def predict_odd_even(numbers):
 
 
 
-    for n in numbers:
+    for row in history:
 
 
-        if n%2:
+        if row["special"]%2:
 
             odd+=1
 
@@ -339,7 +351,7 @@ def predict_odd_even(numbers):
 
 
 
-    total=len(numbers)
+    total=odd+even
 
 
 
@@ -349,113 +361,34 @@ def predict_odd_even(numbers):
 
 
 
+    op=odd/total
+
+    ep=even/total
+
+
+
     return {
 
 
         "单概率":
-
-            round(
-                odd/total,
-                3
-            ),
-
+            round(op,3),
 
 
         "双概率":
-
-            round(
-                even/total,
-                3
-            ),
-
+            round(ep,3),
 
 
         "推荐":
 
             "单"
 
-            if odd>=even
+            if op>ep
 
             else
 
             "双"
 
     }
-
-
-
-
-
-# =====================================================
-# 置信度
-# =====================================================
-
-
-def confidence(scores):
-
-
-    values=sorted(
-
-        scores.values(),
-
-        reverse=True
-
-    )
-
-
-    if len(values)<2:
-
-        return 0
-
-
-
-    gap=values[0]-values[1]
-
-
-
-    result=round(
-
-        min(
-
-            gap/10,
-
-            1
-
-        ),
-
-        3
-
-    )
-
-
-    return result
-
-
-
-
-
-# =====================================================
-# 风险等级
-# =====================================================
-
-
-def risk_level(conf):
-
-
-    if conf>=0.7:
-
-        return "低风险"
-
-
-    elif conf>=0.4:
-
-        return "中风险"
-
-
-    else:
-
-        return "高风险"
-
 
 
 
@@ -474,13 +407,11 @@ def predict(history):
 
         return {
 
+            "error":
 
-            "错误":
-
-                "无历史数据"
+            "无历史数据"
 
         }
-
 
 
 
@@ -488,8 +419,9 @@ def predict(history):
 
 
 
-    scores=score_numbers(history)
-
+    scores=score_numbers(
+        history
+    )
 
 
 
@@ -502,7 +434,6 @@ def predict(history):
         reverse=True
 
     )
-
 
 
 
@@ -526,63 +457,23 @@ def predict(history):
 
 
 
+    confidence=confidence_score(
 
+        history,
 
-    # Markov
+        ranking
 
-
-    if len(history)>=20:
-
-
-        markov=markov_predict(history)
-
-
-    else:
-
-        markov=[]
+    )
 
 
 
-
-
-    # HMM
-
-
-    if len(history)>=50:
-
-
-        state=detect_state(history)
-
-
-    else:
-
-
-        state={
-
-            "状态":
-
-                "数据不足"
-
-        }
-
-
-
-
-
-
-    conf=confidence(scores)
-
-
-
-
-
-    return {
+    result={
 
 
 
         "模型版本":
 
-            "V3.3 FINAL",
+            "V3.4 QUANT FINAL",
 
 
 
@@ -592,27 +483,33 @@ def predict(history):
 
 
 
-        "模型状态":
-
-            model_status(history),
+        "模型状态":{
 
 
+            "Markov":
 
-        "当前状态":
+            "启用"
 
-            state,
+            if len(history)>=20
 
+            else
 
-
-        "特码10码":
-
-            top10,
+            "等待",
 
 
 
-        "重点3码":
+            "HMM":
 
-            top3,
+            "启用"
+
+            if len(history)>=50
+
+            else
+
+            "等待"
+
+
+        },
 
 
 
@@ -622,9 +519,33 @@ def predict(history):
 
 
 
+        "重点3码":
+
+            top3,
+
+
+
+        "特码10码":
+
+            top10,
+
+
+
         "波色":
 
             predict_wave(history),
+
+
+
+        "大小":
+
+            predict_size(history),
+
+
+
+        "单双":
+
+            predict_odd_even(history),
 
 
 
@@ -640,49 +561,81 @@ def predict(history):
 
 
 
-        "大小":
-
-            predict_size(top10),
-
-
-
-        "单双":
-
-            predict_odd_even(top10),
-
-
-
         "置信度":
 
-            conf,
+            confidence,
+
+
+
+        "AI评分":
+
+            int(confidence*100),
 
 
 
         "风险等级":
 
-            risk_level(conf),
+            "低"
 
+            if confidence>=0.7
 
+            else
 
-        "马尔可夫":
+            "中"
 
-            markov[:5],
+            if confidence>=0.4
 
+            else
 
-
-        "评分":
-
-            {
-
-                str(k):
-
-                    v
-
-                for k,v in ranking[:10]
-
-            }
+            "高"
 
     }
+
+
+
+
+
+    if len(history)>=20:
+
+
+        result["马尔可夫"]=markov_predict(
+
+            history
+
+        )[:5]
+
+
+    else:
+
+
+        result["马尔可夫"]=[]
+
+
+
+    if len(history)>=50:
+
+
+        result["状态"]=detect_state(
+
+            history
+
+        )
+
+
+    else:
+
+
+        result["状态"]={
+
+            "状态":
+
+            "数据不足"
+
+        }
+
+
+
+    return result
 
 
 
