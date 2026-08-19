@@ -1,42 +1,36 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V4.1 QUANT FINAL
+六合彩 AI V3.5 FINAL
 
 智能预测核心
 
-模型:
+新增:
 
-Bayesian Fusion
-Frequency
-Missing
-Recent
+🔥 热号分析
+❄ 冷号分析
+📈 趋势分析
+🎯 推荐理由
+
+保留:
+
+频率模型
+遗漏模型
 Markov
 HMM
-Wave
-Size
-OddEven
-
+波色
+生肖
 """
 
 
-from .quant import (
-
-    bayesian_fusion,
-
-    model_confidence
-
-)
+from collections import Counter
 
 
 from .wave import predict_wave
 
-
 from .zodiac import get_zodiac
 
-
 from .markov import markov_predict
-
 
 from .hmm import detect_state
 
@@ -55,18 +49,17 @@ def data_quality(history):
     count=len(history)
 
 
-
     if count>=500:
 
         level="优秀"
 
 
-    elif count>=300:
+    elif count>=100:
 
         level="良好"
 
 
-    elif count>=100:
+    elif count>=30:
 
         level="一般"
 
@@ -79,97 +72,9 @@ def data_quality(history):
 
     return {
 
+        "数量":count,
 
-        "历史数量":
-
-        count,
-
-
-        "等级":
-
-        level
-
-
-    }
-
-
-
-
-
-
-# =====================================================
-# 大小
-# =====================================================
-
-
-def analyze_size(history):
-
-
-    big=sum(
-
-        1
-
-        for x in history
-
-        if x["special"]>=25
-
-    )
-
-
-    small=len(history)-big
-
-
-
-    total=max(
-
-        len(history),
-
-        1
-
-    )
-
-
-    big_p=round(
-
-        big/total,
-
-        3
-
-    )
-
-
-    small_p=round(
-
-        small/total,
-
-        3
-
-    )
-
-
-
-    return {
-
-
-        "大概率":
-
-        big_p,
-
-
-        "小概率":
-
-        small_p,
-
-
-        "推荐":
-
-        "大"
-
-        if big_p>small_p
-
-        else
-
-        "小"
+        "等级":level
 
     }
 
@@ -180,80 +85,72 @@ def analyze_size(history):
 
 
 # =====================================================
-# 单双
+# 号码频率
 # =====================================================
 
 
-def analyze_even(history):
+def number_frequency(history):
 
 
-    odd=sum(
+    counter=Counter()
 
-        1
 
-        for x in history
+    for row in history:
 
-        if x["special"]%2
+
+        n=row.get(
+            "special"
+        )
+
+
+        if n:
+
+            counter[n]+=1
+
+
+
+    return counter
+
+
+
+
+
+
+
+# =====================================================
+# 热号
+# =====================================================
+
+
+def hot_numbers(history):
+
+
+    recent=history[-50:]
+
+
+    counter=number_frequency(
+        recent
+    )
+
+
+    ranking=sorted(
+
+        counter.items(),
+
+        key=lambda x:x[1],
+
+        reverse=True
 
     )
 
 
-    even=len(history)-odd
+    return [
 
+        x[0]
 
+        for x in ranking[:5]
 
-    total=max(
-
-        len(history),
-
-        1
-
-    )
-
-
-    odd_p=round(
-
-        odd/total,
-
-        3
-
-    )
-
-
-    even_p=round(
-
-        even/total,
-
-        3
-
-    )
-
-
-
-    return {
-
-
-        "单概率":
-
-        odd_p,
-
-
-        "双概率":
-
-        even_p,
-
-
-        "推荐":
-
-        "单"
-
-        if odd_p>even_p
-
-        else
-
-        "双"
-
-    }
+    ]
 
 
 
@@ -263,24 +160,260 @@ def analyze_even(history):
 
 
 # =====================================================
-# 风险
+# 冷号
 # =====================================================
 
 
-def risk(conf):
+def cold_numbers(history):
 
 
-    if conf>=0.7:
-
-        return "低风险"
+    last_seen={}
 
 
-    if conf>=0.4:
 
-        return "中风险"
+    for index,row in enumerate(history):
 
 
-    return "高风险"
+        n=row.get(
+            "special"
+        )
+
+
+        if n:
+
+            last_seen[n]=index
+
+
+
+
+
+    result=[]
+
+
+    length=len(history)
+
+
+
+    for n in range(1,50):
+
+
+        miss=length-last_seen.get(
+
+            n,
+
+            -1
+
+        )
+
+
+        result.append(
+
+            (
+
+                n,
+
+                miss
+
+            )
+
+        )
+
+
+
+    result.sort(
+
+        key=lambda x:x[1],
+
+        reverse=True
+
+    )
+
+
+
+    return [
+
+        x[0]
+
+        for x in result[:5]
+
+    ]
+
+
+
+
+
+
+
+
+# =====================================================
+# 评分模型
+# =====================================================
+
+
+def score_numbers(history):
+
+
+    scores={}
+
+
+    freq=number_frequency(
+        history
+    )
+
+
+
+    hot=hot_numbers(
+        history
+    )
+
+
+
+    cold=cold_numbers(
+        history
+    )
+
+
+
+    for n in range(1,50):
+
+
+        score=0
+
+
+
+        # 历史频率
+
+        score += freq[n]*1.0
+
+
+
+        # 热号加权
+
+        if n in hot:
+
+            score += 5
+
+
+
+        # 冷号补偿
+
+        if n in cold:
+
+            score += 2
+
+
+
+        scores[n]=round(
+
+            score,
+
+            2
+
+        )
+
+
+
+    return scores
+
+
+
+
+
+
+
+# =====================================================
+# 趋势分析
+# =====================================================
+
+
+def trend_analysis(history):
+
+
+    if len(history)<10:
+
+
+        return "数据不足"
+
+
+
+    recent=[
+
+        x["special"]
+
+        for x in history[-10:]
+
+    ]
+
+
+
+    avg=sum(recent)/len(recent)
+
+
+
+    if avg>=25:
+
+
+        return "近期偏大号趋势"
+
+
+
+    else:
+
+
+        return "近期偏小号趋势"
+
+
+
+
+
+
+
+
+# =====================================================
+# 推荐理由
+# =====================================================
+
+
+def build_reason(history,number):
+
+
+    reasons=[]
+
+
+    if len(history)>=100:
+
+        reasons.append(
+            "历史数据充足"
+        )
+
+
+
+    if number in hot_numbers(history):
+
+        reasons.append(
+            "近期热号支持"
+        )
+
+
+
+    if number in cold_numbers(history):
+
+        reasons.append(
+            "遗漏补偿"
+        )
+
+
+
+    reasons.append(
+
+        "综合评分最高"
+
+    )
+
+
+
+    return reasons
+
 
 
 
@@ -301,24 +434,16 @@ def predict(history):
 
         return {
 
+            "error":
 
-            "错误":
-
-            "没有历史数据"
+            "无历史数据"
 
         }
 
 
 
-    # ======================
-    # Bayesian评分
-    # ======================
-
-
-    scores=bayesian_fusion(
-
+    scores=score_numbers(
         history
-
     )
 
 
@@ -332,7 +457,6 @@ def predict(history):
         reverse=True
 
     )
-
 
 
 
@@ -357,93 +481,63 @@ def predict(history):
 
 
 
-
-    # ======================
-    # Markov
-    # ======================
+    markov=[]
 
 
     if len(history)>=20:
 
 
         markov=markov_predict(
-
             history
-
         )
 
 
-    else:
-
-        markov=[]
 
 
 
+    state={
 
+        "状态":
 
-    # ======================
-    # HMM
-    # ======================
+        "数据不足"
+
+    }
 
 
     if len(history)>=50:
 
 
-        hmm=detect_state(
-
+        state=detect_state(
             history
-
         )
 
 
-    else:
-
-
-        hmm={
-
-            "状态":
-
-            "数据不足"
-
-        }
 
 
 
 
-
-    # ======================
-    # 信心
-    # ======================
-
-
-    confidence=model_confidence(
-
-        scores
-
-    )
-
-
-
+    first=top3[0]
 
 
 
     return {
 
 
-
         "模型版本":
 
-        "V4.1 QUANT FINAL",
+        "V3.5 FINAL",
 
 
 
-        "数据质量":
+        "历史数量":
 
-        data_quality(
+        len(history),
 
-            history
 
-        ),
+
+        "第一推荐":
+
+        first,
 
 
 
@@ -459,9 +553,44 @@ def predict(history):
 
 
 
-        "第一推荐":
+        "🔥热号":
 
-        top3[0],
+        hot_numbers(
+            history
+        ),
+
+
+
+        "❄冷号":
+
+        cold_numbers(
+            history
+        ),
+
+
+
+        "📈趋势":
+
+        trend_analysis(
+            history
+        ),
+
+
+
+        "🎯推荐理由":
+
+        build_reason(
+            history,
+            first
+        ),
+
+
+
+        "波色":
+
+        predict_wave(
+            history
+        ),
 
 
 
@@ -477,75 +606,40 @@ def predict(history):
 
 
 
-        "波色":
+        "当前状态":
 
-        predict_wave(
-
-            history
-
-        ),
+        state,
 
 
 
-        "大小":
-
-        analyze_size(
-
-            history
-
-        ),
-
-
-
-        "单双":
-
-        analyze_even(
-
-            history
-
-        ),
-
-
-
-        "AI信心":
-
-        confidence,
-
-
-
-        "风险":
-
-        risk(
-
-            confidence
-
-        ),
-
-
-
-        "HMM状态":
-
-        hmm,
-
-
-
-        "Markov":
+        "马尔可夫":
 
         markov[:5],
 
 
 
-        "评分":
+        "置信度":
 
-        {
+        min(
 
-            str(k):
+            0.8,
 
-            v
+            len(history)/1000
 
-            for k,v in ranking[:10]
+        ),
 
-        }
+
+
+        "风险等级":
+
+        "中风险"
+
+        if len(history)>=300
+
+        else
+
+        "高风险"
+
 
 
     }
