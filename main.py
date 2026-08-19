@@ -1,92 +1,52 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
-六合AI V4.0 FINAL
+六合彩综合预测系统
+V4.0 FINAL
 
-程序入口
-
-
-流程:
+程序入口：
 
 main.py
-
-↓
-
+    ↓
 core.engine
-
-↓
-
-数据库
-
-↓
-
+    ↓
+SQLite
+    ↓
 API同步
-
-↓
-
-AI预测
-
-↓
-
-报告输出
-
-
+    ↓
+统计分析
+    ↓
+预测候选
+    ↓
+JSON输出
 """
-
 
 from __future__ import annotations
 
-
 import sys
-
-
-
 from core.engine import run_system
 
 
-
-
-
-def main():
-
-
+def main() -> None:
     try:
-
-
         run_system()
 
-
-
-    except Exception as e:
-
-
+    except KeyboardInterrupt:
         print()
+        print("=" * 70)
+        print("用户中断程序")
+        print("=" * 70)
+        sys.exit(130)
 
-        print("="*70)
-
-        print(
-
-            "系统运行异常"
-
-        )
-
-        print(
-
-            e
-
-        )
-
-        print("="*70)
-
-
+    except Exception as exc:
+        print()
+        print("=" * 70)
+        print("系统运行异常")
+        print("=" * 70)
+        print(str(exc))
+        print("=" * 70)
         sys.exit(1)
 
 
-
-
-
-
-if __name__=="__main__":
-
-
+if __name__ == "__main__":
     main()
