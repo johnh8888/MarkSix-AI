@@ -1,726 +1,452 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
-六合彩 AI V3.4 FINAL
+六合彩 API 数据层
+V6.0 REAL DATA MULTI HISTORY
 
-API同步模块
+功能：
 
-支持:
-marksix6.net
-
-功能:
-1. 历史开奖同步
-2. 最新开奖同步
-3. SSL异常兼容
-4. SQLite保存
-5. 三彩种统一处理
-
+1. 获取最新开奖
+2. 获取历史开奖
+3. 双 API fallback
+4. SSL 异常自动切换
+5. 兼容多种 JSON 结构
+6. 自动去重
+7. 自动排序
 """
-
 
 from __future__ import annotations
 
-
-import re
-
-import requests
-
-import urllib3
-
-
-urllib3.disable_warnings(
-    urllib3.exceptions.InsecureRequestWarning
-)
+import json
+import ssl
+import urllib.parse
+import urllib.request
+from typing import Any, Dict, List, Optional
 
 
-
-from config import API_CONFIG
-
-
-from .database import save_draw
+PRIMARY_BASE = "https://marksix6.net/api/lottery_api.php"
+BACKUP_BASE = "https://api3.marksix6.net/lottery_api.php"
 
 
-
-
-
-# =====================================================
-# API
-# =====================================================
-
-
-API_HISTORY = API_CONFIG["history"]
-
-
-API_URLS = {
-
-
-    "hk":
-
-    API_CONFIG["hk"],
-
-
-    "newMacau":
-
-    API_CONFIG["newMacau"],
-
-
-    "oldMacau":
-
-    API_CONFIG["oldMacau"]
-
+LOTTERY_CONFIG = {
+    "新澳门彩": "newMacau",
+    "老澳门彩": "oldMacau",
+    "香港彩": "hk",
 }
 
 
+def log(message: str) -> None:
+    print(message, flush=True)
 
 
-
-# =====================================================
-# 请求
-# =====================================================
-
-
-def request_api(url):
-
-
-    print()
-
-    print(
-        "正在请求API:"
-    )
-
-    print(url)
-
-
-
-    response=requests.get(
-
-        url,
-
-        timeout=20,
-
-        verify=False,
-
-        headers={
-
-            "User-Agent":
-
-            "Mozilla/5.0"
-
-        }
-
-    )
-
-
-
-    response.raise_for_status()
-
-
-
-    print(
-
-        "API请求成功"
-
-    )
-
-
-
-    return response.json()
-
-
-
-
-
-
-
-
-# =====================================================
-# 历史字符串解析
-# =====================================================
-
-
-def parse_history(text):
-
-
+def _request_json(url: str, timeout: int = 20) -> Any:
     """
-    例如:
+    请求 JSON。
 
-    2026090 期：39,41,08,09,07,14,49
-
+    不关闭 SSL 验证。
+    如果证书异常，直接交给上层 fallback。
     """
 
-
-    if not isinstance(
-        text,
-        str
-    ):
-
-        return None
-
-
-
-    match=re.search(
-
-        r"(\d+).*?([\d,]+)",
-
-        text
-
-    )
-
-
-
-    if not match:
-
-        return None
-
-
-
-
-    issue=match.group(1)
-
-
-
-    nums=[
-
-
-        int(x)
-
-
-        for x in match.group(2).split(",")
-
-    ]
-
-
-
-    if len(nums)!=7:
-
-        return None
-
-
-
-    return {
-
-
-        "issue":
-
-        issue,
-
-
-        "numbers":
-
-        nums,
-
-
-        "special":
-
-        nums[-1]
-
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 "
+            "(X11; Linux x86_64) "
+            "AppleWebKit/537.36 "
+            "Chrome/120 Safari/537.36"
+        ),
+        "Accept": "application/json,text/plain,*/*",
+        "Connection": "close",
     }
 
-
-
-
-
-
-
-# =====================================================
-# 历史同步
-# =====================================================
-
-
-def sync_history():
-
-
-    print("="*70)
-
-    print(
-        "正在同步历史开奖"
+    request = urllib.request.Request(
+        url,
+        headers=headers,
+        method="GET",
     )
 
-    print("="*70)
+    context = ssl.create_default_context()
 
+    with urllib.request.urlopen(
+        request,
+        timeout=timeout,
+        context=context,
+    ) as response:
 
+        raw = response.read()
 
-    data=request_api(
+        if not raw:
+            raise ValueError("API返回空内容")
 
-        API_HISTORY
-
-    )
-
-
-
-    result={}
-
-
-
-    lottery_data=data.get(
-
-        "lottery_data",
-
-        []
-
-    )
-
-
-
-    for item in lottery_data:
-
-
-
-        code=item.get(
-            "code"
+        text = raw.decode(
+            "utf-8",
+            errors="replace",
         )
 
+        return json.loads(text)
 
 
-        if code not in API_URLS:
+def _extract_number(value: Any) -> Optional[int]:
+    try:
+        number = int(str(value).strip())
+
+        if 1 <= number <= 49:
+            return number
+
+    except Exception:
+        pass
+
+    return None
 
 
-            continue
+def _parse_numbers(value: Any) -> List[int]:
+    """
+    兼容：
 
+    [1,2,3]
+    ["01","02"]
+    "01,02,03"
+    "01 02 03"
+    {"numbers":[...]}
+    """
 
+    result: List[int] = []
 
-        history=item.get(
+    if value is None:
+        return result
 
-            "history",
+    if isinstance(value, dict):
 
-            []
+        for key in (
+            "numbers",
+            "openCode",
+            "open_code",
+            "code",
+            "result",
+        ):
 
-        )
+            if key in value:
 
+                result = _parse_numbers(
+                    value[key]
+                )
 
+                if result:
+                    return result
 
-        count=0
+        return result
 
+    if isinstance(value, (list, tuple)):
 
+        for item in value:
 
-        for row in history:
+            number = _extract_number(item)
 
+            if number is not None:
+                result.append(number)
 
-            info=parse_history(
-                row
+        return result[:7]
+
+    if isinstance(value, str):
+
+        text = value.strip()
+
+        for separator in (
+            ",",
+            "|",
+            " ",
+            "/",
+            "-",
+        ):
+            text = text.replace(
+                separator,
+                ",",
             )
 
+        for part in text.split(","):
 
+            number = _extract_number(part)
 
-            if not info:
+            if number is not None:
+                result.append(number)
 
-                continue
-
-
-
-            saved=save_draw(
-
-                code,
-
-                info["issue"],
-
-                info["numbers"],
-
-                info["special"],
-
-                "api"
-
-            )
-
-
-
-            if saved.get(
-
-                "status"
-
-            )=="new":
-
-
-                count+=1
-
-
-
-
-
-
-        result[code]=count
-
-
-
-        print(
-
-            item.get("name"),
-
-            "新增:",
-
-            count,
-
-            "期"
-
-        )
-
-
-
+        return result[:7]
 
     return result
 
 
+def _normalize_record(
+    item: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
 
+    if not isinstance(item, dict):
+        return None
 
-
-
-
-# =====================================================
-# 最新同步
-# =====================================================
-
-
-def sync_latest():
-
-
-    print("="*70)
-
-    print(
-        "正在同步最新开奖"
+    issue = (
+        item.get("expect")
+        or item.get("issue")
+        or item.get("period")
+        or item.get("qihao")
+        or item.get("draw")
+        or item.get("drawNo")
     )
 
-    print("="*70)
+    if issue is None:
+        return None
+
+    issue = str(issue).strip()
+
+    if not issue:
+        return None
+
+    numbers = _parse_numbers(
+        item.get("numbers")
+        or item.get("openCode")
+        or item.get("open_code")
+        or item.get("code")
+    )
+
+    if len(numbers) < 7:
+        return None
+
+    open_time = (
+        item.get("openTime")
+        or item.get("open_time")
+        or item.get("date")
+        or item.get("drawTime")
+        or ""
+    )
+
+    return {
+        "issue": issue,
+        "numbers": numbers[:7],
+        "open_time": str(open_time),
+        "raw": item,
+    }
 
 
+def _looks_like_record(
+    value: Any,
+) -> bool:
 
-    result={}
+    if not isinstance(value, dict):
+        return False
+
+    issue_keys = {
+        "expect",
+        "issue",
+        "period",
+        "qihao",
+        "draw",
+        "drawNo",
+    }
+
+    number_keys = {
+        "numbers",
+        "openCode",
+        "open_code",
+        "code",
+    }
+
+    return bool(
+        issue_keys.intersection(value.keys())
+    ) and bool(
+        number_keys.intersection(value.keys())
+    )
 
 
+def _collect_records(
+    obj: Any,
+    output: List[Dict[str, Any]],
+) -> None:
+    """
+    递归寻找历史记录。
+    """
 
-    for code,url in API_URLS.items():
+    if obj is None:
+        return
 
+    if isinstance(obj, dict):
+
+        if _looks_like_record(obj):
+
+            record = _normalize_record(obj)
+
+            if record:
+                output.append(record)
+
+        for key, value in obj.items():
+
+            key_lower = str(key).lower()
+
+            if key_lower in {
+                "history",
+                "historical",
+                "records",
+                "data",
+                "lottery_data",
+                "result",
+                "list",
+            }:
+                _collect_records(
+                    value,
+                    output,
+                )
+
+            elif isinstance(
+                value,
+                (dict, list),
+            ):
+                _collect_records(
+                    value,
+                    output,
+                )
+
+        return
+
+    if isinstance(obj, list):
+
+        for item in obj:
+
+            _collect_records(
+                item,
+                output,
+            )
+
+
+def _deduplicate_records(
+    records: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+
+    unique: Dict[str, Dict[str, Any]] = {}
+
+    for record in records:
+
+        issue = str(
+            record["issue"]
+        )
+
+        unique[issue] = record
+
+    def sort_key(item: Dict[str, Any]):
+        issue = str(item["issue"])
+
+        digits = "".join(
+            c for c in issue
+            if c.isdigit()
+        )
+
+        try:
+            return int(digits)
+        except Exception:
+            return digits
+
+    result = list(
+        unique.values()
+    )
+
+    result.sort(
+        key=sort_key
+    )
+
+    return result
+
+
+def fetch_lottery(
+    lottery_name: str,
+    max_retries: int = 2,
+) -> Dict[str, Any]:
+
+    if lottery_name not in LOTTERY_CONFIG:
+        raise ValueError(
+            f"未知彩种：{lottery_name}"
+        )
+
+    lottery_type = LOTTERY_CONFIG[
+        lottery_name
+    ]
+
+    query = urllib.parse.urlencode(
+        {
+            "type": lottery_type,
+        }
+    )
+
+    urls = [
+        f"{PRIMARY_BASE}?{query}",
+        f"{BACKUP_BASE}?{query}",
+    ]
+
+    all_records: List[
+        Dict[str, Any]
+    ] = []
+
+    latest_payload = None
+
+    for index, url in enumerate(
+        urls,
+        start=1,
+    ):
+
+        log(
+            f"[{lottery_name}] "
+            f"请求API 第{index}次"
+        )
+
+        log(url)
 
         try:
 
-
-            data=request_api(
-
+            payload = _request_json(
                 url
-
             )
 
+            latest_payload = payload
 
+            records: List[
+                Dict[str, Any]
+            ] = []
 
-            item=None
-
-
-
-
-            # ----------------------
-            # 兼容结构
-            # ----------------------
-
-
-            if isinstance(
-                data,
-                dict
-            ):
-
-
-
-                if (
-
-                    "expect" in data
-
-                    or
-
-                    "issue" in data
-
-                ):
-
-
-                    item=data
-
-
-
-                elif "lottery_data" in data:
-
-
-                    item=data["lottery_data"]
-
-
-                    if isinstance(
-                        item,
-                        list
-                    ):
-
-                        item=item[0]
-
-
-
-                elif "data" in data:
-
-
-                    item=data["data"]
-
-
-                    if isinstance(
-                        item,
-                        list
-                    ):
-
-                        item=item[0]
-
-
-
-
-            if not isinstance(
-                item,
-                dict
-            ):
-
-
-                raise Exception(
-                    "API格式错误"
-                )
-
-
-
-
-
-
-            issue=(
-
-                item.get(
-                    "expect"
-                )
-
-                or
-
-                item.get(
-                    "issue"
-                )
-
+            _collect_records(
+                payload,
+                records,
             )
 
+            records = _deduplicate_records(
+                records
+            )
 
+            if records:
 
-            numbers=(
-
-                item.get(
-                    "numbers"
+                log(
+                    f"[{lottery_name}] "
+                    f"API解析得到："
+                    f"{len(records)} 期"
                 )
 
-                or
-
-                item.get(
-                    "openCode"
+                all_records.extend(
+                    records
                 )
 
+                break
+
+            log(
+                f"[{lottery_name}] "
+                "API没有解析到有效历史记录"
             )
 
+        except Exception as exc:
 
-
-            if isinstance(
-                numbers,
-                str
-            ):
-
-
-                numbers=[
-
-
-                    int(x)
-
-
-                    for x in numbers.replace(
-
-                        "-",
-
-                        ","
-
-                    ).split(",")
-
-
-                    if x.strip()
-
-                ]
-
-
-
-            else:
-
-
-                numbers=[
-
-                    int(x)
-
-                    for x in numbers
-
-                ]
-
-
-
-
-
-
-            saved=save_draw(
-
-                code,
-
-                issue,
-
-                numbers,
-
-                numbers[-1],
-
-                "api"
-
+            log(
+                f"[WARN] 请求失败：{exc}"
             )
 
-
-
-
-            print(
-
-                code,
-
-                "最新期:",
-
-                issue,
-
-                "状态:",
-
-                saved.get(
-                    "status"
-                )
-
-            )
-
-
-
-            result[code]={
-
-
-                "status":
-
-                saved.get(
-                    "status"
-                ),
-
-
-                "issue":
-
-                issue
-
-            }
-
-
-
-
-        except Exception as e:
-
-
-
-            print(
-
-                code,
-
-                "失败:",
-
-                e
-
-            )
-
-
-
-            result[code]={
-
-
-                "status":
-
-                "error",
-
-
-                "error":
-
-                str(e)
-
-            }
-
-
-
-
-
-    return result
-
-
-
-
-
-
-
-# =====================================================
-# 总同步入口
-# =====================================================
-
-
-def sync_all():
-
-
-    print("="*70)
-
-    print(
-        "开始API同步"
+    all_records = _deduplicate_records(
+        all_records
     )
 
-    print("="*70)
-
-
-
-    history=sync_history()
-
-
-
-    realtime=sync_latest()
-
-
-
-
-    result={
-
-
-        "history":
-
-        history,
-
-
-        "realtime":
-
-        realtime,
-
-
-        "status":
-
-        "completed"
-
+    return {
+        "lottery": lottery_name,
+        "type": lottery_type,
+        "records": all_records,
+        "payload": latest_payload,
     }
-
-
-
-    print()
-
-    print(
-        "API同步结果:"
-    )
-
-    print(result)
-
-
-
-    return result
-
-
-
-
-
-
-__all__=[
-
-    "sync_all",
-
-    "sync_history",
-
-    "sync_latest"
-
-]
