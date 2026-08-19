@@ -15,7 +15,50 @@ import sqlite3
 from datetime import datetime
 
 
+from pathlib import Path
+
+
+import sys
+
+
+
+# =====================================================
+# 修复 GitHub Actions 导入路径
+# =====================================================
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+if str(BASE_DIR) not in sys.path:
+
+    sys.path.insert(
+        0,
+        str(BASE_DIR)
+    )
+
+
+
 from config import DATABASE_FILE
+
+
+
+
+
+
+# =====================================================
+# 数据库连接
+# =====================================================
+
+
+def get_connection():
+
+
+    return sqlite3.connect(
+        DATABASE_FILE
+    )
+
+
 
 
 
@@ -24,16 +67,6 @@ from config import DATABASE_FILE
 # =====================================================
 # 初始化数据库
 # =====================================================
-
-
-def get_connection():
-
-    return sqlite3.connect(
-        DATABASE_FILE
-    )
-
-
-
 
 
 def init_database():
@@ -54,7 +87,7 @@ def init_database():
 
             lottery TEXT,
 
-            issue TEXT UNIQUE,
+            issue TEXT,
 
             numbers TEXT,
 
@@ -62,7 +95,10 @@ def init_database():
 
             source TEXT,
 
-            create_time TEXT
+            create_time TEXT,
+
+
+            UNIQUE(lottery,issue)
 
         )
         """
@@ -72,6 +108,9 @@ def init_database():
     conn.commit()
 
     conn.close()
+
+
+
 
 
 
@@ -110,12 +149,19 @@ def save_draw(
             """
             INSERT OR IGNORE INTO draws
             (
+
             lottery,
+
             issue,
+
             numbers,
+
             special,
+
             source,
+
             create_time
+
             )
 
             VALUES (?,?,?,?,?,?)
@@ -148,6 +194,7 @@ def save_draw(
         conn.commit()
 
 
+
         return cur.rowcount > 0
 
 
@@ -160,6 +207,7 @@ def save_draw(
             e
         )
 
+
         return False
 
 
@@ -168,6 +216,9 @@ def save_draw(
 
 
         conn.close()
+
+
+
 
 
 
@@ -196,16 +247,24 @@ def load_history(
     cur.execute(
 
         """
+
         SELECT
+
         issue,
+
         numbers,
+
         special
+
 
         FROM draws
 
+
         WHERE lottery=?
 
+
         ORDER BY id DESC
+
 
         LIMIT ?
 
@@ -234,6 +293,7 @@ def load_history(
     result=[]
 
 
+
     for issue,numbers,special in rows:
 
 
@@ -241,17 +301,21 @@ def load_history(
 
             {
 
-            "issue":issue,
+                "issue":issue,
 
-            "numbers":[
 
-                int(x)
+                "numbers":[
 
-                for x in numbers.split(",")
+                    int(x)
 
-            ],
+                    for x in numbers.split(",")
 
-            "special":special
+                    if x
+
+                ],
+
+
+                "special":special
 
             }
 
@@ -260,6 +324,8 @@ def load_history(
 
 
     return result[::-1]
+
+
 
 
 
@@ -284,7 +350,24 @@ def latest_draw(lottery):
 
     if data:
 
+
         return data[0]
 
 
     return None
+
+
+
+
+
+__all__=[
+
+    "init_database",
+
+    "save_draw",
+
+    "load_history",
+
+    "latest_draw"
+
+]
