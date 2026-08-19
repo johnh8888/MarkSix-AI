@@ -1,9 +1,10 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.1 FINAL
+六合AI V4.0 FINAL
 
 程序入口
+
 
 流程:
 
@@ -23,11 +24,12 @@ API同步
 
 ↓
 
-预测
+AI预测
 
 ↓
 
-输出JSON
+报告输出
+
 
 """
 
@@ -60,21 +62,21 @@ def main():
 
         print()
 
-        print(
-            "="*70
-        )
+        print("="*70)
 
         print(
+
             "系统运行异常"
+
         )
 
         print(
+
             e
+
         )
 
-        print(
-            "="*70
-        )
+        print("="*70)
 
 
         sys.exit(1)
@@ -83,7 +85,8 @@ def main():
 
 
 
-if __name__ == "__main__":
+
+if __name__=="__main__":
 
 
     main()
