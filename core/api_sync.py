@@ -7,9 +7,13 @@ API同步模块
 
 支持:
 marksix6.net
-历史数据同步
-最新数据同步
-SQLite保存
+
+功能:
+1. 历史开奖同步
+2. 最新开奖同步
+3. SSL异常兼容
+4. SQLite保存
+5. 三彩种统一处理
 
 """
 
@@ -18,11 +22,15 @@ from __future__ import annotations
 
 
 import re
+
 import requests
+
 import urllib3
 
 
-urllib3.disable_warnings()
+urllib3.disable_warnings(
+    urllib3.exceptions.InsecureRequestWarning
+)
 
 
 
@@ -34,7 +42,14 @@ from .database import save_draw
 
 
 
+
+# =====================================================
+# API
+# =====================================================
+
+
 API_HISTORY = API_CONFIG["history"]
+
 
 API_URLS = {
 
@@ -59,10 +74,9 @@ API_URLS = {
 
 
 
-
-# ==================================================
+# =====================================================
 # 请求
-# ==================================================
+# =====================================================
 
 
 def request_api(url):
@@ -70,19 +84,21 @@ def request_api(url):
 
     print()
 
-    print("正在请求API:")
+    print(
+        "正在请求API:"
+    )
 
     print(url)
 
 
 
-    r=requests.get(
+    response=requests.get(
 
         url,
 
-        verify=False,
-
         timeout=20,
+
+        verify=False,
 
         headers={
 
@@ -95,7 +111,8 @@ def request_api(url):
     )
 
 
-    r.raise_for_status()
+
+    response.raise_for_status()
 
 
 
@@ -106,19 +123,22 @@ def request_api(url):
     )
 
 
-    return r.json()
+
+    return response.json()
 
 
 
 
 
 
-# ==================================================
-# 解析历史字符串
-# ==================================================
 
 
-def parse_history_line(text):
+# =====================================================
+# 历史字符串解析
+# =====================================================
+
+
+def parse_history(text):
 
 
     """
@@ -138,7 +158,7 @@ def parse_history_line(text):
 
 
 
-    m=re.search(
+    match=re.search(
 
         r"(\d+).*?([\d,]+)",
 
@@ -147,13 +167,16 @@ def parse_history_line(text):
     )
 
 
-    if not m:
+
+    if not match:
 
         return None
 
 
 
-    issue=m.group(1)
+
+    issue=match.group(1)
+
 
 
     nums=[
@@ -162,8 +185,7 @@ def parse_history_line(text):
         int(x)
 
 
-        for x in m.group(2).split(",")
-
+        for x in match.group(2).split(",")
 
     ]
 
@@ -200,9 +222,9 @@ def parse_history_line(text):
 
 
 
-# ==================================================
+# =====================================================
 # 历史同步
-# ==================================================
+# =====================================================
 
 
 def sync_history():
@@ -210,7 +232,9 @@ def sync_history():
 
     print("="*70)
 
-    print("正在同步历史开奖")
+    print(
+        "正在同步历史开奖"
+    )
 
     print("="*70)
 
@@ -238,29 +262,20 @@ def sync_history():
 
 
 
-
     for item in lottery_data:
 
 
+
         code=item.get(
-
             "code"
-
         )
 
 
-        if code not in [
 
-            "hk",
+        if code not in API_URLS:
 
-            "newMacau",
-
-            "oldMacau"
-
-        ]:
 
             continue
-
 
 
 
@@ -281,11 +296,10 @@ def sync_history():
         for row in history:
 
 
-            info=parse_history_line(
-
+            info=parse_history(
                 row
-
             )
+
 
 
             if not info:
@@ -294,7 +308,7 @@ def sync_history():
 
 
 
-            save=save_draw(
+            saved=save_draw(
 
                 code,
 
@@ -310,13 +324,16 @@ def sync_history():
 
 
 
-            if save.get(
+            if saved.get(
 
                 "status"
 
             )=="new":
 
+
                 count+=1
+
+
 
 
 
@@ -339,6 +356,7 @@ def sync_history():
 
 
 
+
     return result
 
 
@@ -346,9 +364,10 @@ def sync_history():
 
 
 
-# ==================================================
+
+# =====================================================
 # 最新同步
-# ==================================================
+# =====================================================
 
 
 def sync_latest():
@@ -356,7 +375,9 @@ def sync_latest():
 
     print("="*70)
 
-    print("正在同步最新开奖")
+    print(
+        "正在同步最新开奖"
+    )
 
     print("="*70)
 
@@ -369,104 +390,255 @@ def sync_latest():
     for code,url in API_URLS.items():
 
 
-        data=request_api(
-
-            url
-
-        )
+        try:
 
 
+            data=request_api(
 
-        item=data.get(
+                url
 
-            "lottery_data"
-
-        )
+            )
 
 
 
-        if isinstance(
-
-            item,
-
-            list
-
-        ):
-
-            item=item[0]
+            item=None
 
 
 
-        issue=item.get(
 
-            "expect"
-
-        )
-
+            # ----------------------
+            # 兼容结构
+            # ----------------------
 
 
-        numbers=item.get(
-
-            "numbers"
-
-        )
+            if isinstance(
+                data,
+                dict
+            ):
 
 
 
-        numbers=[
+                if (
 
-            int(x)
+                    "expect" in data
 
-            for x in numbers
+                    or
 
-        ]
+                    "issue" in data
+
+                ):
 
 
-
-        save=save_draw(
-
-            code,
-
-            issue,
-
-            numbers,
-
-            numbers[-1],
-
-            "api"
-
-        )
+                    item=data
 
 
 
-        print(
-
-            code,
-
-            "最新期:",
-
-            issue,
-
-            "状态:",
-
-            save.get("status")
-
-        )
+                elif "lottery_data" in data:
 
 
-
-        result[code]={
-
-            "issue":
-
-            issue,
+                    item=data["lottery_data"]
 
 
-            "status":
+                    if isinstance(
+                        item,
+                        list
+                    ):
 
-            save.get("status")
+                        item=item[0]
 
-        }
+
+
+                elif "data" in data:
+
+
+                    item=data["data"]
+
+
+                    if isinstance(
+                        item,
+                        list
+                    ):
+
+                        item=item[0]
+
+
+
+
+            if not isinstance(
+                item,
+                dict
+            ):
+
+
+                raise Exception(
+                    "API格式错误"
+                )
+
+
+
+
+
+
+            issue=(
+
+                item.get(
+                    "expect"
+                )
+
+                or
+
+                item.get(
+                    "issue"
+                )
+
+            )
+
+
+
+            numbers=(
+
+                item.get(
+                    "numbers"
+                )
+
+                or
+
+                item.get(
+                    "openCode"
+                )
+
+            )
+
+
+
+            if isinstance(
+                numbers,
+                str
+            ):
+
+
+                numbers=[
+
+
+                    int(x)
+
+
+                    for x in numbers.replace(
+
+                        "-",
+
+                        ","
+
+                    ).split(",")
+
+
+                    if x.strip()
+
+                ]
+
+
+
+            else:
+
+
+                numbers=[
+
+                    int(x)
+
+                    for x in numbers
+
+                ]
+
+
+
+
+
+
+            saved=save_draw(
+
+                code,
+
+                issue,
+
+                numbers,
+
+                numbers[-1],
+
+                "api"
+
+            )
+
+
+
+
+            print(
+
+                code,
+
+                "最新期:",
+
+                issue,
+
+                "状态:",
+
+                saved.get(
+                    "status"
+                )
+
+            )
+
+
+
+            result[code]={
+
+
+                "status":
+
+                saved.get(
+                    "status"
+                ),
+
+
+                "issue":
+
+                issue
+
+            }
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                code,
+
+                "失败:",
+
+                e
+
+            )
+
+
+
+            result[code]={
+
+
+                "status":
+
+                "error",
+
+
+                "error":
+
+                str(e)
+
+            }
+
+
 
 
 
@@ -478,9 +650,9 @@ def sync_latest():
 
 
 
-# ==================================================
-# 总同步
-# ==================================================
+# =====================================================
+# 总同步入口
+# =====================================================
 
 
 def sync_all():
@@ -488,7 +660,9 @@ def sync_all():
 
     print("="*70)
 
-    print("开始API同步")
+    print(
+        "开始API同步"
+    )
 
     print("="*70)
 
@@ -499,6 +673,7 @@ def sync_all():
 
 
     realtime=sync_latest()
+
 
 
 
@@ -526,9 +701,7 @@ def sync_all():
     print()
 
     print(
-
         "API同步结果:"
-
     )
 
     print(result)
@@ -536,6 +709,7 @@ def sync_all():
 
 
     return result
+
 
 
 
