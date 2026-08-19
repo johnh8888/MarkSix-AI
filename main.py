@@ -1,30 +1,46 @@
 # ============================================================
-# 六合智能预测系统 V1.0 STABLE
-# ============================================================
-# 稳定版
+# 六合综合预测系统 V8.3.2 FINAL FIX
+#
 # 数据源:
 # https://marksix6.net/index.php?api=1
 #
-# 功能:
-# SQLite历史保存
-# 三彩种独立
-# 49码评分
-# 生肖/波色/大小/单双
-# 简单输出
+# Python 3.11+
+#
+# 修复:
+# 1. 历史数据同步
+# 2. 数据库
+# 3. 49码评分
+# 4. 10/20/30期回测
+# 5. 简洁输出
 # ============================================================
 
 
 import os
 import json
 import sqlite3
-import datetime
 import requests
+import datetime
+import urllib3
+
 
 from collections import Counter
 
 
 
-VERSION = "V1.0 STABLE"
+
+
+urllib3.disable_warnings(
+    urllib3.exceptions.InsecureRequestWarning
+)
+
+
+
+
+
+VERSION = "V8.3.2 FINAL FIX"
+
+
+
 
 
 
@@ -33,27 +49,59 @@ VERSION = "V1.0 STABLE"
 # ============================================================
 
 
-DATA_DIR = "data"
+BASE_DIR=os.path.dirname(
 
-OUTPUT_DIR = "output"
+    os.path.abspath(__file__)
 
-
-
-os.makedirs(
-    DATA_DIR,
-    exist_ok=True
 )
 
 
+
+DB_DIR=os.path.join(
+
+    BASE_DIR,
+
+    "database"
+
+)
+
+
+OUTPUT_DIR=os.path.join(
+
+    BASE_DIR,
+
+    "output"
+
+)
+
+
+
 os.makedirs(
+
+    DB_DIR,
+
+    exist_ok=True
+
+)
+
+
+
+os.makedirs(
+
     OUTPUT_DIR,
+
     exist_ok=True
+
 )
+
+
+
 
 
 
 # ============================================================
 # 数据源
+# 保持你的原始接口
 # ============================================================
 
 
@@ -65,31 +113,50 @@ API_URL = (
 
 
 
+
+
+
+
 # ============================================================
 # 数据库
 # ============================================================
 
 
-DB_FILES = {
+DB_FILES={
+
 
     "新澳门彩":
+
     os.path.join(
-        DATA_DIR,
+
+        DB_DIR,
+
         "new_macau.db"
+
     ),
+
 
 
     "老澳门彩":
+
     os.path.join(
-        DATA_DIR,
+
+        DB_DIR,
+
         "old_macau.db"
+
     ),
 
 
+
     "香港彩":
+
     os.path.join(
-        DATA_DIR,
+
+        DB_DIR,
+
         "hk.db"
+
     )
 
 }
@@ -97,39 +164,52 @@ DB_FILES = {
 
 
 
+
+
+
 # ============================================================
-# 波色
+# 49码波色
 # ============================================================
 
 
-RED = {
 
-1,2,7,8,12,13,
-18,19,23,24,
-29,30,34,35,
-40,45,46
+RED={
 
-}
+1,2,7,8,
 
+12,13,18,19,
 
+23,24,29,30,
 
-BLUE = {
-
-3,4,9,10,14,
-15,20,25,26,
-31,36,37,41,
-42,47,48
+34,35,40,45,46
 
 }
 
 
 
-GREEN = {
+BLUE={
 
-5,6,11,16,17,
-21,22,27,28,
-32,33,38,39,
-43,44,49
+3,4,9,10,
+
+14,15,20,25,
+
+26,31,36,37,
+
+41,42,47,48
+
+}
+
+
+
+GREEN={
+
+5,6,11,16,
+
+17,21,22,27,
+
+28,32,33,38,
+
+39,43,44,49
 
 }
 
@@ -137,16 +217,23 @@ GREEN = {
 
 
 
-def get_wave(num):
 
-    if num in RED:
+def get_wave(n):
+
+
+    n=int(n)
+
+
+    if n in RED:
 
         return "红"
 
 
-    if num in BLUE:
+
+    if n in BLUE:
 
         return "蓝"
+
 
 
     return "绿"
@@ -155,49 +242,57 @@ def get_wave(num):
 
 
 
-# ============================================================
-# 大小
-# ============================================================
 
 
-def get_size(num):
+def get_size(n):
+
 
     return (
+
         "大"
-        if num >=25
+
+        if int(n)>=25
+
         else
+
         "小"
+
     )
 
 
 
 
-# ============================================================
-# 单双
-# ============================================================
 
 
-def get_odd_even(num):
+
+def get_odd_even(n):
+
 
     return (
+
         "单"
-        if num % 2
+
+        if int(n)%2
+
         else
+
         "双"
+
     )
 
 
 
 
 
-# ============================================================
-# 尾数
-# ============================================================
 
 
-def get_tail(num):
+def get_tail(n):
 
-    return num % 10
+
+    return int(n)%10
+
+
+
 
 
 
@@ -208,31 +303,118 @@ def get_tail(num):
 # ============================================================
 
 
-ZODIAC = {
 
-1:"鼠",
-2:"牛",
-3:"虎",
-4:"兔",
-5:"龙",
-6:"蛇",
-7:"马",
-8:"羊",
-9:"猴",
-10:"鸡",
-11:"狗",
-12:"猪"
+ZODIAC=[
 
-}
+"鼠",
+
+"牛",
+
+"虎",
+
+"兔",
+
+"龙",
+
+"蛇",
+
+"马",
+
+"羊",
+
+"猴",
+
+"鸡",
+
+"狗",
+
+"猪"
+
+]
 
 
 
 
-def get_zodiac(num):
+
+def get_zodiac(n):
+
 
     return ZODIAC[
-        ((num-1)%12)+1
+
+        (int(n)-1)%12
+
     ]
+
+
+
+
+
+
+
+
+# ============================================================
+# 请求API
+# ============================================================
+
+
+def request_json(url):
+
+
+    try:
+
+
+        print(
+
+            "请求:",
+
+            url
+
+        )
+
+
+
+        r=requests.get(
+
+            url,
+
+            timeout=20,
+
+            verify=False,
+
+            headers={
+
+                "User-Agent":
+
+                "Mozilla/5.0"
+
+            }
+
+        )
+
+
+
+        r.raise_for_status()
+
+
+
+        return r.json()
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "请求失败:",
+
+            e
+
+        )
+
+
+        return None
+
 
 
 
@@ -246,85 +428,40 @@ def get_zodiac(num):
 def init_db(path):
 
 
-    conn = sqlite3.connect(
-        path
+    conn=sqlite3.connect(path)
+
+
+
+    cur=conn.cursor()
+
+
+
+    cur.execute(
+
+    """
+
+    CREATE TABLE IF NOT EXISTS history(
+
+        issue TEXT PRIMARY KEY,
+
+        numbers TEXT,
+
+        open_time TEXT
+
     )
 
+    """
 
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS history(
-
-            issue TEXT PRIMARY KEY,
-
-            numbers TEXT,
-
-            open_time TEXT
-
-        )
-        """
     )
+
 
 
     conn.commit()
 
     conn.close()
 
-
-
-
-def init_all_db():
-
-    for path in DB_FILES.values():
-
-        init_db(path)
-        # ============================================================
-# API请求
 # ============================================================
-
-
-def fetch_api():
-
-    try:
-
-        r = requests.get(
-
-            API_URL,
-
-            timeout=30,
-
-            verify=False
-
-        )
-
-
-        r.encoding="utf-8"
-
-
-        data = r.json()
-
-
-        return data
-
-
-
-    except Exception as e:
-
-
-        print(
-            "API请求失败:",
-            e
-        )
-
-
-        return None
-
-
-
-
-
-# ============================================================
-# 号码解析
+# 数字解析
 # ============================================================
 
 
@@ -333,97 +470,111 @@ def parse_numbers(code):
 
     if isinstance(code,list):
 
-        try:
 
-            return [
+        nums=[]
+
+
+        for x in code:
+
+
+            try:
+
+                nums.append(
+
+                    int(x)
+
+                )
+
+            except:
+
+                pass
+
+
+
+        return nums[:7]
+
+
+
+    if not code:
+
+        return []
+
+
+
+    nums=[]
+
+
+
+    for x in str(code).split(","):
+
+
+        x=x.strip()
+
+
+        if x.isdigit():
+
+            nums.append(
 
                 int(x)
 
-                for x in code
-
-            ]
-
-        except:
-
-            return []
+            )
 
 
 
-
-    if isinstance(code,str):
-
-
-        code = code.replace(
-
-            ",",
-
-            " "
-
-        )
+    return nums[:7]
 
 
-        code = code.replace(
-
-            "|",
-
-            " "
-
-        )
-
-
-        parts = code.split()
-
-
-
-        try:
-
-            return [
-
-                int(x)
-
-                for x in parts
-
-            ]
-
-        except:
-
-            return []
-
-
-
-    return []
 
 
 
 
 
 # ============================================================
-# API历史解析
-#
-# 真实结构:
-#
-# lottery_data
-#       |
-#       name
-#       |
-#       history
-#       |
-#       openCode
-#
+# 解析 marksix API
 # ============================================================
 
 
-def extract_history(data, lottery):
+
+def parse_marksix_data(data,lottery):
 
 
     result=[]
 
 
 
-    if not isinstance(data,dict):
+    if not data:
+
 
         return result
 
+
+
+
+
+    code_map={
+
+
+        "新澳门彩":
+
+        "newMacau",
+
+
+
+        "老澳门彩":
+
+        "oldMacau",
+
+
+
+        "香港彩":
+
+        "hk"
+
+    }
+
+
+
+    target=code_map[lottery]
 
 
 
@@ -438,15 +589,32 @@ def extract_history(data, lottery):
 
 
 
-    for block in lottery_data:
+    for item in lottery_data:
 
 
 
-        name=str(
+        if item.get(
 
-            block.get(
+            "code"
 
-                "name",
+        ) != target:
+
+
+            continue
+
+
+
+
+        # -------------------------
+        # 最新一期
+        # -------------------------
+
+
+        nums=parse_numbers(
+
+            item.get(
+
+                "openCode",
 
                 ""
 
@@ -456,90 +624,30 @@ def extract_history(data, lottery):
 
 
 
-        if lottery not in name:
-
-            continue
+        if len(nums)==7:
 
 
+            result.append({
 
+                "issue":
 
-        history=block.get(
-
-            "history",
-
-            []
-
-        )
-
-
-
-
-        for item in history:
-
-
-
-            issue=str(
-
-                item.get(
-
-                    "expect",
+                str(
 
                     item.get(
 
-                        "issue",
+                        "expect",
 
                         ""
 
                     )
 
-                )
-
-            )
+                ),
 
 
+                "numbers":
 
+                nums,
 
-            code=item.get(
-
-                "openCode",
-
-                item.get(
-
-                    "numbers",
-
-                    ""
-
-                )
-
-            )
-
-
-
-
-            nums=parse_numbers(
-
-                code
-
-            )
-
-
-
-
-            if len(nums)!=7:
-
-                continue
-
-
-
-
-
-            result.append(
-
-                {
-
-                "issue":issue,
-
-                "numbers":nums,
 
                 "open_time":
 
@@ -551,9 +659,91 @@ def extract_history(data, lottery):
 
                 )
 
-                }
+            })
 
-            )
+
+
+
+
+        # -------------------------
+        # 历史
+        # -------------------------
+
+
+        for h in item.get(
+
+            "history",
+
+            []
+
+        ):
+
+
+
+            if not isinstance(
+
+                h,
+
+                str
+
+            ):
+
+                continue
+
+
+
+            try:
+
+
+
+                issue,code=h.split(
+
+                    "期：",
+
+                    1
+
+                )
+
+
+
+                nums=parse_numbers(
+
+                    code
+
+                )
+
+
+
+                if len(nums)!=7:
+
+                    continue
+
+
+
+                result.append({
+
+                    "issue":
+
+                    issue.strip(),
+
+
+                    "numbers":
+
+                    nums,
+
+
+                    "open_time":
+
+                    ""
+
+                })
+
+
+
+            except:
+
+
+                continue
 
 
 
@@ -565,64 +755,77 @@ def extract_history(data, lottery):
 
 
 
+
+
 # ============================================================
 # 保存历史
 # ============================================================
 
 
-def save_history(lottery,records):
+def save_history(path,records):
 
 
-    path=DB_FILES[lottery]
-
-
-    conn=sqlite3.connect(
-
-        path
-
-    )
-
-
-    add=0
+    init_db(path)
 
 
 
-    for row in records:
+    conn=sqlite3.connect(path)
 
 
 
-        cur=conn.execute(
+    cur=conn.cursor()
 
-            """
 
-            INSERT OR IGNORE INTO history
 
-            VALUES(?,?,?)
+    for r in records:
 
-            """,
 
-            (
 
-            row["issue"],
+        cur.execute(
 
-            json.dumps(
+        """
 
-                row["numbers"]
+        INSERT OR IGNORE INTO history
+
+        (
+
+        issue,
+
+        numbers,
+
+        open_time
+
+        )
+
+        VALUES(?,?,?)
+
+        """,
+
+        (
+
+            r["issue"],
+
+
+            ",".join(
+
+                str(x)
+
+                for x in r["numbers"]
 
             ),
 
-            row["open_time"]
+
+            r.get(
+
+                "open_time",
+
+                ""
 
             )
 
         )
 
-
-
-        if cur.rowcount:
-
-            add+=1
-
+        )
 
 
 
@@ -632,50 +835,53 @@ def save_history(lottery,records):
 
 
 
-    return add
-
 
 
 
 
 # ============================================================
-# 读取历史
+# 读取数据库
 # ============================================================
 
 
-def load_history(lottery):
+def load_history(path):
 
 
-    path=DB_FILES[lottery]
+    init_db(path)
 
 
-    conn=sqlite3.connect(
 
-        path
+    conn=sqlite3.connect(path)
+
+
+
+    cur=conn.cursor()
+
+
+
+    cur.execute(
+
+    """
+
+    SELECT
+
+    issue,
+
+    numbers,
+
+    open_time
+
+    FROM history
+
+    ORDER BY issue DESC
+
+    """
 
     )
 
 
 
-    rows=conn.execute(
-
-        """
-
-        SELECT
-
-        issue,
-
-        numbers,
-
-        open_time
-
-        FROM history
-
-        ORDER BY issue DESC
-
-        """
-
-    ).fetchall()
+    rows=cur.fetchall()
 
 
 
@@ -687,28 +893,38 @@ def load_history(lottery):
 
 
 
-    for r in rows:
+    for issue,numbers,time in rows:
 
 
-        result.append(
 
-            {
+        nums=parse_numbers(
 
-            "issue":r[0],
-
-            "numbers":
-
-            json.loads(
-
-                r[1]
-
-            ),
-
-            "open_time":r[2]
-
-            }
+            numbers
 
         )
+
+
+
+        if len(nums)==7:
+
+
+            result.append({
+
+                "issue":
+
+                issue,
+
+
+                "numbers":
+
+                nums,
+
+
+                "open_time":
+
+                time
+
+            })
 
 
 
@@ -718,8 +934,9 @@ def load_history(lottery):
 
 
 
+
 # ============================================================
-# 同步数据库
+# 更新数据库
 # ============================================================
 
 
@@ -731,21 +948,28 @@ def update_database(lottery):
     print("="*60)
 
     print(
-        "更新:",
+
+        "更新",
+
         lottery
+
     )
 
     print("="*60)
 
 
 
-    api_data=fetch_api()
+    data=request_json(
+
+        API_URL
+
+    )
 
 
 
-    records=extract_history(
+    records=parse_marksix_data(
 
-        api_data,
+        data,
 
         lottery
 
@@ -755,7 +979,7 @@ def update_database(lottery):
 
     print(
 
-        "API解析:",
+        "解析",
 
         len(records),
 
@@ -765,54 +989,22 @@ def update_database(lottery):
 
 
 
-    # 数据保护
-
-    if len(records)<30:
+    if records:
 
 
-        print(
+        save_history(
 
-            "⚠️ API数据异常"
+            DB_FILES[lottery],
 
-        )
-
-
-        history=load_history(
-
-            lottery
+            records
 
         )
-
-
-        print(
-
-            "使用本地历史:",
-
-            len(history),
-
-            "期"
-
-        )
-
-
-        return history
-
-
-
-
-    save_history(
-
-        lottery,
-
-        records
-
-    )
 
 
 
     history=load_history(
 
-        lottery
+        DB_FILES[lottery]
 
     )
 
@@ -822,17 +1014,16 @@ def update_database(lottery):
 
         "数据库历史:",
 
-        len(history),
-
-        "期"
+        len(history)
 
     )
 
 
 
     return history
-    # ============================================================
-# 49码评分模型
+
+# ============================================================
+# 49码评分系统
 # ============================================================
 
 
@@ -842,147 +1033,307 @@ def score_numbers(history):
     scores={}
 
 
+    detail={}
 
-    recent=[]
 
 
-    for row in history[:50]:
+    for n in range(1,50):
 
-        recent.extend(
-            row["numbers"]
+
+        scores[n]=0
+
+
+        detail[n]={
+
+            "frequency":0,
+
+            "missing":0,
+
+            "tail":0,
+
+            "recent":0
+
+        }
+
+
+
+
+
+
+    if len(history)<30:
+
+
+        return scores,detail
+
+
+
+
+
+
+    # 最近窗口
+
+
+    h10=history[:10]
+
+    h20=history[:20]
+
+    h30=history[:30]
+
+    h100=history[:100]
+
+
+
+
+
+    freq10=Counter()
+
+    freq20=Counter()
+
+    freq30=Counter()
+
+    freq100=Counter()
+
+
+
+
+    for h in h10:
+
+
+        for n in h["numbers"]:
+
+            freq10[n]+=1
+
+
+
+    for h in h20:
+
+
+        for n in h["numbers"]:
+
+            freq20[n]+=1
+
+
+
+    for h in h30:
+
+
+        for n in h["numbers"]:
+
+            freq30[n]+=1
+
+
+
+    for h in h100:
+
+
+        for n in h["numbers"]:
+
+            freq100[n]+=1
+
+
+
+
+
+
+    for n in range(1,50):
+
+
+        # =========================
+        # 频率评分
+        # =========================
+
+
+        frequency=(
+
+            freq10[n]*2.5
+
+            +
+
+            freq20[n]*1.8
+
+            +
+
+            freq30[n]*1.3
+
+            +
+
+            freq100[n]*0.8
+
+        )
+
+
+        scores[n]+=frequency
+
+
+        detail[n]["frequency"]=round(
+
+            frequency,
+
+            2
+
         )
 
 
 
-    freq=Counter(
-        recent
+
+
+        # =========================
+        # 遗漏评分
+        # =========================
+
+
+        miss=0
+
+
+        for h in history:
+
+
+            if n in h["numbers"]:
+
+                break
+
+
+            miss+=1
+
+
+
+        missing=min(
+
+            miss,
+
+            40
+
+        )*0.15
+
+
+
+        scores[n]+=missing
+
+
+        detail[n]["missing"]=round(
+
+            missing,
+
+            2
+
+        )
+
+
+
+
+
+
+        # =========================
+        # 尾数趋势
+        # =========================
+
+
+        tail_score=0
+
+
+
+        for h in h30:
+
+
+            for x in h["numbers"]:
+
+
+                if get_tail(x)==get_tail(n):
+
+
+                    tail_score+=0.12
+
+
+
+        scores[n]+=tail_score
+
+
+        detail[n]["tail"]=round(
+
+            tail_score,
+
+            2
+
+        )
+
+
+
+
+
+
+        # =========================
+        # 最近走势
+        # =========================
+
+
+        recent=0
+
+
+
+        for i,h in enumerate(h10):
+
+
+            if n in h["numbers"]:
+
+
+                recent+=(10-i)*0.1
+
+
+
+
+        scores[n]+=recent
+
+
+        detail[n]["recent"]=round(
+
+            recent,
+
+            2
+
+        )
+
+
+
+
+
+    return scores,detail
+
+
+
+
+
+
+
+# ============================================================
+# 排名
+# ============================================================
+
+
+def rank_numbers(scores):
+
+
+    return sorted(
+
+        scores.items(),
+
+        key=lambda x:x[1],
+
+        reverse=True
+
     )
 
 
 
-    # 最近出现位置
 
-    last_seen={}
 
-
-
-    for index,row in enumerate(history):
-
-
-        for n in row["numbers"]:
-
-
-            if n not in last_seen:
-
-                last_seen[n]=index
-
-
-
-
-
-    for num in range(1,50):
-
-
-        score=0
-
-
-
-        # 高频奖励
-
-        score += freq.get(
-            num,
-            0
-        ) * 2
-
-
-
-
-        # 遗漏奖励
-
-        miss=last_seen.get(
-
-            num,
-
-            30
-
-        )
-
-
-        score += min(
-            miss,
-            20
-        )
-
-
-
-
-        # 最近一期关联
-
-        if history and num in history[0]["numbers"]:
-
-            score += 3
-
-
-
-
-        # 尾数趋势
-
-        tail=get_tail(num)
-
-
-
-        tail_count=0
-
-
-        for x in recent:
-
-
-            if get_tail(x)==tail:
-
-                tail_count+=1
-
-
-
-        score += tail_count*0.3
-
-
-
-
-        scores[num]=round(
-            score,
-            2
-        )
-
-
-
-
-    return scores
-
-
-
-
-
-# ============================================================
-# 获取Top号码
-# ============================================================
-
-
-def get_top(scores,count):
+def top_numbers(scores,count):
 
 
     return [
 
-        x[0]
+        n
 
-        for x in sorted(
-
-            scores.items(),
-
-            key=lambda x:x[1],
-
-            reverse=True
-
-        )[:count]
+        for n,s in rank_numbers(scores)[:count]
 
     ]
 
@@ -990,152 +1341,132 @@ def get_top(scores,count):
 
 
 
+
 # ============================================================
-# 属性统计
+# 属性模型
 # ============================================================
 
 
-def attribute_predict(numbers):
+def attribute_predict(history,func):
 
 
-    wave=[]
-
-    size=[]
-
-    odd=[]
-
-    zodiac=[]
+    counter=Counter()
 
 
 
-    for n in numbers:
+    for index,h in enumerate(history[:100]):
 
 
-        wave.append(
-            get_wave(n)
-        )
+        weight=1/(1+index*0.02)
 
 
-        size.append(
-            get_size(n)
-        )
+
+        for n in h["numbers"]:
 
 
-        odd.append(
-            get_odd_even(n)
-        )
+            counter[
 
+                func(n)
 
-        zodiac.append(
-            get_zodiac(n)
-        )
+            ]+=weight
 
 
 
 
+    return [
 
-    def unique(arr):
+        x[0]
 
-        return list(
-            dict.fromkeys(arr)
-        )
+        for x in counter.most_common()
+
+    ]
 
 
+
+
+
+
+# ============================================================
+# 属性独立输出
+# ============================================================
+
+
+def build_attributes(history):
 
 
     return {
 
 
-        "生肖":unique(
-            zodiac
-        )[:5],
+        "zodiac":{
 
 
-        "波色":unique(
-            wave
-        ),
+            "top5":
+
+            attribute_predict(
+
+                history,
+
+                get_zodiac
+
+            )[:5]
+
+        },
 
 
-        "大小":unique(
-            size
-        ),
+
+        "wave":{
 
 
-        "单双":unique(
-            odd
-        )
+            "rank":
+
+            attribute_predict(
+
+                history,
+
+                get_wave
+
+            )
+
+        },
+
+
+
+        "size":{
+
+
+            "rank":
+
+            attribute_predict(
+
+                history,
+
+                get_size
+
+            )
+
+        },
+
+
+
+        "odd_even":{
+
+
+            "rank":
+
+            attribute_predict(
+
+                history,
+
+                get_odd_even
+
+            )
+
+        }
+
 
     }
 
 
-
-
-
-# ============================================================
-# 简单回测
-# ============================================================
-
-
-def backtest(history,top10):
-
-
-    if len(history)<40:
-
-        return 0
-
-
-
-    hit=0
-
-    total=0
-
-
-
-    for i in range(
-        10,
-        min(
-            len(history),
-            60
-        )
-    ):
-
-
-
-        real=set(
-            history[i]["numbers"]
-        )
-
-
-        pred=set(
-            top10
-        )
-
-
-
-        if real & pred:
-
-            hit+=1
-
-
-
-        total+=1
-
-
-
-
-    if total==0:
-
-        return 0
-
-
-
-    return round(
-
-        hit/total*100,
-
-        2
-
-    )
 
 
 
@@ -1146,7 +1477,7 @@ def backtest(history,top10):
 # ============================================================
 
 
-def build_prediction(lottery,history):
+def predict_lottery(lottery,history):
 
 
     if len(history)<30:
@@ -1154,8 +1485,9 @@ def build_prediction(lottery,history):
 
         return {
 
+            "success":
 
-            "success":False,
+            False,
 
 
             "error":
@@ -1168,7 +1500,8 @@ def build_prediction(lottery,history):
 
 
 
-    scores=score_numbers(
+
+    scores,detail=score_numbers(
 
         history
 
@@ -1176,62 +1509,11 @@ def build_prediction(lottery,history):
 
 
 
-    top5=get_top(
+    ranking=rank_numbers(
 
-        scores,
-
-        5
+        scores
 
     )
-
-
-    top10=get_top(
-
-        scores,
-
-        10
-
-    )
-
-
-    top12=get_top(
-
-        scores,
-
-        12
-
-    )
-
-
-
-    attrs=attribute_predict(
-
-        top10
-
-    )
-
-
-
-    latest=history[0]
-
-
-
-    try:
-
-        next_issue=str(
-
-            int(
-
-                latest["issue"]
-
-            )+1
-
-        )
-
-    except:
-
-        next_issue=""
-
 
 
 
@@ -1239,86 +1521,546 @@ def build_prediction(lottery,history):
     return {
 
 
-        "success":True,
+        "success":
+
+        True,
 
 
-        "lottery":lottery,
+
+        "lottery":
+
+        lottery,
 
 
-        "历史期数":
+
+        "latest_issue":
+
+        history[0]["issue"],
+
+
+
+        "latest_numbers":
+
+        history[0]["numbers"],
+
+
+
+        "history_size":
 
         len(history),
 
 
 
-        "最新期":
+        "prediction_issue":
 
-        latest["issue"],
+        str(
 
+            int(history[0]["issue"])+1
 
-
-        "预测期":
-
-        next_issue,
+        ),
 
 
 
-        "开奖号码":
+        "top5":
 
-        latest["numbers"],
+        top_numbers(
 
+            scores,
 
+            5
 
-        "Top5":
-
-        top5,
-
-
-
-        "Top10":
-
-        top10,
+        ),
 
 
 
-        "Top12":
+        "top10":
 
-        top12,
+        top_numbers(
+
+            scores,
+
+            10
+
+        ),
 
 
 
-        "属性":
+        "top12":
 
-        attrs,
+        top_numbers(
+
+            scores,
+
+            12
+
+        ),
 
 
 
-        "回测":
+        "score_rank":[
 
-        backtest(
 
-            history,
+            {
 
-            top10
+                "number":n,
+
+                "score":round(s,2),
+
+                "detail":
+
+                detail[n]
+
+            }
+
+
+            for n,s in ranking
+
+        ],
+
+
+
+        "attributes":
+
+        build_attributes(
+
+            history
 
         )
 
     }
-   # ============================================================
+
+# ============================================================
+# Walk Forward 回测
+# ============================================================
+
+
+def backtest(history):
+
+
+    result={}
+
+
+
+    for window in [10,20,30]:
+
+
+        hit=0
+
+        total=0
+
+
+
+        samples=min(
+
+            100,
+
+            len(history)-window-40
+
+        )
+
+
+
+        if samples<=0:
+
+
+            result[str(window)]={
+
+                "samples":0,
+
+                "hit_rate":0
+
+            }
+
+
+            continue
+
+
+
+
+
+
+        for i in range(samples):
+
+
+            # 模拟过去时间点
+
+            train_start=i+window
+
+
+            train=history[
+
+                train_start:
+
+            ]
+
+
+
+            if len(train)<50:
+
+                continue
+
+
+
+
+
+            scores,_=score_numbers(
+
+                train
+
+            )
+
+
+
+            predict=set(
+
+                top_numbers(
+
+                    scores,
+
+                    10
+
+                )
+
+            )
+
+
+
+            target=history[i]
+
+
+
+            real=set(
+
+                target["numbers"]
+
+            )
+
+
+
+            hit += len(
+
+                predict & real
+
+            )
+
+
+
+            total += 7
+
+
+
+
+
+
+        rate=0
+
+
+
+        if total:
+
+
+            rate=round(
+
+                hit/total*100,
+
+                2
+
+            )
+
+
+
+
+        result[str(window)]={
+
+
+            "samples":
+
+            samples,
+
+
+            "hit_rate":
+
+            rate
+
+
+        }
+
+
+
+    return result
+
+
+
+
+
+
+
+# ============================================================
+# 格式化输出
+# ============================================================
+
+
+def print_report(data):
+
+
+    if not data.get(
+
+        "success"
+
+    ):
+
+
+        print(
+
+            "预测失败:",
+
+            data.get(
+
+                "error"
+
+            )
+
+        )
+
+        return
+
+
+
+
+
+    print()
+
+    print("="*60)
+
+    print(
+
+        "【",
+
+        data["lottery"],
+
+        "】"
+
+    )
+
+    print("="*60)
+
+
+
+    print(
+
+        "历史:",
+
+        data["history_size"],
+
+        "期"
+
+    )
+
+
+    print(
+
+        "最新期:",
+
+        data["latest_issue"]
+
+    )
+
+
+    print(
+
+        "预测期:",
+
+        data["prediction_issue"]
+
+    )
+
+
+
+
+    print()
+
+    print(
+
+        "推荐10码:"
+
+    )
+
+
+    print(
+
+        " "
+
+        .join(
+
+            f"{x:02d}"
+
+            for x in data["top10"]
+
+        )
+
+    )
+
+
+
+
+
+    attr=data["attributes"]
+
+
+
+
+    print()
+
+    print(
+
+        "生肖5推:",
+
+        " ".join(
+
+            attr["zodiac"]["top5"]
+
+        )
+
+    )
+
+
+
+    print(
+
+        "波色:",
+
+        " "
+
+        .join(
+
+            attr["wave"]["rank"][:3]
+
+        )
+
+    )
+
+
+    print(
+
+        "大小:",
+
+        " "
+
+        .join(
+
+            attr["size"]["rank"]
+
+        )
+
+    )
+
+
+    print(
+
+        "单双:",
+
+        " "
+
+        .join(
+
+            attr["odd_even"]["rank"]
+
+        )
+
+    )
+
+
+
+
+
+    print()
+
+    print(
+
+        "历史回测:"
+
+    )
+
+
+    bt=data.get(
+
+        "backtest",
+
+        {}
+
+    )
+
+
+
+    for x in [10,20,30]:
+
+
+        print(
+
+            x,
+
+            "期:",
+
+            bt.get(
+
+                str(x),
+
+                {}
+
+            ).get(
+
+                "hit_rate",
+
+                0
+
+            ),
+
+            "%"
+
+        )
+
+
+
+
+
+# ============================================================
 # 保存JSON
 # ============================================================
 
 
-def save_json(data,filename):
+def save_json(result):
 
 
     path=os.path.join(
 
         OUTPUT_DIR,
 
-        filename
+        "prediction.json"
 
     )
+
+
+
+    output={
+
+
+        "version":
+
+        VERSION,
+
+
+        "time":
+
+        datetime.datetime.now()
+
+        .isoformat(),
+
+
+        "lotteries":
+
+        result
+
+    }
 
 
 
@@ -1333,10 +2075,9 @@ def save_json(data,filename):
     ) as f:
 
 
-
         json.dump(
 
-            data,
+            output,
 
             f,
 
@@ -1348,229 +2089,16 @@ def save_json(data,filename):
 
 
 
-    return path
-
-
-
-
-
-# ============================================================
-# 简单中文输出
-# ============================================================
-
-
-def print_result(name,result):
-
-
-    if not result.get(
-        "success"
-    ):
-
-
-        print()
-
-        print(
-            name,
-            "预测失败:",
-            result.get(
-                "error"
-            )
-        )
-
-        return
-
-
-
-
-    print()
-
-    print("="*60)
-
-    print(
-        "【",
-        name,
-        "】"
-    )
-
-    print("="*60)
-
-
-
-    print(
-
-        "历史:",
-
-        result["历史期数"],
-
-        "期"
-
-    )
-
-
-
-    print(
-
-        "最新期:",
-
-        result["最新期"]
-
-    )
-
-
-
-    print(
-
-        "开奖号码:",
-
-        " ".join(
-
-            f"{x:02d}"
-
-            for x in result["开奖号码"]
-
-        )
-
-    )
-
-
-
     print()
 
     print(
 
-        "预测期:",
+        "输出完成:",
 
-        result["预测期"]
-
-    )
-
-
-
-    print()
-
-    print(
-
-        "推荐10码:",
-
-        " ".join(
-
-            f"{x:02d}"
-
-            for x in result["Top10"]
-
-        )
+        path
 
     )
 
-
-
-    print()
-
-
-    print(
-
-        "生肖:",
-
-        " ".join(
-
-            result["属性"]["生肖"]
-
-        )
-
-    )
-
-
-
-    print(
-
-        "波色:",
-
-        " ".join(
-
-            result["属性"]["波色"]
-
-        )
-
-    )
-
-
-
-    print(
-
-        "大小:",
-
-        " ".join(
-
-            result["属性"]["大小"]
-
-        )
-
-    )
-
-
-
-    print(
-
-        "单双:",
-
-        " ".join(
-
-            result["属性"]["单双"]
-
-        )
-
-    )
-
-
-
-    print()
-
-
-    print(
-
-        "回测命中:",
-
-        result["回测"],
-
-        "%"
-
-    )
-
-
-
-
-
-# ============================================================
-# 输出完整结果
-# ============================================================
-
-
-def build_output(results):
-
-
-    return {
-
-
-        "系统":
-
-        VERSION,
-
-
-        "时间":
-
-        datetime.datetime.now().isoformat(),
-
-
-
-        "数据源":
-
-        API_URL,
-
-
-
-        "彩种":results
-
-    }
 # ============================================================
 # 主程序
 # ============================================================
@@ -1585,7 +2113,7 @@ def main():
 
     print(
 
-        "六合智能预测系统",
+        "六合彩综合预测系统",
 
         VERSION
 
@@ -1595,34 +2123,31 @@ def main():
 
 
 
-    print(
 
-        "数据源:",
-
-        API_URL
-
-    )
-
-
-
-    print()
-
-
-
-    # 初始化数据库
-
-    init_all_db()
-
-
-
-    results={}
+    all_result={}
 
 
 
 
-    # 三个彩种
 
-    for lottery in DB_FILES:
+    lotteries=[
+
+
+        "新澳门彩",
+
+        "老澳门彩",
+
+        "香港彩"
+
+
+    ]
+
+
+
+
+
+
+    for lottery in lotteries:
 
 
 
@@ -1634,7 +2159,7 @@ def main():
 
 
 
-        result=build_prediction(
+        data=predict_lottery(
 
             lottery,
 
@@ -1644,35 +2169,62 @@ def main():
 
 
 
-        results[lottery]=result
+
+        if data.get(
+
+            "success"
+
+        ):
 
 
 
-        print_result(
+            data["backtest"]=backtest(
 
-            lottery,
+                history
 
-            result
-
-        )
+            )
 
 
 
+            print_report(
+
+                data
+
+            )
 
 
-    output=build_output(
 
-        results
+        else:
 
-    )
+
+
+            print(
+
+                lottery,
+
+                "失败:",
+
+                data.get(
+
+                    "error"
+
+                )
+
+            )
+
+
+
+        all_result[lottery]=data
+
+
+
+
 
 
 
     save_json(
 
-        output,
-
-        "prediction.json"
+        all_result
 
     )
 
@@ -1684,15 +2236,7 @@ def main():
 
     print(
 
-        "输出完成"
-
-    )
-
-    print(
-
-        "文件:",
-
-        "output/prediction.json"
+        "系统运行完成"
 
     )
 
@@ -1701,6 +2245,12 @@ def main():
 
 
 
+
+
+
+# ============================================================
+# 启动
+# ============================================================
 
 
 if __name__=="__main__":
