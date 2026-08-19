@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.2 FINAL
+六合彩 AI V3.3 FINAL
 
-系统总控制引擎
+系统控制引擎
 
 
 流程:
@@ -36,16 +36,15 @@ API同步
 
  ↓
 
-输出
-
+输出JSON
 
 """
+
 
 
 from datetime import datetime
 
 import json
-
 
 
 
@@ -58,7 +57,6 @@ from config import (
     VERSION
 
 )
-
 
 
 
@@ -114,10 +112,8 @@ from .features import (
 
 
 
-
-
 # =====================================================
-# 输出
+# 保存输出
 # =====================================================
 
 
@@ -130,7 +126,6 @@ def save_output(data):
 
     file.write_text(
 
-
         json.dumps(
 
             data,
@@ -141,8 +136,109 @@ def save_output(data):
 
         ),
 
-
         encoding="utf-8"
+
+    )
+
+
+
+    print()
+
+    print("="*70)
+
+    print(
+
+        "预测文件:",
+
+        file
+
+    )
+
+    print("="*70)
+
+
+
+    return file
+
+
+
+
+
+
+# =====================================================
+# 打印预测报告
+# =====================================================
+
+
+def print_prediction(name,result):
+
+
+    print()
+
+    print("="*70)
+
+    print(
+
+        "AI预测报告:",
+
+        name
+
+    )
+
+    print("="*70)
+
+
+
+    if "错误" in result:
+
+        print(
+
+            result["错误"]
+
+        )
+
+        return
+
+
+
+
+    print()
+
+    print(
+
+        "第一推荐:",
+
+        result.get(
+
+            "第一推荐"
+
+        )
+
+    )
+
+
+    print(
+
+        "重点3码:",
+
+        result.get(
+
+            "重点3码"
+
+        )
+
+    )
+
+
+    print(
+
+        "特码10码:",
+
+        result.get(
+
+            "特码10码"
+
+        )
 
     )
 
@@ -152,16 +248,89 @@ def save_output(data):
 
     print(
 
-        "输出文件:",
+        "波色预测:"
 
-        file
+    )
+
+
+    print(
+
+        json.dumps(
+
+            result.get(
+
+                "波色",
+
+                {}
+
+            ),
+
+            ensure_ascii=False
+
+        )
 
     )
 
 
 
-    return file
+    print()
 
+
+    print(
+
+        "大小:",
+
+        result.get(
+
+            "大小"
+
+        )
+
+    )
+
+
+    print(
+
+        "单双:",
+
+        result.get(
+
+            "单双"
+
+        )
+
+    )
+
+
+    print(
+
+        "置信度:",
+
+        result.get(
+
+            "置信度"
+
+        )
+
+    )
+
+
+    print(
+
+        "风险:",
+
+        result.get(
+
+            "风险等级"
+
+        )
+
+    )
+
+
+    print()
+
+    print("="*70)
 
 
 
@@ -182,12 +351,7 @@ def analyze_lottery(key):
 
     print()
 
-    print(
-
-        "="*60
-
-    )
-
+    print("="*70)
 
     print(
 
@@ -197,14 +361,7 @@ def analyze_lottery(key):
 
     )
 
-
-    print(
-
-        "="*60
-
-    )
-
-
+    print("="*70)
 
 
 
@@ -237,7 +394,6 @@ def analyze_lottery(key):
 
 
 
-
     if not history:
 
 
@@ -246,19 +402,21 @@ def analyze_lottery(key):
 
             "彩种":
 
-            name,
-
-
-            "数据质量":
-
-            quality,
+                name,
 
 
             "错误":
 
-            "无历史数据"
+                "无历史数据",
+
+
+            "数据质量":
+
+                quality
 
         }
+
+
 
 
 
@@ -269,6 +427,22 @@ def analyze_lottery(key):
         history
 
     )
+
+
+
+    # =============================
+    # 输出控制台预测
+    # =============================
+
+
+    print_prediction(
+
+        name,
+
+        result
+
+    )
+
 
 
 
@@ -290,7 +464,6 @@ def analyze_lottery(key):
         history
 
     )
-
 
 
 
@@ -321,16 +494,11 @@ def run_system():
 
     print()
 
-    print(
-
-        "="*70
-
-    )
-
+    print("="*70)
 
     print(
 
-        "六合 AI V3.2 FINAL"
+        "六合彩 AI V3.3 FINAL"
 
     )
 
@@ -342,20 +510,18 @@ def run_system():
     )
 
 
-    print(
-
-        "="*70
-
-    )
+    print("="*70)
 
 
 
 
 
-    # -----------------
+    # ------------------
     # 数据库
-    # -----------------
+    # ------------------
 
+
+    print()
 
     print(
 
@@ -364,9 +530,7 @@ def run_system():
     )
 
 
-
     init_database()
-
 
 
     print(
@@ -379,12 +543,9 @@ def run_system():
 
 
 
-
-
-
-    # -----------------
-    # API
-    # -----------------
+    # ------------------
+    # API同步
+    # ------------------
 
 
     print()
@@ -416,13 +577,11 @@ def run_system():
         )
 
 
-
         sync_result={
-
 
             "error":
 
-            str(e)
+                str(e)
 
         }
 
@@ -431,12 +590,9 @@ def run_system():
 
 
 
-
-
-
-    # -----------------
+    # ------------------
     # 预测
-    # -----------------
+    # ------------------
 
 
     print()
@@ -450,7 +606,6 @@ def run_system():
 
 
     results={}
-
 
 
 
@@ -471,6 +626,7 @@ def run_system():
         except Exception as e:
 
 
+            print()
 
             print(
 
@@ -486,10 +642,9 @@ def run_system():
 
             results[key]={
 
+                "错误":
 
-                "error":
-
-                str(e)
+                    str(e)
 
             }
 
@@ -498,10 +653,9 @@ def run_system():
 
 
 
-
-    # -----------------
-    # 输出
-    # -----------------
+    # ------------------
+    # 最终JSON
+    # ------------------
 
 
     final={
@@ -509,34 +663,33 @@ def run_system():
 
         "版本":
 
-        VERSION,
+            VERSION,
 
 
 
         "系统":
 
-        "六合AI V3.2 FINAL",
+            "六合AI V3.3 FINAL",
 
 
 
         "时间":
 
-        datetime.now().isoformat(),
+            datetime.now().isoformat(),
 
 
 
         "同步":
 
-        sync_result,
+            sync_result,
 
 
 
         "预测":
 
-        results
+            results
 
     }
-
 
 
 
@@ -549,33 +702,22 @@ def run_system():
 
 
 
+
     print()
 
-    print(
-
-        "="*70
-
-    )
-
+    print("="*70)
 
     print(
 
-        "V3.2 FINAL运行完成"
+        "V3.3 FINAL运行完成"
 
     )
 
-
-    print(
-
-        "="*70
-
-    )
-
+    print("="*70)
 
 
 
     return final
-
 
 
 
