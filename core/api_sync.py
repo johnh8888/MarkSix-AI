@@ -5,6 +5,13 @@
 
 API同步模块
 
+功能:
+
+1. 请求 marksix6 API
+2. 自动处理SSL证书过期
+3. 解析历史开奖
+4. 保存SQLite
+
 支持:
 
 香港六合彩
@@ -14,21 +21,19 @@ API同步模块
 """
 
 
+from __future__ import annotations
+
+
 import json
-
-
-import requests
-
-
+import re
 import urllib3
+import requests
 
 
 
 from config import (
 
     API_HISTORY,
-
-    API_REALTIME,
 
     LOTTERIES
 
@@ -42,27 +47,49 @@ from .database import save_draw
 
 
 
-urllib3.disable_warnings()
+urllib3.disable_warnings(
+    urllib3.exceptions.InsecureRequestWarning
+)
 
 
 
 
 
 # =====================================================
-# 请求
+# API请求
 # =====================================================
 
 
 def request_api(url):
 
 
+    print()
+
     print(
-
-        "请求:",
-
-        url
-
+        "正在请求API:"
     )
+
+    print(
+        url
+    )
+
+
+
+    headers={
+
+
+        "User-Agent":
+
+        "Mozilla/5.0"
+
+
+    }
+
+
+
+    # -------------------------
+    # 第一次正常SSL
+    # -------------------------
 
 
     try:
@@ -72,20 +99,19 @@ def request_api(url):
 
             url,
 
-            timeout=20,
+            headers=headers,
 
-            headers={
-
-                "User-Agent":
-
-                "Mozilla/5.0"
-
-            }
+            timeout=20
 
         )
 
 
         r.raise_for_status()
+
+
+        print(
+            "SSL正常"
+        )
 
 
         return r.json()
@@ -97,7 +123,7 @@ def request_api(url):
 
         print(
 
-            "SSL正常请求失败:",
+            "正常SSL失败:",
 
             e
 
@@ -105,59 +131,141 @@ def request_api(url):
 
 
 
+
+
+    # -------------------------
+    # 第二次关闭SSL验证
+    # -------------------------
+
+
+    try:
+
+
         print(
 
-            "启用SSL备用模式"
+            "启用SSL兼容模式"
 
         )
-
 
 
         r=requests.get(
 
             url,
 
+            headers=headers,
+
             timeout=20,
 
-            verify=False,
-
-            headers={
-
-                "User-Agent":
-
-                "Mozilla/5.0"
-
-            }
+            verify=False
 
         )
+
+
+        r.raise_for_status()
+
 
 
         return r.json()
 
 
 
+    except Exception as e:
+
+
+        print(
+
+            "API请求失败:",
+
+            e
+
+        )
+
+
+        return {}
+
+
+
 
 
 
 
 # =====================================================
-# 同步
+# 数字解析
 # =====================================================
 
 
-def sync_all():
+def parse_numbers(text):
 
 
-    print("="*60)
+    nums=re.findall(
 
-    print(
+        r"\d+",
 
-        "开始API同步"
+        str(text)
 
     )
 
-    print("="*60)
 
+    result=[]
+
+
+
+    for x in nums:
+
+
+        n=int(x)
+
+
+        if 1<=n<=49:
+
+            result.append(n)
+
+
+
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 彩种识别
+# =====================================================
+
+
+def detect_lottery(name):
+
+
+    name=str(name)
+
+
+
+    for key,title in LOTTERIES.items():
+
+
+        if title in name:
+
+
+            return key
+
+
+
+    return None
+
+
+
+
+
+
+
+# =====================================================
+# 历史同步
+# =====================================================
+
+
+def sync_history():
 
 
     data=request_api(
@@ -168,7 +276,14 @@ def sync_all():
 
 
 
-    count={}
+    if not data:
+
+
+        return {}
+
+
+
+    result={}
 
 
 
@@ -182,35 +297,55 @@ def sync_all():
 
 
 
+    print()
+
+    print(
+
+        "发现彩种:",
+
+        len(items)
+
+    )
+
+
+
+
     for item in items:
 
 
 
-        name=item.get(
+        if not isinstance(
 
-            "name",
+            item,
 
-            ""
+            dict
+
+        ):
+
+            continue
+
+
+
+
+        key=detect_lottery(
+
+            item.get(
+
+                "name",
+
+                ""
+
+            )
 
         )
-
-
-        key=None
-
-
-
-        for k,v in LOTTERIES.items():
-
-
-            if v in name:
-
-                key=k
 
 
 
         if not key:
 
             continue
+
+
 
 
 
@@ -224,70 +359,73 @@ def sync_all():
 
 
 
-        c=0
+        count=0
 
 
 
-        for row in history:
-
-
-            nums=[]
-
-
-            if isinstance(row,str):
-
-
-                nums=[
-
-                    int(x)
-
-                    for x in row.replace(
-
-                        ",",
-
-                        " "
-
-                    ).split()
-
-                    if x.isdigit()
-
-                ]
+        for index,row in enumerate(history):
 
 
 
-            if len(nums)>=7:
+            nums=parse_numbers(
 
+                row
 
-                ok=save_draw(
-
-                    key,
-
-                    str(c),
-
-                    nums[:6],
-
-                    nums[6],
-
-                    "api"
-
-                )
-
-
-                if ok:
-
-                    c+=1
+            )
 
 
 
-        count[key]=c
+            if len(nums)<7:
+
+                continue
+
+
+
+
+
+            issue=str(
+
+                index
+
+            )
+
+
+
+            ok=save_draw(
+
+                key,
+
+                issue,
+
+                nums[:6],
+
+                nums[6],
+
+                "marksix6"
+
+            )
+
+
+
+            if ok:
+
+                count+=1
+
+
+
+
+
+        result[key]=count
 
 
 
         print(
 
-            key,
+            LOTTERIES[key],
 
-            c,
+            "新增",
+
+            count,
 
             "期"
 
@@ -295,4 +433,92 @@ def sync_all():
 
 
 
-    return count
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 总同步入口
+# =====================================================
+
+
+def sync_all():
+
+
+    print()
+
+    print(
+
+        "="*70
+
+    )
+
+
+    print(
+
+        "开始API同步"
+
+    )
+
+
+    print(
+
+        "="*70
+
+    )
+
+
+
+    try:
+
+
+        history=sync_history()
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "历史同步错误:",
+
+            e
+
+        )
+
+
+        history={}
+
+
+
+
+
+    return {
+
+
+        "history":
+
+        history,
+
+
+        "status":
+
+        "完成"
+
+
+    }
+
+
+
+
+
+__all__=[
+
+    "sync_all"
+
+]
