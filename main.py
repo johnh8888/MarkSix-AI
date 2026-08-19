@@ -2,9 +2,24 @@
 
 """
 六合彩综合预测系统
-主程序入口
 
-V6.1 REAL DATA FIXED
+程序入口
+
+流程：
+
+main.py
+    ↓
+core.engine
+    ↓
+core.api_sync
+    ↓
+SQLite
+    ↓
+统计分析
+    ↓
+Walk-Forward
+    ↓
+JSON输出
 """
 
 from __future__ import annotations
@@ -15,22 +30,31 @@ from core.engine import run_system
 
 
 def main() -> None:
+
     try:
+
         run_system()
 
     except KeyboardInterrupt:
+
         print()
         print("=" * 70)
         print("用户中断程序")
         print("=" * 70)
+
         sys.exit(130)
 
     except Exception as exc:
+
         print()
         print("=" * 70)
         print("系统运行异常")
         print("=" * 70)
-        print(str(exc))
+
+        print(
+            f"{type(exc).__name__}: {exc}"
+        )
+
         print("=" * 70)
 
         sys.exit(1)
