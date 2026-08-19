@@ -837,3 +837,84 @@ def get_features(draw):
     兼容旧版。
     """
     return extract_draw_feature(draw)
+# ============================================================
+# V3.5 FINAL 兼容接口
+# ============================================================
+
+def feature_statistics(draws):
+    """
+    统一特征统计接口。
+
+    兼容 predictor.py / engine.py。
+    """
+
+    draw_list = list(draws or [])
+
+    number_freq = number_frequency(draw_list)
+    color_freq = color_frequency(draw_list)
+    size_freq = size_frequency(draw_list)
+    odd_even_freq = odd_even_frequency(draw_list)
+    zodiac_freq = zodiac_frequency(draw_list)
+
+    return {
+        "号码": number_freq,
+        "号码频率": number_freq,
+
+        "波色": color_freq,
+        "波色频率": color_freq,
+
+        "大小": size_freq,
+        "大小频率": size_freq,
+
+        "单双": odd_even_freq,
+        "单双频率": odd_even_freq,
+
+        "生肖": zodiac_freq,
+        "生肖频率": zodiac_freq,
+
+        "热号": get_hot_numbers(draw_list, 10),
+        "冷号": get_cold_numbers(draw_list, 10),
+
+        "特别生肖": get_special_zodiac(
+            draw_list,
+            5,
+        ),
+
+        "历史数量": len(draw_list),
+    }
+
+
+def hot_numbers(draws, top_n=10):
+    return get_hot_numbers(draws, top_n)
+
+
+def cold_numbers(draws, top_n=10):
+    return get_cold_numbers(draws, top_n)
+
+
+def extract_draw_features(draw):
+    return extract_draw_feature(draw)
+
+
+def get_features(draw):
+    return extract_draw_feature(draw)
+
+
+def number_frequency_map(draws):
+    return number_frequency(draws)
+
+
+def color_frequency_map(draws):
+    return color_frequency(draws)
+
+
+def size_frequency_map(draws):
+    return size_frequency(draws)
+
+
+def odd_even_frequency_map(draws):
+    return odd_even_frequency(draws)
+
+
+def zodiac_frequency_map(draws):
+    return zodiac_frequency(draws)
