@@ -1,34 +1,128 @@
-- name: 检查Python环境
-
-  env:
-    PYTHONPATH: ${{ github.workspace }}
-
-  run: |
-
-    python - <<'PY'
-
-    import sys
-    import os
-
-    sys.path.insert(
-        0,
-        os.getcwd()
-    )
+name: 六合AI V3.0 自动运行
 
 
-    import config
+on:
 
-    print("✅ config")
+  workflow_dispatch:
 
+  schedule:
 
-    from core.database import init_database
-
-    print("✅ database")
-
-
-    init_database()
-
-    print("✅ sqlite")
+    - cron: "5 * * * *"
 
 
-    PY
+
+permissions:
+
+  contents: write
+
+
+
+jobs:
+
+
+  run:
+
+
+    runs-on: ubuntu-latest
+
+
+    timeout-minutes: 15
+
+
+
+    steps:
+
+
+    - name: 下载代码
+
+      uses: actions/checkout@v4
+
+
+
+    - name: 安装Python
+
+      uses: actions/setup-python@v5
+
+      with:
+
+        python-version: "3.11"
+
+
+
+    - name: 安装依赖
+
+      run:
+
+        pip install requests
+
+
+
+    - name: 检查Python语法
+
+      run:
+
+        python -m compileall core main.py
+
+
+
+    - name: 检查模块
+
+      env:
+
+        PYTHONPATH: .
+
+      run: |
+
+        python - <<'PY'
+
+        import core.engine
+
+        import core.database
+
+        import core.predictor
+
+        import core.api_sync
+
+        print("模块检查成功")
+
+        PY
+
+
+
+    - name: 运行系统
+
+      env:
+
+        PYTHONPATH: .
+
+      run:
+
+        python main.py
+
+
+
+    - name: 查看输出
+
+      if: always()
+
+      run:
+
+        ls -R output || true
+
+
+
+    - name: 保存结果
+
+      if: success()
+
+      run: |
+
+        git config user.name github-actions
+
+        git config user.email github-actions@github.com
+
+        git add .
+
+        git commit -m "更新预测结果" || true
+
+        git push || true
