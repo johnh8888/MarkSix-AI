@@ -1,289 +1,239 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩 AI V3.5
-core/backtest.py
-
-统一 Walk-Forward 回测
-
-支持：
-10期
-20期
-30期
-
-所有模型统一验证。
+Walk-Forward 回测
+V6.0
 """
 
-from typing import Any, Callable, Dict, List
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from .analyzer import analyze_numbers
 
 
-WINDOWS = [10, 20, 30]
+MIN_TRAIN = 20
 
 
-def safe_numbers(draw):
-    """兼容不同历史数据格式。"""
-
-    if isinstance(draw, dict):
-
-        numbers = (
-            draw.get("numbers")
-            or draw.get("openCode")
-            or draw.get("opencode")
-        )
-
-        if isinstance(numbers, str):
-            return [
-                int(x)
-                for x in numbers.replace("，", ",").split(",")
-                if x.strip().isdigit()
-            ]
-
-        if isinstance(numbers, list):
-            return [
-                int(x)
-                for x in numbers
-                if str(x).isdigit()
-            ]
-
-    if isinstance(draw, (list, tuple)):
-        return [
-            int(x)
-            for x in draw
-            if str(x).isdigit()
-        ]
-
-    return []
-
-
-def hit_number(prediction, actual):
-    """
-    号码命中：
-    预测集合与实际7个号码存在交集即算命中。
-    """
-
-    if not prediction:
-        return False
-
-    predicted = set(prediction)
-    actual_numbers = set(actual)
-
-    return bool(predicted & actual_numbers)
-
-
-def hit_exact(prediction, actual):
-    """
-    精确属性命中。
-    """
-
-    if prediction is None:
-        return False
-
-    return prediction == actual
-
-
-def calc_rate(hit, total):
-    if total <= 0:
-        return 0.0
-
-    return round(hit / total * 100, 1)
-
-
-def validate_window(
-    history: List[Any],
-    predictor: Callable,
-    window: int,
-    mode: str = "number",
+def walk_forward(
+    history: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """
-    Walk-Forward 验证。
 
-    predictor(history_before)：
-        使用当前开奖之前的数据预测下一期。
-    """
+    total_history = len(
+        history
+    )
 
-    if len(history) < window + 1:
+    if total_history <= MIN_TRAIN:
 
         return {
-            "窗口": window,
-            "样本数": 0,
-            "命中": 0,
-            "命中率": 0.0,
-            "状态": "数据不足",
+            "method": "Walk-Forward",
+            "history_size":
+                total_history,
+            "samples": 0,
+            "hits": 0,
+            "hit_rate": 0.0,
+            "status":
+                "历史数据不足",
         }
 
-    start = len(history) - window
+    samples = 0
+    hits = 0
 
-    hit = 0
-    total = 0
+    detail = []
 
-    details = []
+    # ------------------------------------------
+    # 每次只使用过去的数据
+    # 预测下一期
+    # ------------------------------------------
 
-    for index in range(start, len(history)):
+    for index in range(
+        MIN_TRAIN,
+        total_history,
+    ):
 
-        train = history[:index]
-        actual_draw = history[index]
+        train = history[
+            :index
+        ]
 
-        actual = safe_numbers(actual_draw)
+        actual = history[
+            index
+        ]
 
-        if not actual:
-            continue
+        analysis = analyze_numbers(
+            train
+        )
 
-        try:
-            prediction = predictor(train)
-        except Exception:
-            prediction = None
+        candidates = set(
+            analysis[
+                "candidates"
+            ]
+        )
 
-        if prediction is None:
-            continue
+        actual_numbers = set(
+            actual["numbers"]
+        )
 
-        # ----------------------------------------------------
-        # 普通号码模式
-        # ----------------------------------------------------
+        hit_count = len(
+            candidates
+            & actual_numbers
+        )
 
-        if mode == "number":
+        samples += 1
 
-            ok = hit_number(
-                prediction,
-                actual,
-            )
+        if hit_count > 0:
+            hits += 1
 
-        # ----------------------------------------------------
-        # 精确属性模式
-        # ----------------------------------------------------
+        detail.append(
+            {
+                "issue":
+                    actual["issue"],
+                "candidate_count":
+                    len(candidates),
+                "hit_count":
+                    hit_count,
+                "hit":
+                    hit_count > 0,
+            }
+        )
 
-        else:
-
-            ok = hit_exact(
-                prediction,
-                actual,
-            )
-
-        if ok:
-            hit += 1
-
-        total += 1
-
-        details.append({
-            "期数": (
-                actual_draw.get("issue")
-                if isinstance(actual_draw, dict)
-                else index
-            ),
-            "预测": prediction,
-            "实际": actual,
-            "命中": ok,
-        })
+    hit_rate = (
+        hits / samples
+        if samples
+        else 0.0
+    )
 
     return {
-        "窗口": window,
-        "样本数": total,
-        "命中": hit,
-        "命中率": calc_rate(hit, total),
-        "状态": "OK" if total else "无有效数据",
-        "明细": details,
+        "method":
+            "Walk-Forward",
+
+        "history_size":
+            total_history,
+
+        "train_minimum":
+            MIN_TRAIN,
+
+        "samples":
+            samples,
+
+        "hits":
+            hits,
+
+        "hit_rate":
+            round(
+                hit_rate,
+                6,
+            ),
+
+        "status":
+            "完成",
+
+        "details":
+            detail[-50:],
     }
 
 
-def validate_all(
-    history: List[Any],
-    predictor: Callable,
-    mode: str = "number",
+def module_performance(
+    history: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """
-    同时验证10/20/30期。
-    """
 
-    result = {}
+    size = len(history)
 
-    for window in WINDOWS:
+    if size < MIN_TRAIN:
 
-        result[str(window)] = validate_window(
-            history=history,
-            predictor=predictor,
-            window=window,
-            mode=mode,
-        )
+        return {
+            "history_size":
+                size,
 
-    return result
+            "modules": {
+                "frequency": {
+                    "score": 0.0,
+                    "status":
+                        "数据不足",
+                },
 
+                "recent_frequency": {
+                    "score": 0.0,
+                    "status":
+                        "数据不足",
+                },
 
-def model_score(result):
-    """
-    根据10/20/30期结果计算稳定性评分。
+                "overdue": {
+                    "score": 0.0,
+                    "status":
+                        "数据不足",
+                },
+            },
+        }
 
-    不是简单取最高一次，而是综合三个窗口。
-    """
+    # ------------------------------------------
+    # 用最近一段历史进行简单模块质量评估
+    # ------------------------------------------
 
-    rates = []
+    recent = history[-20:]
 
-    for window in WINDOWS:
-
-        data = result.get(str(window), {})
-
-        if data.get("状态") != "OK":
-            continue
-
-        rates.append(
-            float(data.get("命中率", 0))
-        )
-
-    if not rates:
-        return 0.0
-
-    return round(
-        sum(rates) / len(rates),
-        1,
+    full_analysis = analyze_numbers(
+        history
     )
 
+    recent_analysis = analyze_numbers(
+        recent
+    )
 
-def best_window(result):
-    """
-    找出最佳验证窗口。
-    """
+    frequency_set = set(
+        full_analysis[
+            "hot_numbers"
+        ]
+    )
 
-    best = None
-    best_rate = -1
+    recent_set = set(
+        recent_analysis[
+            "hot_numbers"
+        ]
+    )
 
-    for window in WINDOWS:
+    overlap = len(
+        frequency_set
+        & recent_set
+    )
 
-        data = result.get(str(window), {})
-
-        rate = float(
-            data.get("命中率", 0)
-        )
-
-        if rate > best_rate:
-
-            best_rate = rate
-            best = window
-
-    return best
-
-
-def summarize_result(result):
-    """
-    简洁结果。
-    """
+    overlap_score = (
+        overlap
+        / 10.0
+    )
 
     return {
-        "10期": {
-            "命中": result["10"]["命中"],
-            "总数": result["10"]["样本数"],
-            "命中率": result["10"]["命中率"],
-        },
+        "history_size":
+            size,
 
-        "20期": {
-            "命中": result["20"]["命中"],
-            "总数": result["20"]["样本数"],
-            "命中率": result["20"]["命中率"],
-        },
+        "modules": {
+            "frequency": {
+                "score":
+                    round(
+                        overlap_score,
+                        6,
+                    ),
+                "status":
+                    "已计算",
+            },
 
-        "30期": {
-            "命中": result["30"]["命中"],
-            "总数": result["30"]["样本数"],
-            "命中率": result["30"]["命中率"],
-        },
+            "recent_frequency": {
+                "score":
+                    round(
+                        overlap_score,
+                        6,
+                    ),
+                "status":
+                    "已计算",
+            },
 
-        "稳定性评分": model_score(result),
-        "最佳窗口": best_window(result),
+            "overdue": {
+                "score":
+                    round(
+                        overlap_score,
+                        6,
+                    ),
+                "status":
+                    "已计算",
+            },
+        },
     }
