@@ -1,97 +1,101 @@
 # -*- coding: utf-8 -*-
 
-"""
-六合彩统计分析模块
-
-注意：
-
-本模块是统计分析，不代表真实中奖概率。
-"""
-
 from __future__ import annotations
 
 from collections import Counter
-
 from typing import Any
 
 
-# ============================================================
-# 波色
-# ============================================================
-
 RED = {
-
-    1, 2, 7, 8,
-    12, 13, 18, 19,
-    23, 24, 29, 30,
-    34, 35, 40,
-    45, 46,
-
+    1, 2, 7, 8, 12, 13,
+    18, 19, 23, 24, 29, 30,
+    34, 35, 40, 45, 46
 }
-
 
 BLUE = {
-
-    3, 4, 9, 10,
-    14, 15, 20,
-    25, 26, 31,
-    36, 37, 41,
-    42, 47, 48,
-
+    3, 4, 9, 10, 14, 15,
+    20, 25, 26, 31, 36, 37,
+    41, 42, 47, 48
 }
-
 
 GREEN = {
-
-    5, 6, 11,
-    16, 17, 21,
-    22, 27, 28,
-    32, 33, 38,
-    39, 43, 44,
-    49,
-
+    5, 6, 11, 16, 17, 21,
+    22, 27, 28, 32, 33, 38,
+    39, 43, 44, 49
 }
 
 
-# ============================================================
-# 属性
-# ============================================================
+ZODIAC = [
+    "鼠",
+    "牛",
+    "虎",
+    "兔",
+    "龙",
+    "蛇",
+    "马",
+    "羊",
+    "猴",
+    "鸡",
+    "狗",
+    "猪",
+]
+
 
 def get_color(
     number: int,
 ) -> str:
 
     if number in RED:
-
         return "红"
 
     if number in BLUE:
-
         return "蓝"
 
-    return "绿"
+    if number in GREEN:
+        return "绿"
+
+    return "未知"
 
 
 def get_size(
     number: int,
 ) -> str:
 
-    if number >= 25:
-
-        return "大"
-
-    return "小"
+    return (
+        "大"
+        if number >= 25
+        else "小"
+    )
 
 
 def get_odd_even(
     number: int,
 ) -> str:
 
-    if number % 2:
+    return (
+        "单"
+        if number % 2
+        else "双"
+    )
 
-        return "单"
 
-    return "双"
+def get_zone(
+    number: int,
+) -> int:
+
+    if number <= 10:
+        return 1
+
+    if number <= 20:
+        return 2
+
+    if number <= 30:
+        return 3
+
+    if number <= 40:
+        return 4
+
+    return 5
 
 
 def get_tail(
@@ -101,406 +105,177 @@ def get_tail(
     return number % 10
 
 
-def get_zone(
+def zodiac_for_number(
     number: int,
-) -> int:
+    year: int,
+) -> str:
 
-    if number <= 10:
+    # 2026 = 马年
+    base_year = 2026
+    base_index = 6
 
-        return 1
+    offset = (
+        (year - base_year) % 12
+    )
 
-    if number <= 20:
+    year_index = (
+        base_index + offset
+    ) % 12
 
-        return 2
+    # 49号生肖映射：
+    # 根据当前年生肖倒推号码生肖
+    #
+    # 这里采用：
+    # 1号对应当前年生肖，依次循环
+    #
+    # 实际系统可继续替换为你的
+    # 固定六合彩生肖表。
 
-    if number <= 30:
+    index = (
+        year_index
+        - (number - 1)
+    ) % 12
 
-        return 3
-
-    if number <= 40:
-
-        return 4
-
-    return 5
+    return ZODIAC[index]
 
 
-# ============================================================
-# 属性统计
-# ============================================================
+def analyze_attributes(
+    numbers: list[int],
+) -> dict[str, Any]:
 
-def attribute_counter(
-    history: list[dict],
-    function,
+    colors = Counter()
+    sizes = Counter()
+    odd_even = Counter()
+    tails = Counter()
+    zones = Counter()
+
+    for number in numbers:
+
+        colors[
+            get_color(number)
+        ] += 1
+
+        sizes[
+            get_size(number)
+        ] += 1
+
+        odd_even[
+            get_odd_even(number)
+        ] += 1
+
+        tails[
+            str(get_tail(number))
+        ] += 1
+
+        zones[
+            str(get_zone(number))
+        ] += 1
+
+    return {
+        "colors": dict(colors),
+        "sizes": dict(sizes),
+        "odd_even": dict(odd_even),
+        "tails": dict(tails),
+        "zones": dict(zones),
+    }
+
+
+def number_frequency(
+    history: list[dict[str, Any]],
 ) -> Counter:
 
     counter = Counter()
 
-    for row in history:
+    for record in history:
 
-        for number in row[
+        for number in record[
             "numbers"
         ]:
 
-            counter[
-                function(number)
-            ] += 1
+            counter[number] += 1
 
     return counter
 
 
-# ============================================================
-# 数字格式
-# ============================================================
+def recent_frequency(
+    history: list[dict[str, Any]],
+    window: int = 30,
+) -> Counter:
 
-def format_numbers(
-    numbers: list[int],
-) -> str:
+    counter = Counter()
 
-    return " ".join(
+    recent = history[-window:]
 
-        f"{number:02d}"
+    for record in recent:
 
-        for number in numbers
+        for number in record[
+            "numbers"
+        ]:
 
-    )
+            counter[number] += 1
+
+    return counter
 
 
-# ============================================================
-# Walk Forward
-# ============================================================
+def overdue_score(
+    history: list[dict[str, Any]],
+) -> dict[int, int]:
 
-def walk_forward(
-    history: list[dict],
-) -> dict[str, Any]:
+    seen = {}
 
-    size = len(history)
+    for number in range(1, 50):
 
-    # 至少 11 期
-    if size < 11:
-
-        return {
-
-            "method":
-                "Walk-Forward",
-
-            "history_size":
-                size,
-
-            "samples":
-                0,
-
-            "hits":
-                0,
-
-            "hit_rate":
-                0.0,
-
-            "status":
-                "历史数据不足",
-
-        }
-
-    samples = 0
-
-    hits = 0
+        seen[number] = len(history)
 
     for index in range(
-        10,
-        size,
+        len(history) - 1,
+        -1,
+        -1,
     ):
 
-        training = (
-            history[:index]
+        numbers = history[
+            index
+        ]["numbers"]
+
+        distance = (
+            len(history)
+            - 1
+            - index
         )
 
-        actual = set(
+        for number in numbers:
 
-            history[index][
-                "numbers"
-            ]
+            if (
+                seen[number]
+                == len(history)
+            ):
 
-        )
+                seen[number] = distance
 
-        counter = Counter()
-
-        for row in training:
-
-            counter.update(
-                row["numbers"]
-            )
-
-        prediction = sorted(
-
-            range(1, 50),
-
-            key=lambda n: (
-                -counter[n],
-                n,
-            ),
-
-        )[:12]
-
-        hits += len(
-
-            set(prediction)
-            & actual
-
-        )
-
-        samples += 1
-
-    denominator = (
-        samples * 7
-    )
-
-    hit_rate = (
-
-        hits / denominator
-
-        if denominator
-
-        else 0.0
-
-    )
-
-    return {
-
-        "method":
-            "Walk-Forward",
-
-        "history_size":
-            size,
-
-        "samples":
-            samples,
-
-        "hits":
-            hits,
-
-        "hit_rate":
-            round(
-                hit_rate,
-                6,
-            ),
-
-        "status":
-            "有效",
-
-    }
+    return seen
 
 
-# ============================================================
-# 主分析
-# ============================================================
-
-def analyze(
-    history: list[dict],
-    candidate_count: int = 12,
-) -> dict[str, Any]:
-
-    # ========================================================
-    # 无数据
-    # ========================================================
+def rank_numbers(
+    history: list[dict[str, Any]],
+) -> list[int]:
 
     if not history:
 
-        return {
+        return list(
+            range(1, 50)
+        )
 
-            "lottery":
-                "",
-
-            "latest_issue":
-                "",
-
-            "latest_draw_issue":
-                "",
-
-            "prediction_issue":
-                "",
-
-            "next_prediction_issue":
-                "",
-
-            "latest_numbers":
-                [],
-
-            "history_size":
-                0,
-
-            "candidates":
-                [],
-
-            "hot_numbers":
-                [],
-
-            "cold_numbers":
-                [],
-
-            "attributes": {
-
-                "sample_size":
-                    0,
-
-                "colors":
-                    {},
-
-                "sizes":
-                    {},
-
-                "odd_even":
-                    {},
-
-                "tails":
-                    {},
-
-                "zones":
-                    {},
-
-            },
-
-            "backtest": {
-
-                "method":
-                    "Walk-Forward",
-
-                "history_size":
-                    0,
-
-                "samples":
-                    0,
-
-                "hits":
-                    0,
-
-                "hit_rate":
-                    0.0,
-
-                "status":
-                    "历史数据不足",
-
-            },
-
-            "module_performance": {
-
-                "history_size":
-                    0,
-
-                "modules": {
-
-                    "frequency": {
-
-                        "score":
-                            0.0,
-
-                        "status":
-                            "数据不足",
-
-                    },
-
-                    "recent_frequency": {
-
-                        "score":
-                            0.0,
-
-                        "status":
-                            "数据不足",
-
-                    },
-
-                    "overdue": {
-
-                        "score":
-                            0.0,
-
-                        "status":
-                            "数据不足",
-
-                    },
-
-                },
-
-            },
-
-            "success":
-                False,
-
-        }
-
-
-    # ========================================================
-    # 最新开奖
-    # ========================================================
-
-    latest = history[-1]
-
-    latest_issue = str(
-        latest["issue"]
+    freq = number_frequency(
+        history
     )
 
-    latest_numbers = [
+    recent = recent_frequency(
+        history
+    )
 
-        int(x)
-
-        for x in latest[
-            "numbers"
-        ]
-
-    ]
-
-
-    # ========================================================
-    # 下一期
-    # ========================================================
-
-    try:
-
-        prediction_issue = str(
-
-            int(
-                latest_issue
-            ) + 1
-
-        )
-
-    except (
-        ValueError,
-        TypeError,
-    ):
-
-        prediction_issue = ""
-
-
-    # ========================================================
-    # 全历史频率
-    # ========================================================
-
-    frequency = Counter()
-
-    for row in history:
-
-        frequency.update(
-            row["numbers"]
-        )
-
-
-    # ========================================================
-    # 近期频率
-    # ========================================================
-
-    recent_history = history[-20:]
-
-    recent_frequency = Counter()
-
-    for row in recent_history:
-
-        recent_frequency.update(
-            row["numbers"]
-        )
-
-
-    # ========================================================
-    # 综合评分
-    # ========================================================
+    overdue = overdue_score(
+        history
+    )
 
     scores = {}
 
@@ -509,294 +284,256 @@ def analyze(
         50,
     ):
 
-        scores[number] = (
+        score = 0.0
 
-            frequency[number]
+        score += (
+            freq.get(number, 0)
             * 1.0
-
-            +
-
-            recent_frequency[number]
-            * 0.35
-
         )
 
+        score += (
+            recent.get(number, 0)
+            * 2.0
+        )
 
-    # ========================================================
-    # 排序
-    # ========================================================
+        # 轻微考虑遗漏
+        score += min(
+            overdue.get(number, 0),
+            20,
+        ) * 0.15
 
-    ranking = sorted(
+        scores[number] = score
 
-        range(1, 50),
-
-        key=lambda n: (
-
-            -scores[n],
-
-            -frequency[n],
-
-            n,
-
+    ranked = sorted(
+        scores,
+        key=lambda x: (
+            -scores[x],
+            x,
         ),
-
     )
 
-
-    # ========================================================
-    # 高频
-    # ========================================================
-
-    hot_numbers = ranking[
-        :10
-    ]
+    return ranked
 
 
-    # ========================================================
-    # 低频
-    # ========================================================
+def predict_numbers(
+    history: list[dict[str, Any]],
+) -> dict[str, list[int]]:
 
-    cold_numbers = sorted(
-
-        range(1, 50),
-
-        key=lambda n: (
-
-            frequency[n],
-
-            recent_frequency[n],
-
-            n,
-
-        ),
-
-    )[:10]
-
-
-    # ========================================================
-    # 候选
-    # ========================================================
-
-    candidates = ranking[
-        :candidate_count
-    ]
-
-
-    # ========================================================
-    # 最新期开奖属性
-    # ========================================================
-
-    colors = attribute_counter(
-
-        [latest],
-
-        get_color,
-
-    )
-
-    sizes = attribute_counter(
-
-        [latest],
-
-        get_size,
-
-    )
-
-    odd_even = attribute_counter(
-
-        [latest],
-
-        get_odd_even,
-
-    )
-
-    tails = attribute_counter(
-
-        [latest],
-
-        get_tail,
-
-    )
-
-    zones = attribute_counter(
-
-        [latest],
-
-        get_zone,
-
-    )
-
-
-    # ========================================================
-    # Walk Forward
-    # ========================================================
-
-    backtest = walk_forward(
+    ranked = rank_numbers(
         history
     )
 
+    return {
+        "top5": ranked[:5],
+        "top7": ranked[:7],
+        "top12": ranked[:12],
+    }
 
-    # ========================================================
-    # 模块表现
-    # ========================================================
 
-    if len(history) >= 10:
+def predict_size(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
 
-        frequency_score = min(
+    counter = Counter()
 
-            1.0,
+    for record in history:
 
-            sum(
-                frequency[n]
-                for n in hot_numbers
-            )
-            /
-            max(
-                1,
-                len(history) * 7,
-            ),
+        numbers = record[
+            "numbers"
+        ]
 
-        )
+        # 特码
+        value = numbers[-1]
 
-        recent_score = min(
+        counter[
+            get_size(value)
+        ] += 1
 
-            1.0,
+    if not counter:
 
-            sum(
-                recent_frequency[n]
-                for n in hot_numbers
-            )
-            /
-            max(
-                1,
-                len(recent_history) * 7,
-            ),
+        return {
+            "primary": "大",
+            "secondary": "小",
+        }
 
-        )
+    ranked = [
+        x
+        for x, _ in counter.most_common()
+    ]
 
-        module_status = "有效"
+    primary = ranked[0]
 
-    else:
-
-        frequency_score = 0.0
-
-        recent_score = 0.0
-
-        module_status = "数据不足"
-
+    secondary = (
+        "小"
+        if primary == "大"
+        else "大"
+    )
 
     return {
+        "primary": primary,
+        "secondary": secondary,
+    }
 
-        "latest_issue":
-            latest_issue,
 
-        "latest_draw_issue":
-            latest_issue,
+def predict_odd_even(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
 
-        "latest_numbers":
-            latest_numbers,
+    counter = Counter()
 
-        "prediction_issue":
-            prediction_issue,
+    for record in history:
 
-        "next_prediction_issue":
-            prediction_issue,
+        value = record[
+            "numbers"
+        ][-1]
 
-        "history_size":
-            len(history),
+        counter[
+            get_odd_even(value)
+        ] += 1
 
-        "candidates":
-            candidates,
+    if not counter:
 
-        "hot_numbers":
-            hot_numbers,
+        return {
+            "primary": "单",
+            "secondary": "双",
+        }
 
-        "cold_numbers":
-            cold_numbers,
+    primary = counter.most_common(
+        1
+    )[0][0]
 
-        "attributes": {
+    secondary = (
+        "双"
+        if primary == "单"
+        else "单"
+    )
 
-            "sample_size":
-                len(history),
+    return {
+        "primary": primary,
+        "secondary": secondary,
+    }
 
-            "colors":
-                dict(colors),
 
-            "sizes":
-                dict(sizes),
+def predict_color(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
 
-            "odd_even":
-                dict(odd_even),
+    counter = Counter()
 
-            "tails": {
+    for record in history:
 
-                str(k): v
+        value = record[
+            "numbers"
+        ][-1]
 
-                for k, v in tails.items()
+        counter[
+            get_color(value)
+        ] += 1
 
-            },
+    ranked = [
+        x
+        for x, _ in counter.most_common()
+    ]
 
-            "zones": {
+    all_colors = [
+        "红",
+        "蓝",
+        "绿",
+    ]
 
-                str(k): v
+    for color in all_colors:
 
-                for k, v in zones.items()
+        if color not in ranked:
+            ranked.append(color)
 
-            },
+    return {
+        "primary": ranked[0],
+        "secondary": ranked[1],
+        "double": ranked[:2],
+        "ranking": ranked,
+    }
 
+
+def predict_zodiac(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = Counter()
+
+    for record in history:
+
+        issue = record[
+            "issue"
+        ]
+
+        try:
+
+            year = int(issue[:4])
+
+        except Exception:
+
+            year = 2026
+
+        value = record[
+            "numbers"
+        ][-1]
+
+        zodiac = zodiac_for_number(
+            value,
+            year,
+        )
+
+        counter[zodiac] += 1
+
+    ranked = [
+        x
+        for x, _ in counter.most_common()
+    ]
+
+    for zodiac in ZODIAC:
+
+        if zodiac not in ranked:
+            ranked.append(zodiac)
+
+    return {
+        "primary": ranked[0],
+        "secondary": ranked[1],
+        "ranking": ranked,
+    }
+
+
+def build_prediction(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    number_prediction = (
+        predict_numbers(history)
+    )
+
+    color = predict_color(
+        history
+    )
+
+    size = predict_size(
+        history
+    )
+
+    odd_even = predict_odd_even(
+        history
+    )
+
+    zodiac = predict_zodiac(
+        history
+    )
+
+    return {
+        "number_prediction":
+            number_prediction,
+
+        "attributes_prediction": {
+            "color": color,
+            "size": size,
+            "odd_even": odd_even,
+            "zodiac": zodiac,
         },
-
-        "backtest":
-            backtest,
-
-        "module_performance": {
-
-            "history_size":
-                len(history),
-
-            "modules": {
-
-                "frequency": {
-
-                    "score":
-                        round(
-                            frequency_score,
-                            4,
-                        ),
-
-                    "status":
-                        module_status,
-
-                },
-
-                "recent_frequency": {
-
-                    "score":
-                        round(
-                            recent_score,
-                            4,
-                        ),
-
-                    "status":
-                        module_status,
-
-                },
-
-                "overdue": {
-
-                    "score":
-                        0.0,
-
-                    "status":
-                        module_status,
-
-                },
-
-            },
-
-        },
-
-        "success":
-            True,
-
     }
