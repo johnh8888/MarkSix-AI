@@ -1,232 +1,287 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL
+六合彩 AI V3.2 FINAL
 
-Walk-Forward 回测
+Walk Forward 回测模块
 
-目的：
+功能:
 
-使用过去数据预测下一期，
-避免直接使用未来数据。
+历史滚动验证
+预测命中统计
+模型评估
 
-注意：
-
-回测结果仅代表历史样本表现，
-不能代表未来中奖概率。
 """
 
-from __future__ import annotations
 
-from collections import Counter
+from .predictor import predict
 
-from .predictor import (
-    score_numbers
-)
+
+
 
 
 # =====================================================
-# 获取特码
+# 单次命中
 # =====================================================
 
-def extract_specials(history):
 
-    result = []
+def check_hit(prediction, actual):
 
-    for row in history:
 
-        if not isinstance(row, dict):
-            continue
+    result={}
 
-        try:
 
-            n = int(
-                row["special"]
-            )
+    top10 = prediction.get(
 
-        except Exception:
+        "特码10码",
 
-            continue
+        []
 
-        if 1 <= n <= 49:
+    )
 
-            result.append(n)
+
+    top3 = prediction.get(
+
+        "重点3码",
+
+        []
+
+    )
+
+
+
+    special = actual.get(
+
+        "special"
+
+    )
+
+
+
+    result["特码10码命中"] = (
+
+        special in top10
+
+    )
+
+
+
+    result["重点3码命中"] = (
+
+        special in top3
+
+    )
+
+
 
     return result
 
 
-# =====================================================
-# 单次预测
-# =====================================================
 
-def predict_one(
-    train
-):
-
-    scores = score_numbers(
-        train
-    )
-
-    ranking = sorted(
-        scores.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    return [
-        number
-        for number, score
-        in ranking[:10]
-    ]
 
 
 # =====================================================
 # Walk Forward
 # =====================================================
 
+
 def walk_forward(
-    history,
-    min_train=30,
-    top_n=10
+
+        history,
+
+        min_train=30,
+
+        step=1
+
 ):
 
-    specials = extract_specials(
-        history
-    )
 
-    total = len(
-        specials
-    )
+    total=len(history)
 
-    if total <= min_train:
+
+
+    if total < min_train + 1:
+
 
         return {
-            "状态": "样本不足",
 
-            "样本": total,
 
-            "测试次数": 0
+            "状态":
+
+            "数据不足",
+
+
+            "历史数量":
+
+            total
+
         }
 
-    hits = 0
 
-    tests = 0
 
-    top3_hits = 0
 
-    details = []
 
-    for i in range(
-        min_train,
-        total
-    ):
+    total_test=0
 
-        train_specials = (
-            specials[:i]
-        )
 
-        actual = specials[i]
+    hit10=0
 
-        # 构造训练数据
-        train = [
-            {
-                "special": n
-            }
-            for n
-            in train_specials
-        ]
 
-        scores = score_numbers(
-            train
-        )
+    hit3=0
 
-        ranking = sorted(
-            scores.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
 
-        prediction = [
-            number
-            for number, score
-            in ranking[:top_n]
-        ]
 
-        tests += 1
 
-        hit = actual in prediction
+    start=min_train
 
-        if hit:
-            hits += 1
 
-        top3 = prediction[:3]
 
-        if actual in top3:
-            top3_hits += 1
 
-        if len(details) < 20:
+    while start < total:
 
-            details.append(
-                {
-                    "测试期":
-                        i + 1,
 
-                    "实际":
-                        actual,
 
-                    "预测":
-                        prediction,
+        train=history[:start]
 
-                    "命中":
-                        hit
-                }
+
+        test=history[start]
+
+
+
+
+        try:
+
+
+            prediction=predict(
+
+                train
+
             )
 
-    top10_rate = (
-        hits / tests
-        if tests
-        else 0.0
-    )
 
-    top3_rate = (
-        top3_hits / tests
-        if tests
-        else 0.0
-    )
+
+            hit=check_hit(
+
+                prediction,
+
+                test
+
+            )
+
+
+
+            total_test +=1
+
+
+
+            if hit["特码10码命中"]:
+
+
+                hit10 +=1
+
+
+
+            if hit["重点3码命中"]:
+
+
+                hit3 +=1
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "回测错误:",
+
+                e
+
+            )
+
+
+
+        start += step
+
+
+
+
+
+
+    if total_test==0:
+
+
+        return {
+
+
+            "状态":
+
+            "无测试数据"
+
+        }
+
+
+
 
     return {
 
-        "状态": "完成",
 
-        "样本":
-            total,
+        "状态":
+
+        "完成",
+
+
 
         "测试次数":
-            tests,
 
-        "Top10命中次数":
-            hits,
+        total_test,
 
-        "Top10命中率":
-            round(
-                top10_rate,
-                4
-            ),
 
-        "Top3命中次数":
-            top3_hits,
 
-        "Top3命中率":
-            round(
-                top3_rate,
-                4
-            ),
+        "特码10码命中":
 
-        "最近测试":
-            details
+        hit10,
+
+
+
+        "重点3码命中":
+
+        hit3,
+
+
+
+        "特码10码准确率":
+
+        round(
+
+            hit10 / total_test,
+
+            4
+
+        ),
+
+
+
+        "重点3码准确率":
+
+        round(
+
+            hit3 / total_test,
+
+            4
+
+        )
+
     }
 
 
-__all__ = [
+
+
+
+__all__=[
+
     "walk_forward"
+
 ]
