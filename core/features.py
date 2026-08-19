@@ -758,3 +758,82 @@ if __name__ == "__main__":
     print("=" * 60)
     print("features.py OK")
     print("=" * 60)
+# ============================================================
+# V3.5 旧版本兼容接口
+# ============================================================
+
+def hot_numbers(draws, top_n=10):
+    """
+    兼容 predictor.py:
+        hot_numbers(history)
+
+    返回出现频率最高的号码。
+    """
+    return get_hot_numbers(draws, top_n)
+
+
+def cold_numbers(draws, top_n=10):
+    """
+    兼容旧版调用。
+    """
+    return get_cold_numbers(draws, top_n)
+
+
+def number_frequency_map(draws):
+    """
+    兼容旧版频率统计。
+    """
+    return number_frequency(draws)
+
+
+def color_frequency_map(draws):
+    """
+    兼容旧版波色统计。
+    """
+    return color_frequency(draws)
+
+
+def size_frequency_map(draws):
+    """
+    兼容旧版大小统计。
+    """
+    return size_frequency(draws)
+
+
+def odd_even_frequency_map(draws):
+    """
+    兼容旧版单双统计。
+    """
+    return odd_even_frequency(draws)
+
+
+def zodiac_frequency_map(draws):
+    """
+    兼容旧版生肖统计。
+    """
+    return zodiac_frequency(draws)
+
+
+def get_hot_cold_numbers(draws, hot_n=10, cold_n=10):
+    """
+    同时返回热号和冷号。
+    """
+
+    return {
+        "hot": hot_numbers(draws, hot_n),
+        "cold": cold_numbers(draws, cold_n),
+    }
+
+
+def extract_draw_features(draw):
+    """
+    兼容可能存在的复数函数名。
+    """
+    return extract_draw_feature(draw)
+
+
+def get_features(draw):
+    """
+    兼容旧版。
+    """
+    return extract_draw_feature(draw)
