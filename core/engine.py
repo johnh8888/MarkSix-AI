@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.1 FINAL
+六合彩 AI V3.2 FINAL
 
 系统总控制引擎
 
@@ -16,7 +16,7 @@ engine
 
  ↓
 
-数据库初始化
+数据库
 
  ↓
 
@@ -24,7 +24,7 @@ API同步
 
  ↓
 
-读取历史
+质量检测
 
  ↓
 
@@ -36,17 +36,16 @@ API同步
 
  ↓
 
-JSON输出
+输出
+
 
 """
-
-from __future__ import annotations
 
 
 from datetime import datetime
 
-
 import json
+
 
 
 
@@ -59,6 +58,7 @@ from config import (
     VERSION
 
 )
+
 
 
 
@@ -96,21 +96,32 @@ from .backtest import (
 
 
 
+from .quality import (
+
+    analyze_quality
+
+)
+
+
+
+from .features import (
+
+    feature_statistics
+
+)
+
+
+
+
+
 
 
 # =====================================================
-# 保存输出
+# 输出
 # =====================================================
 
 
 def save_output(data):
-
-
-    OUTPUT_DIR.mkdir(
-
-        exist_ok=True
-
-    )
 
 
     file=OUTPUT_DIR / "prediction.json"
@@ -118,6 +129,7 @@ def save_output(data):
 
 
     file.write_text(
+
 
         json.dumps(
 
@@ -129,9 +141,11 @@ def save_output(data):
 
         ),
 
+
         encoding="utf-8"
 
     )
+
 
 
     print()
@@ -145,7 +159,11 @@ def save_output(data):
     )
 
 
+
     return file
+
+
+
 
 
 
@@ -161,9 +179,15 @@ def analyze_lottery(key):
     name=LOTTERIES[key]
 
 
+
     print()
 
-    print("="*60)
+    print(
+
+        "="*60
+
+    )
+
 
     print(
 
@@ -173,7 +197,14 @@ def analyze_lottery(key):
 
     )
 
-    print("="*60)
+
+    print(
+
+        "="*60
+
+    )
+
+
 
 
 
@@ -196,6 +227,17 @@ def analyze_lottery(key):
 
 
 
+
+    quality=analyze_quality(
+
+        history
+
+    )
+
+
+
+
+
     if not history:
 
 
@@ -207,7 +249,12 @@ def analyze_lottery(key):
             name,
 
 
-            "状态":
+            "数据质量":
+
+            quality,
+
+
+            "错误":
 
             "无历史数据"
 
@@ -217,38 +264,11 @@ def analyze_lottery(key):
 
 
 
-    try:
+    result=predict(
 
+        history
 
-        result=predict(
-
-            history
-
-        )
-
-
-
-    except Exception as e:
-
-
-        return {
-
-
-            "彩种":
-
-            name,
-
-
-            "状态":
-
-            "预测失败",
-
-
-            "错误":
-
-            str(e)
-
-        }
+    )
 
 
 
@@ -256,33 +276,35 @@ def analyze_lottery(key):
     result["彩种"]=name
 
 
+
     result["历史数量"]=len(history)
 
 
 
-    try:
+    result["数据质量"]=quality
 
 
-        result["回测"]=walk_forward(
 
-            history
+    result["特征统计"]=feature_statistics(
 
-        )
+        history
 
-
-    except Exception as e:
-
-
-        result["回测异常"]=str(e)
+    )
 
 
 
 
-    result["状态"]="完成"
+    result["回测"]=walk_forward(
+
+        history
+
+    )
+
 
 
 
     return result
+
 
 
 
@@ -299,15 +321,19 @@ def run_system():
 
     print()
 
-    print("="*70)
+    print(
+
+        "="*70
+
+    )
+
 
     print(
 
-        "启动六合AI",
-
-        VERSION
+        "六合 AI V3.2 FINAL"
 
     )
+
 
     print(
 
@@ -315,17 +341,21 @@ def run_system():
 
     )
 
-    print("="*70)
+
+    print(
+
+        "="*70
+
+    )
 
 
 
 
-    # -----------------------------
+
+    # -----------------
     # 数据库
-    # -----------------------------
+    # -----------------
 
-
-    print()
 
     print(
 
@@ -339,17 +369,29 @@ def run_system():
 
 
 
+    print(
 
-    # -----------------------------
-    # API同步
-    # -----------------------------
+        "数据库完成"
+
+    )
+
+
+
+
+
+
+
+
+    # -----------------
+    # API
+    # -----------------
 
 
     print()
 
     print(
 
-        "【2】同步在线数据"
+        "【2】API同步"
 
     )
 
@@ -367,19 +409,15 @@ def run_system():
 
         print(
 
-            "API同步失败:",
+            "API错误:",
 
             e
 
         )
 
 
+
         sync_result={
-
-
-            "status":
-
-            "failed",
 
 
             "error":
@@ -394,16 +432,18 @@ def run_system():
 
 
 
-    # -----------------------------
+
+
+    # -----------------
     # 预测
-    # -----------------------------
+    # -----------------
 
 
     print()
 
     print(
 
-        "【3】开始智能预测"
+        "【3】智能预测"
 
     )
 
@@ -427,18 +467,27 @@ def run_system():
             )
 
 
+
         except Exception as e:
+
+
+
+            print(
+
+                key,
+
+                "失败:",
+
+                e
+
+            )
+
 
 
             results[key]={
 
 
-                "状态":
-
-                "异常",
-
-
-                "错误":
+                "error":
 
                 str(e)
 
@@ -449,9 +498,10 @@ def run_system():
 
 
 
-    # -----------------------------
-    # 总输出
-    # -----------------------------
+
+    # -----------------
+    # 输出
+    # -----------------
 
 
     final={
@@ -462,14 +512,17 @@ def run_system():
         VERSION,
 
 
-        "运行时间":
+
+        "系统":
+
+        "六合AI V3.2 FINAL",
+
+
+
+        "时间":
 
         datetime.now().isoformat(),
 
-
-        "系统状态":
-
-        "completed",
 
 
         "同步":
@@ -477,11 +530,14 @@ def run_system():
         sync_result,
 
 
+
         "预测":
 
         results
 
     }
+
+
 
 
 
@@ -495,19 +551,31 @@ def run_system():
 
     print()
 
-    print("="*70)
-
     print(
 
-        "V3.1 FINAL运行完成"
+        "="*70
 
     )
 
-    print("="*70)
+
+    print(
+
+        "V3.2 FINAL运行完成"
+
+    )
+
+
+    print(
+
+        "="*70
+
+    )
+
 
 
 
     return final
+
 
 
 
