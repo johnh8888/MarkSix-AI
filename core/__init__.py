@@ -1,8 +1,6 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
-六合彩 AI V3.0 FINAL CORE
+MarkSix-AI Core
+V6.0
 """
-
-
-__version__ = "3.0"
