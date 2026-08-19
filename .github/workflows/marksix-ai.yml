@@ -1,128 +1,400 @@
-name: 六合AI V3.0 自动运行
-
+name: 六合AI V3.0 FINAL
 
 on:
-
   workflow_dispatch:
 
   schedule:
-
-    - cron: "5 * * * *"
-
-
-
-permissions:
-
-  contents: write
-
-
+    - cron: "0 */6 * * *"
 
 jobs:
 
-
   run:
-
 
     runs-on: ubuntu-latest
 
-
-    timeout-minutes: 15
-
-
-
     steps:
 
+      # ==================================================
+      # 1. 拉取代码
+      # ==================================================
 
-    - name: 下载代码
-
-      uses: actions/checkout@v4
-
-
-
-    - name: 安装Python
-
-      uses: actions/setup-python@v5
-
-      with:
-
-        python-version: "3.11"
+      - name: 拉取项目代码
+        uses: actions/checkout@v4
 
 
+      # ==================================================
+      # 2. Python
+      # ==================================================
 
-    - name: 安装依赖
-
-      run:
-
-        pip install requests
-
-
-
-    - name: 检查Python语法
-
-      run:
-
-        python -m compileall core main.py
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
 
+      # ==================================================
+      # 3. 安装依赖
+      # ==================================================
 
-    - name: 检查模块
+      - name: 安装依赖
+        run: |
 
-      env:
+          python -m pip install --upgrade pip
 
-        PYTHONPATH: .
-
-      run: |
-
-        python - <<'PY'
-
-        import core.engine
-
-        import core.database
-
-        import core.predictor
-
-        import core.api_sync
-
-        print("模块检查成功")
-
-        PY
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
 
+      # ==================================================
+      # 4. 设置 Python 路径
+      # ==================================================
 
-    - name: 运行系统
+      - name: 设置项目路径
+        run: |
 
-      env:
+          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
 
-        PYTHONPATH: .
+          export PYTHONPATH="$GITHUB_WORKSPACE"
 
-      run:
+          echo "项目目录:"
+          pwd
 
-        python main.py
-
-
-
-    - name: 查看输出
-
-      if: always()
-
-      run:
-
-        ls -R output || true
+          echo "Python:"
+          python --version
 
 
+      # ==================================================
+      # 5. 检查目录
+      # ==================================================
 
-    - name: 保存结果
+      - name: 检查项目结构
+        run: |
 
-      if: success()
+          echo "=============================================="
+          echo "检查项目结构"
+          echo "=============================================="
 
-      run: |
+          test -f main.py
+          test -f config.py
 
-        git config user.name github-actions
+          test -f core/__init__.py
+          test -f core/api_sync.py
+          test -f core/backtest.py
+          test -f core/database.py
+          test -f core/engine.py
+          test -f core/features.py
+          test -f core/hmm.py
+          test -f core/markov.py
+          test -f core/parser.py
+          test -f core/predictor.py
+          test -f core/quality.py
+          test -f core/wave.py
+          test -f core/zodiac.py
 
-        git config user.email github-actions@github.com
+          echo "项目结构检查通过"
 
-        git add .
 
-        git commit -m "更新预测结果" || true
+      # ==================================================
+      # 6. 检查 Python 语法
+      # ==================================================
 
-        git push || true
+      - name: 检查 Python 语法
+        run: |
+
+          echo "=============================================="
+          echo "开始 Python 语法检查"
+          echo "=============================================="
+
+          python -m compileall -q .
+
+          echo "Python 语法检查通过"
+
+
+      # ==================================================
+      # 7. 检查核心模块导入
+      # ==================================================
+
+      - name: 检查核心模块
+        run: |
+
+          echo "=============================================="
+          echo "开始检查模块"
+          echo "=============================================="
+
+          python - <<'PY'
+
+          import core
+
+          import core.api_sync
+          print("✅ core.api_sync")
+
+          import core.backtest
+          print("✅ core.backtest")
+
+          import core.database
+          print("✅ core.database")
+
+          import core.engine
+          print("✅ core.engine")
+
+          import core.features
+          print("✅ core.features")
+
+          import core.hmm
+          print("✅ core.hmm")
+
+          import core.markov
+          print("✅ core.markov")
+
+          import core.parser
+          print("✅ core.parser")
+
+          import core.predictor
+          print("✅ core.predictor")
+
+          import core.quality
+          print("✅ core.quality")
+
+          import core.wave
+          print("✅ core.wave")
+
+          import core.zodiac
+          print("✅ core.zodiac")
+
+          print("")
+          print("==============================================")
+          print("所有核心模块导入成功")
+          print("==============================================")
+
+          PY
+
+
+      # ==================================================
+      # 8. 检查配置
+      # ==================================================
+
+      - name: 检查系统配置
+        run: |
+
+          python - <<'PY'
+
+          import config
+
+          print("==============================================")
+          print("系统配置")
+          print("==============================================")
+
+          print("版本:", config.VERSION)
+
+          print("数据库:", config.DATABASE_FILE)
+
+          print("输出目录:", config.OUTPUT_DIR)
+
+          print("彩种:")
+
+          for key, name in config.LOTTERIES.items():
+              print(" ", key, "=", name)
+
+          assert config.VERSION == "V3.0 FINAL"
+
+          assert len(config.LOTTERIES) == 3
+
+          print("")
+          print("✅ 配置检查通过")
+
+          PY
+
+
+      # ==================================================
+      # 9. 数据库检查
+      # ==================================================
+
+      - name: 检查数据库
+        run: |
+
+          python - <<'PY'
+
+          from core.database import (
+              init_database,
+              load_history
+          )
+
+          print("==============================================")
+          print("数据库检查")
+          print("==============================================")
+
+          init_database()
+
+          print("数据库初始化成功")
+
+          for lottery in [
+              "hk",
+              "newMacau",
+              "oldMacau"
+          ]:
+
+              data = load_history(
+                  lottery
+              )
+
+              print(
+                  lottery,
+                  "历史:",
+                  len(data)
+              )
+
+          print("")
+          print("✅ 数据库检查通过")
+
+          PY
+
+
+      # ==================================================
+      # 10. API 同步
+      # ==================================================
+
+      - name: 同步在线数据
+        run: |
+
+          echo "=============================================="
+          echo "开始 API 同步"
+          echo "=============================================="
+
+          python - <<'PY'
+
+          from core.api_sync import sync_all
+
+          try:
+
+              result = sync_all()
+
+              print("")
+              print("API同步结果:")
+              print(result)
+
+          except Exception as e:
+
+              print("")
+              print("API同步失败:")
+              print(e)
+
+              print("")
+              print("注意：")
+              print("API失败不会导致整个工作流崩溃。")
+              print("系统会继续使用数据库已有历史数据。")
+
+          PY
+
+
+      # ==================================================
+      # 11. 正式运行
+      # ==================================================
+
+      - name: 运行 V3.0 FINAL
+        run: |
+
+          echo "=============================================="
+          echo "开始运行六合AI V3.0 FINAL"
+          echo "=============================================="
+
+          python -u main.py
+
+
+      # ==================================================
+      # 12. 检查输出
+      # ==================================================
+
+      - name: 检查预测结果
+        run: |
+
+          echo "=============================================="
+          echo "检查预测结果"
+          echo "=============================================="
+
+          test -f output/prediction.json
+
+          python - <<'PY'
+
+          import json
+
+          from pathlib import Path
+
+          file = Path(
+              "output/prediction.json"
+          )
+
+          data = json.loads(
+              file.read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          print("JSON读取成功")
+
+          print("版本:", data.get("版本"))
+
+          print("运行时间:", data.get("运行时间"))
+
+          print("预测彩种:")
+
+          for key in data.get(
+              "预测",
+              {}
+          ):
+
+              print(
+                  " ",
+                  key
+              )
+
+          assert "版本" in data
+          assert "预测" in data
+
+          print("")
+          print("✅ prediction.json 检查通过")
+
+          PY
+
+
+      # ==================================================
+      # 13. 保存结果
+      # ==================================================
+
+      - name: 保存预测结果
+        uses: actions/upload-artifact@v4
+        with:
+
+          name: marksix-v3-prediction
+
+          path: |
+
+            output/prediction.json
+            data/marksix_v3.db
+
+          if-no-files-found: warn
+
+
+      # ==================================================
+      # 14. 完成
+      # ==================================================
+
+      - name: 完成
+        run: |
+
+          echo ""
+          echo "=============================================="
+          echo "       六合 AI V3.0 FINAL"
+          echo "=============================================="
+          echo ""
+          echo "✅ 项目结构正常"
+          echo "✅ Python语法正常"
+          echo "✅ 核心模块正常"
+          echo "✅ 配置正常"
+          echo "✅ SQLite正常"
+          echo "✅ API同步流程完成"
+          echo "✅ 预测流程完成"
+          echo "✅ JSON输出完成"
+          echo ""
+          echo "系统运行完成"
+          echo "=============================================="
