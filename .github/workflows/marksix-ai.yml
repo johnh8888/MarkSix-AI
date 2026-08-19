@@ -1,273 +1,349 @@
-name: 六合AI V4.0 FINAL
-
+name: MarkSix AI
 
 on:
-
   workflow_dispatch:
 
-
   schedule:
-
     - cron: "0 */6 * * *"
 
+  push:
+    branches:
+      - main
 
 
 jobs:
 
-
-  run:
-
+  predict:
 
     runs-on: ubuntu-latest
 
-
-
     steps:
 
+      # ======================================================
+      # 1. 拉取代码
+      # ======================================================
 
-      -
-        name: 拉取代码
+      - name: Checkout
         uses: actions/checkout@v4
 
 
+      # ======================================================
+      # 2. Python
+      # ======================================================
 
-      -
-        name: 设置Python
+      - name: Setup Python
         uses: actions/setup-python@v5
-
         with:
-
           python-version: "3.11"
 
 
+      # ======================================================
+      # 3. Python版本
+      # ======================================================
 
-      -
-        name: 安装依赖
-
+      - name: Python version
         run: |
-
-          python -m pip install --upgrade pip
-
-          if [ -f requirements.txt ]; then
-
-            pip install -r requirements.txt
-
-          fi
-
-
-
-      -
-        name: 设置环境
-
-        run: |
-
-          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
-
-
-
-      -
-        name: 检查Python
-
-        run: |
-
           python --version
 
 
+      # ======================================================
+      # 4. 检查 main.py
+      # ======================================================
 
-      -
-        name: 检查目录
-
+      - name: Check project
         run: |
-
           test -f main.py
-
-          test -f config.py
-
           test -f core/engine.py
 
-          test -f core/predictor.py
-
-          test -f core/report.py
-
-          echo "目录正常"
+          echo "项目文件正常"
 
 
+      # ======================================================
+      # 5. 安装依赖
+      # ======================================================
 
-      -
-        name: Python语法检查
+      - name: Install dependencies
+        run: |
 
+          python -m pip install \
+            --upgrade pip
+
+          if [ -f requirements.txt ]; then
+            python -m pip install \
+              -r requirements.txt
+          fi
+
+
+      # ======================================================
+      # 6. Python语法检查
+      # ======================================================
+
+      - name: Compile
         run: |
 
           python -m compileall -q .
 
-          echo "语法正常"
+          echo "Python语法正常"
 
 
+      # ======================================================
+      # 7. 创建目录
+      # ======================================================
 
-      -
-        name: 模块测试
-
+      - name: Prepare directories
         run: |
 
-          python - <<'PY'
+          mkdir -p data
+          mkdir -p output
 
-          import core
-
-          import core.engine
-
-          import core.predictor
-
-          import core.report
-
-          print("模块加载成功")
-
-          PY
+          echo "目录准备完成"
 
 
+      # ======================================================
+      # 8. 运行系统
+      # ======================================================
 
-      -
-        name: 初始化运行AI
-
+      - name: Run prediction
         run: |
 
           python -u main.py
 
 
+      # ======================================================
+      # 9. 检查输出文件
+      #
+      # 不再使用旧版 jq 条件。
+      # 直接使用 Python 检查 JSON。
+      # ======================================================
 
-      -
-        name: 检查输出
-
+      - name: Check prediction results
         run: |
 
-
           echo "=============================="
-
           echo "检查预测结果"
-
           echo "=============================="
-
 
           test -f output/prediction.json
-
-          test -f output/report.txt
-
-
+          test -f output/backtest.json
+          test -f output/module_performance.json
 
           python - <<'PY'
 
-
           import json
+          import os
+          import sys
 
 
-          from pathlib import Path
+          files = [
+
+              "output/prediction.json",
+
+              "output/backtest.json",
+
+              "output/module_performance.json",
+          ]
 
 
-
-          file=Path(
-
-              "output/prediction.json"
-
-          )
+          print("")
+          print("检查JSON文件")
+          print("")
 
 
+          for path in files:
 
-          data=json.loads(
+              print(f"检查：{path}")
 
-              file.read_text(
+              if not os.path.isfile(path):
 
-                  encoding="utf-8"
+                  print(
+                      f"❌ 文件不存在：{path}"
+                  )
 
+                  sys.exit(1)
+
+
+              try:
+
+                  with open(
+                      path,
+                      "r",
+                      encoding="utf-8",
+                  ) as f:
+
+                      data = json.load(f)
+
+
+              except Exception as exc:
+
+                  print(
+                      f"❌ JSON解析失败："
+                      f"{exc}"
+                  )
+
+                  sys.exit(1)
+
+
+              if not isinstance(
+                  data,
+                  dict,
+              ):
+
+                  print(
+                      "❌ JSON顶层必须是object"
+                  )
+
+                  sys.exit(1)
+
+
+              print("✅ JSON正常")
+
+
+          # ==================================================
+          # prediction.json
+          # ==================================================
+
+          with open(
+              "output/prediction.json",
+              "r",
+              encoding="utf-8",
+          ) as f:
+
+              prediction = json.load(f)
+
+
+          if "lotteries" not in prediction:
+
+              print(
+                  "❌ prediction.json缺少lotteries"
               )
 
-          )
+              sys.exit(1)
 
 
-
-          print(
-
-              "版本:",
-
-              data.get("版本")
-
-          )
+          lotteries = prediction[
+              "lotteries"
+          ]
 
 
-          print(
+          if not isinstance(
+              lotteries,
+              dict,
+          ):
 
-              "系统:",
+              print(
+                  "❌ lotteries必须是object"
+              )
 
-              data.get("系统")
-
-          )
-
-
-
-          assert "预测" in data
-
+              sys.exit(1)
 
 
-          print("JSON正常")
+          required = [
+
+              "新澳门彩",
+
+              "老澳门彩",
+
+              "香港彩",
+          ]
 
 
+          print("")
+          print("检查三彩种")
+          print("")
+
+
+          for lottery in required:
+
+              if lottery not in lotteries:
+
+                  print(
+                      f"❌ 缺少：{lottery}"
+                  )
+
+                  sys.exit(1)
+
+
+              item = lotteries[
+                  lottery
+              ]
+
+
+              if not isinstance(
+                  item,
+                  dict,
+              ):
+
+                  print(
+                      f"❌ {lottery}"
+                      "数据结构错误"
+                  )
+
+                  sys.exit(1)
+
+
+              if "candidates" not in item:
+
+                  print(
+                      f"❌ {lottery}"
+                      "缺少candidates"
+                  )
+
+                  sys.exit(1)
+
+
+              print(
+                  f"✅ {lottery}"
+              )
+
+
+          print("")
+          print("==============================")
+          print("预测结果检查通过")
+          print("==============================")
 
           PY
 
 
+      # ======================================================
+      # 10. 输出文件
+      # ======================================================
 
-
-      -
-        name: 上传AI结果
-
-        uses: actions/upload-artifact@v4
-
-
-        with:
-
-
-          name: marksix-ai-v4-result
-
-
-          path: |
-
-
-            output/prediction.json
-
-            output/report.txt
-
-            data/*.db
-
-
-          if-no-files-found: warn
-
-
-
-
-
-      -
-        name: 完成
-
-
+      - name: Show output
         run: |
 
+          echo "=============================="
+          echo "最终输出文件"
+          echo "=============================="
+
+          ls -lah output/
 
           echo ""
+          echo "=============================="
+          echo "prediction.json"
+          echo "=============================="
 
-          echo "================================"
-
-          echo " 六合AI V4.0 FINAL "
-
-          echo "================================"
-
-          echo ""
-
-          echo "✅ API同步"
-
-          echo "✅ 数据库"
-
-          echo "✅ AI预测"
-
-          echo "✅ 报告生成"
-
-          echo "✅ 输出完成"
+          cat output/prediction.json
 
           echo ""
+          echo "=============================="
+          echo "全部检查通过"
+          echo "=============================="
+
+
+      # ======================================================
+      # 11. 上传结果
+      # ======================================================
+
+      - name: Upload prediction artifacts
+        uses: actions/upload-artifact@v4
+        with:
+
+          name: marksix-ai-output
+
+          path: |
+            output/prediction.json
+            output/backtest.json
+            output/module_performance.json
+            data/*.db
+
+          if-no-files-found: error
