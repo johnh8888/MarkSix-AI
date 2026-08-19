@@ -5,13 +5,12 @@
 
 API同步模块
 
-功能:
+职责:
 
-1. 历史开奖同步
-2. 最新开奖同步
-3. 自动解析
-4. SQLite保存
-5. 重复检测
+1. 请求在线API
+2. 调用parser解析
+3. 保存SQLite
+4. 返回同步状态
 
 """
 
@@ -26,14 +25,32 @@ import urllib3
 from datetime import datetime
 
 
+
 from config import (
+
     API_HISTORY,
+
     API_REALTIME,
+
     LOTTERIES
+
 )
 
 
+
 from .database import save_draw
+
+
+
+from .parser import (
+
+    parse_numbers,
+
+    parse_draw,
+
+    parse_issue
+
+)
 
 
 
@@ -42,7 +59,7 @@ urllib3.disable_warnings()
 
 
 # =====================================================
-# 请求
+# API请求
 # =====================================================
 
 
@@ -58,6 +75,7 @@ def request_api(url):
     print(
         url
     )
+
 
 
     headers={
@@ -77,7 +95,7 @@ def request_api(url):
     try:
 
 
-        r=requests.get(
+        response=requests.get(
 
             url,
 
@@ -88,7 +106,8 @@ def request_api(url):
         )
 
 
-        r.raise_for_status()
+        response.raise_for_status()
+
 
 
         print(
@@ -96,7 +115,7 @@ def request_api(url):
         )
 
 
-        return r.json()
+        return response.json()
 
 
 
@@ -104,17 +123,23 @@ def request_api(url):
 
 
         print(
-            "正常SSL请求失败:",
+
+            "SSL正常请求失败:",
+
             e
+
         )
 
 
         print(
-            "启用SSL备用模式"
+
+            "启用备用SSL模式"
+
         )
 
 
-        r=requests.get(
+
+        response=requests.get(
 
             url,
 
@@ -127,47 +152,17 @@ def request_api(url):
         )
 
 
-        r.raise_for_status()
+        response.raise_for_status()
 
 
         print(
-            "备用SSL请求成功"
+
+            "备用请求成功"
+
         )
 
 
-        return r.json()
-
-
-
-# =====================================================
-# 数字解析
-# =====================================================
-
-
-def parse_numbers(value):
-
-
-    import re
-
-
-    nums=re.findall(
-
-        r"\d+",
-
-        str(value)
-
-    )
-
-
-    return [
-
-        int(x)
-
-        for x in nums
-
-        if 1 <= int(x) <=49
-
-    ]
+        return response.json()
 
 
 
@@ -188,6 +183,7 @@ def identify(name):
             return key
 
 
+
     return None
 
 
@@ -202,17 +198,15 @@ def sync_history():
 
     print()
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
     print(
+
         "正在同步历史开奖"
+
     )
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
 
 
@@ -241,20 +235,18 @@ def sync_history():
     for item in items:
 
 
-        name=item.get(
-
-            "name",
-
-            ""
-
-        )
-
-
         key=identify(
 
-            name
+            item.get(
+
+                "name",
+
+                ""
+
+            )
 
         )
+
 
 
         if not key:
@@ -272,6 +264,7 @@ def sync_history():
         )
 
 
+
         new_count=0
 
         exist_count=0
@@ -283,23 +276,20 @@ def sync_history():
         for index,row in enumerate(history):
 
 
-            nums=parse_numbers(row)
+            numbers=parse_numbers(
 
-
-
-            if len(nums)<7:
-
-                error_count +=1
-
-                continue
-
-
-
-            issue=str(
-
-                index
+                row
 
             )
+
+
+
+            if len(numbers)<7:
+
+
+                error_count+=1
+
+                continue
 
 
 
@@ -307,11 +297,11 @@ def sync_history():
 
                 key,
 
-                issue,
+                str(index),
 
-                nums[:6],
+                numbers[:6],
 
-                nums[6],
+                numbers[6],
 
                 "history_api"
 
@@ -329,22 +319,17 @@ def sync_history():
 
             if status=="new":
 
-
-                new_count +=1
-
+                new_count+=1
 
 
             elif status=="exists":
 
-
-                exist_count +=1
-
+                exist_count+=1
 
 
             else:
 
-
-                error_count +=1
+                error_count+=1
 
 
 
@@ -357,7 +342,7 @@ def sync_history():
             new_count,
 
 
-            "已存在":
+            "存在":
 
             exist_count,
 
@@ -383,9 +368,7 @@ def sync_history():
 
             "新增:",
 
-            new_count,
-
-            "期"
+            new_count
 
         )
 
@@ -393,9 +376,7 @@ def sync_history():
 
             "已存在:",
 
-            exist_count,
-
-            "期"
+            exist_count
 
         )
 
@@ -415,17 +396,15 @@ def sync_realtime():
 
     print()
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
     print(
+
         "正在同步最新开奖"
+
     )
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
 
 
@@ -463,7 +442,7 @@ def sync_realtime():
 
 
 
-            nums=parse_numbers(
+            numbers=parse_numbers(
 
                 data
 
@@ -471,7 +450,7 @@ def sync_realtime():
 
 
 
-            if len(nums)<7:
+            if len(numbers)<7:
 
 
                 result[key]={
@@ -491,13 +470,16 @@ def sync_realtime():
 
 
 
+            issue=(
 
-            issue=data.get(
+                parse_issue(data)
 
-                "expect",
+                or
 
                 datetime.now().strftime(
+
                     "%Y%m%d"
+
                 )
 
             )
@@ -510,9 +492,9 @@ def sync_realtime():
 
                 issue,
 
-                nums[:6],
+                numbers[:6],
 
-                nums[6],
+                numbers[6],
 
                 "realtime_api"
 
@@ -566,6 +548,7 @@ def sync_realtime():
             }
 
 
+
             print(
 
                 key,
@@ -590,17 +573,15 @@ def sync_all():
 
     print()
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
     print(
+
         "开始API同步"
+
     )
 
-    print(
-        "="*70
-    )
+    print("="*70)
 
 
 
@@ -659,6 +640,7 @@ def sync_all():
             str(e)
 
         }
+
 
 
 
