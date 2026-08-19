@@ -1,628 +1,920 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩综合预测系统核心引擎
+六合彩综合预测系统 V7.0
 
-V6.2 REAL DATA HISTORY FIXED
+真实数据
+SQLite
+历史统计
+Walk-Forward
+号码预测
+生肖
+单双
+大小
+波色主推/次推/双色
+命中率
 """
 
 from __future__ import annotations
 
 import json
-
+import os
 from datetime import datetime
+from collections import Counter
+from typing import Any
 
-from pathlib import Path
-
-
-from .api_sync import (
-    API_TYPES,
-    fetch_lottery,
-)
-
+from .api_sync import fetch_lottery
 from .database import (
-    get_history,
+    init_db,
     save_records,
+    load_records,
 )
 
-from .analyzer import (
-    analyze,
-)
-
-
-# ============================================================
-# 路径
-# ============================================================
-
-ROOT = (
-
-    Path(__file__)
-    .resolve()
-    .parent
-    .parent
-
-)
-
-OUTPUT_DIR = (
-    ROOT / "output"
-)
-
-OUTPUT_DIR.mkdir(
-    parents=True,
-    exist_ok=True,
+from .metrics import (
+    get_wave,
+    get_size,
+    get_odd_even,
+    get_zodiac,
+    predict_attribute,
+    calculate_performance,
 )
 
 
-VERSION = (
-    "V6.2 REAL DATA HISTORY FIXED"
-)
+LOTTERIES = [
+    "新澳门彩",
+    "老澳门彩",
+    "香港彩",
+]
 
 
-# ============================================================
-# 保存 JSON
-# ============================================================
+DB_FILES = {
+    "新澳门彩": "data/new_macau.db",
+    "老澳门彩": "data/old_macau.db",
+    "香港彩": "data/hk.db",
+}
 
-def save_json(
-    filename: str,
-    data: dict,
-) -> Path:
 
-    path = (
-        OUTPUT_DIR / filename
+OUTPUT_DIR = "output"
+
+
+def ensure_dirs() -> None:
+
+    os.makedirs(
+        "data",
+        exist_ok=True,
     )
 
-    temp_path = path.with_suffix(
-        path.suffix + ".tmp"
+    os.makedirs(
+        OUTPUT_DIR,
+        exist_ok=True,
     )
 
-    with temp_path.open(
-        "w",
-        encoding="utf-8",
-    ) as file:
 
-        json.dump(
+def next_issue(issue: str) -> str:
 
-            data,
+    try:
+        return str(
+            int(issue) + 1
+        )
+    except Exception:
+        return ""
 
-            file,
 
-            ensure_ascii=False,
+def count_numbers(
+    history: list[dict[str, Any]],
+    window: int = 100,
+) -> Counter:
 
-            indent=2,
+    counter = Counter()
 
+    for row in history[-window:]:
+
+        for number in row.get(
+            "numbers",
+            [],
+        ):
+
+            try:
+                number = int(number)
+            except Exception:
+                continue
+
+            if 1 <= number <= 49:
+                counter[number] += 1
+
+    return counter
+
+
+def predict_numbers(
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    counter = count_numbers(
+        history,
+        100,
+    )
+
+    # 所有号码基础分
+    scores = {}
+
+    for number in range(
+        1,
+        50,
+    ):
+
+        frequency = counter.get(
+            number,
+            0,
         )
 
-    temp_path.replace(path)
+        scores[number] = (
+            frequency
+        )
 
-    return path
+    ranking = sorted(
+        scores,
+        key=lambda x: (
+            -scores[x],
+            x,
+        ),
+    )
+
+    top5 = ranking[:5]
+    top10 = ranking[:10]
+    top12 = ranking[:12]
+
+    return {
+        "top5": top5,
+        "top10": top10,
+        "top12": top12,
+    }
 
 
-# ============================================================
-# 检查 JSON
-# ============================================================
+def evaluate_prediction(
+    prediction: dict[str, Any],
+    actual: dict[str, Any],
+    history_before: list[dict[str, Any]],
+) -> dict[str, Any]:
 
-def check_json(
-    path: Path,
+    actual_numbers = set(
+        actual.get(
+            "numbers",
+            [],
+        )
+    )
+
+    if not actual_numbers:
+        return {}
+
+    actual_special = (
+        actual.get(
+            "numbers",
+            [],
+        )[-1]
+    )
+
+    issue = actual.get(
+        "issue",
+        "",
+    )
+
+    result = {}
+
+    result[
+        "number_top5"
+    ] = bool(
+        actual_numbers
+        & set(
+            prediction["top5"]
+        )
+    )
+
+    result[
+        "number_top10"
+    ] = bool(
+        actual_numbers
+        & set(
+            prediction["top10"]
+        )
+    )
+
+    result[
+        "number_top12"
+    ] = bool(
+        actual_numbers
+        & set(
+            prediction["top12"]
+        )
+    )
+
+    attrs = prediction[
+        "attributes"
+    ]
+
+    zodiac = get_zodiac(
+        actual_special,
+        issue,
+    )
+
+    wave = get_wave(
+        actual_special
+    )
+
+    size = get_size(
+        actual_special
+    )
+
+    odd_even = get_odd_even(
+        actual_special
+    )
+
+    result[
+        "zodiac_main"
+    ] = (
+        zodiac
+        == attrs["zodiac"]["main"]
+    )
+
+    result[
+        "zodiac_double"
+    ] = (
+        zodiac
+        in attrs["zodiac"]["double"]
+    )
+
+    result[
+        "odd_even_main"
+    ] = (
+        odd_even
+        == attrs["odd_even"]["main"]
+    )
+
+    result[
+        "odd_even_double"
+    ] = (
+        odd_even
+        in attrs["odd_even"]["double"]
+    )
+
+    result[
+        "size_main"
+    ] = (
+        size
+        == attrs["size"]["main"]
+    )
+
+    result[
+        "size_double"
+    ] = (
+        size
+        in attrs["size"]["double"]
+    )
+
+    result[
+        "wave_main"
+    ] = (
+        wave
+        == attrs["wave"]["main"]
+    )
+
+    result[
+        "wave_secondary"
+    ] = (
+        wave
+        == attrs["wave"]["secondary"]
+    )
+
+    result[
+        "wave_double"
+    ] = (
+        wave
+        in attrs["wave"]["double"]
+    )
+
+    return result
+
+
+def walk_forward(
+    history: list[dict[str, Any]],
+    minimum_train: int = 30,
+) -> dict[str, Any]:
+
+    evaluations = []
+
+    if len(history) <= minimum_train:
+        return {
+            "method": "Walk-Forward",
+            "samples": 0,
+            "status": "历史数据不足",
+            "performance": {},
+        }
+
+    for index in range(
+        minimum_train,
+        len(history),
+    ):
+
+        train = history[
+            :index
+        ]
+
+        actual = history[
+            index
+        ]
+
+        number_prediction = (
+            predict_numbers(
+                train
+            )
+        )
+
+        attributes = {
+            "zodiac":
+                predict_attribute(
+                    train,
+                    "zodiac",
+                ),
+
+            "odd_even":
+                predict_attribute(
+                    train,
+                    "odd_even",
+                ),
+
+            "size":
+                predict_attribute(
+                    train,
+                    "size",
+                ),
+
+            "wave":
+                predict_attribute(
+                    train,
+                    "wave",
+                ),
+        }
+
+        prediction = {
+            "top5":
+                number_prediction[
+                    "top5"
+                ],
+
+            "top10":
+                number_prediction[
+                    "top10"
+                ],
+
+            "top12":
+                number_prediction[
+                    "top12"
+                ],
+
+            "attributes":
+                attributes,
+        }
+
+        evaluation = (
+            evaluate_prediction(
+                prediction,
+                actual,
+                train,
+            )
+        )
+
+        if evaluation:
+            evaluations.append(
+                evaluation
+            )
+
+    performance = (
+        calculate_performance(
+            evaluations
+        )
+    )
+
+    return {
+        "method": "Walk-Forward",
+        "samples": len(
+            evaluations
+        ),
+        "performance":
+            performance,
+        "status": "正常",
+    }
+
+
+def analyze(
+    lottery_name: str,
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+
+    history = sorted(
+        history,
+        key=lambda x: int(
+            x.get(
+                "issue",
+                0,
+            )
+        ),
+    )
+
+    latest = (
+        history[-1]
+        if history
+        else {}
+    )
+
+    latest_issue = str(
+        latest.get(
+            "issue",
+            "",
+        )
+    )
+
+    prediction_issue = (
+        next_issue(
+            latest_issue
+        )
+        if latest_issue
+        else ""
+    )
+
+    number_prediction = (
+        predict_numbers(
+            history
+        )
+    )
+
+    attributes = {
+
+        "zodiac":
+            predict_attribute(
+                history,
+                "zodiac",
+            ),
+
+        "odd_even":
+            predict_attribute(
+                history,
+                "odd_even",
+            ),
+
+        "size":
+            predict_attribute(
+                history,
+                "size",
+            ),
+
+        "wave":
+            predict_attribute(
+                history,
+                "wave",
+            ),
+    }
+
+    walk = walk_forward(
+        history
+    )
+
+    return {
+        "lottery":
+            lottery_name,
+
+        "latest_issue":
+            latest_issue,
+
+        "latest_draw_issue":
+            latest_issue,
+
+        "latest_numbers":
+            latest.get(
+                "numbers",
+                [],
+            ),
+
+        "prediction_issue":
+            prediction_issue,
+
+        "next_prediction_issue":
+            prediction_issue,
+
+        "history_size":
+            len(history),
+
+        "candidates":
+            number_prediction[
+                "top12"
+            ],
+
+        "top5":
+            number_prediction[
+                "top5"
+            ],
+
+        "top10":
+            number_prediction[
+                "top10"
+            ],
+
+        "top12":
+            number_prediction[
+                "top12"
+            ],
+
+        "attributes":
+            attributes,
+
+        "performance":
+            walk.get(
+                "performance",
+                {},
+            ),
+
+        "backtest":
+            walk,
+
+        "success":
+            bool(history),
+    }
+
+
+def print_result(
+    result: dict[str, Any],
 ) -> None:
 
-    if not path.is_file():
-
-        raise RuntimeError(
-            f"输出文件不存在：{path}"
-        )
-
-    with path.open(
-        "r",
-        encoding="utf-8",
-    ) as file:
-
-        json.load(file)
-
     print(
-        f"✅ {path} "
-        f"({path.stat().st_size} bytes)"
+        "=" * 70
     )
 
+    print(
+        f"【{result['lottery']}】"
+    )
 
-# ============================================================
-# 主系统
-# ============================================================
+    print(
+        "=" * 70
+    )
+
+    print(
+        f"历史期数："
+        f"{result['history_size']}"
+    )
+
+    print(
+        f"最新开奖期数："
+        f"{result['latest_issue']}"
+    )
+
+    print(
+        f"预测下一期期数："
+        f"{result['prediction_issue']}"
+    )
+
+    print(
+        "最新号码："
+        + " ".join(
+            f"{x:02d}"
+            for x in result[
+                "latest_numbers"
+            ]
+        )
+    )
+
+    print()
+
+    print(
+        "【号码预测】"
+    )
+
+    print(
+        "Top5："
+        + " ".join(
+            f"{x:02d}"
+            for x in result["top5"]
+        )
+    )
+
+    print(
+        "Top10："
+        + " ".join(
+            f"{x:02d}"
+            for x in result["top10"]
+        )
+    )
+
+    print(
+        "Top12："
+        + " ".join(
+            f"{x:02d}"
+            for x in result["top12"]
+        )
+    )
+
+    print()
+
+    attrs = result[
+        "attributes"
+    ]
+
+    print(
+        "【属性预测】"
+    )
+
+    print(
+        "生肖："
+        f"主推 {attrs['zodiac']['main']} "
+        f"次推 {attrs['zodiac']['secondary']} "
+        f"双推 {' + '.join(attrs['zodiac']['double'])}"
+    )
+
+    print(
+        "单双："
+        f"主推 {attrs['odd_even']['main']} "
+        f"次推 {attrs['odd_even']['secondary']} "
+        f"双推 {' + '.join(attrs['odd_even']['double'])}"
+    )
+
+    print(
+        "大小："
+        f"主推 {attrs['size']['main']} "
+        f"次推 {attrs['size']['secondary']} "
+        f"双推 {' + '.join(attrs['size']['double'])}"
+    )
+
+    print(
+        "波色："
+        f"主推 {attrs['wave']['main']} "
+        f"次推 {attrs['wave']['secondary']} "
+        f"双色 {' + '.join(attrs['wave']['double'])}"
+    )
+
+    print()
+
+    performance = result[
+        "performance"
+    ]
+
+    if performance:
+
+        print(
+            "【Walk-Forward 命中率】"
+        )
+
+        numbers = performance.get(
+            "numbers",
+            {},
+        )
+
+        print(
+            f"号码 Top5："
+            f"{numbers.get('top5', 0)}%"
+        )
+
+        print(
+            f"号码 Top10："
+            f"{numbers.get('top10', 0)}%"
+        )
+
+        print(
+            f"号码 Top12："
+            f"{numbers.get('top12', 0)}%"
+        )
+
+        zodiac = performance.get(
+            "zodiac",
+            {},
+        )
+
+        print(
+            f"生肖主推："
+            f"{zodiac.get('main', 0)}%"
+        )
+
+        print(
+            f"生肖双推："
+            f"{zodiac.get('double', 0)}%"
+        )
+
+        odd_even = performance.get(
+            "odd_even",
+            {},
+        )
+
+        print(
+            f"单双主推："
+            f"{odd_even.get('main', 0)}%"
+        )
+
+        print(
+            f"单双双推："
+            f"{odd_even.get('double', 0)}%"
+        )
+
+        size = performance.get(
+            "size",
+            {},
+        )
+
+        print(
+            f"大小主推："
+            f"{size.get('main', 0)}%"
+        )
+
+        print(
+            f"大小双推："
+            f"{size.get('double', 0)}%"
+        )
+
+        wave = performance.get(
+            "wave",
+            {},
+        )
+
+        print(
+            f"波色主推："
+            f"{wave.get('main', 0)}%"
+        )
+
+        print(
+            f"波色次推："
+            f"{wave.get('secondary', 0)}%"
+        )
+
+        print(
+            f"波色双色："
+            f"{wave.get('double', 0)}%"
+        )
+
+    print()
+
 
 def run_system() -> None:
 
-    start_time = (
-        datetime.now().isoformat()
-    )
+    ensure_dirs()
 
+    init_db()
 
-    print("=" * 70)
+    all_results = {}
 
-    print(
-        "六合彩综合预测系统"
-    )
-
-    print(
-        "真实数据 + SQLite + "
-        "多期历史统计 + "
-        "Walk-Forward + "
-        "输出文件版"
-    )
-
-    print(
-        f"版本：{VERSION}"
-    )
-
-    print(
-        f"启动时间：{start_time}"
-    )
-
-    print("=" * 70)
-
-
-    results = {}
-
-
-    # ========================================================
-    # 三彩种
-    # ========================================================
-
-    for lottery_name in API_TYPES:
-
-        print("=" * 70)
+    for lottery in LOTTERIES:
 
         print(
-            f"正在更新："
-            f"{lottery_name}"
-        )
-
-        print("=" * 70)
-
-
-        # ----------------------------------------------------
-        # API
-        # ----------------------------------------------------
-
-        records = fetch_lottery(
-            lottery_name
-        )
-
-
-        # ----------------------------------------------------
-        # SQLite
-        # ----------------------------------------------------
-
-        inserted = save_records(
-
-            lottery_name,
-
-            records,
-
-        )
-
-
-        # ----------------------------------------------------
-        # 从数据库重新读取
-        # ----------------------------------------------------
-
-        history = get_history(
-            lottery_name
-        )
-
-
-        print(
-
-            f"[{lottery_name}] "
-            f"本次新增："
-            f"{inserted} 期"
-
+            "=" * 70
         )
 
         print(
-
-            f"[{lottery_name}] "
-            f"当前数据库历史："
-            f"{len(history)} 期"
-
+            f"正在更新：{lottery}"
         )
-
-
-        # ----------------------------------------------------
-        # 分析
-        # ----------------------------------------------------
-
-        result = analyze(
-            history
-        )
-
-
-        result["lottery"] = (
-            lottery_name
-        )
-
-
-        results[
-            lottery_name
-        ] = result
-
-
-        # ====================================================
-        # 输出
-        # ====================================================
-
-        print("=" * 70)
 
         print(
-            f"【{lottery_name}】"
+            "=" * 70
         )
 
-        print("=" * 70)
+        try:
 
-
-        print(
-            f"历史期数："
-            f"{result['history_size']}"
-        )
-
-
-        print(
-            f"最新开奖期数："
-            f"{result['latest_draw_issue']}"
-        )
-
-
-        print(
-            f"预测下一期期数："
-            f"{result['next_prediction_issue']}"
-        )
-
-
-        print(
-            f"最新号码："
-            f"{result['latest_numbers']}"
-        )
-
-
-        attrs = result[
-            "attributes"
-        ]
-
-
-        print(
-            "近期开奖属性统计："
-        )
-
-
-        print(
-            f"波色："
-            f"{attrs['colors']}"
-        )
-
-
-        print(
-            f"大小："
-            f"{attrs['sizes']}"
-        )
-
-
-        print(
-            f"单双："
-            f"{attrs['odd_even']}"
-        )
-
-
-        print(
-            f"尾数："
-            f"{attrs['tails']}"
-        )
-
-
-        print(
-            f"分区："
-            f"{attrs['zones']}"
-        )
-
-
-        print(
-            "高频号码："
-            +
-            " ".join(
-
-                f"{n:02d}"
-
-                for n in result[
-                    "hot_numbers"
-                ]
-
+            records = fetch_lottery(
+                lottery
             )
-        )
 
+            if records:
 
-        print(
-            "低频号码："
-            +
-            " ".join(
+                save_records(
+                    DB_FILES[
+                        lottery
+                    ],
+                    records,
+                )
 
-                f"{n:02d}"
-
-                for n in result[
-                    "cold_numbers"
+            history = load_records(
+                DB_FILES[
+                    lottery
                 ]
-
             )
-        )
 
-
-        print(
-            "综合候选："
-            +
-            " ".join(
-
-                f"{n:02d}"
-
-                for n in result[
-                    "candidates"
-                ]
-
+            result = analyze(
+                lottery,
+                history,
             )
-        )
 
+            print_result(
+                result
+            )
 
-        if (
-            result["history_size"]
-            < 10
-        ):
+            all_results[
+                lottery
+            ] = result
+
+        except Exception as exc:
 
             print(
-                "⚠ 当前历史数据少于10期，"
-                "统计结果仅用于程序测试，"
-                "不适合进行稳定性判断。"
+                f"[ERROR] "
+                f"{lottery}: "
+                f"{exc}"
             )
 
-
-        print(
-            "说明：以上为基于历史数据的"
-            "统计分析，不代表实际开奖结果。"
-        )
-
-
-    # ========================================================
-    # prediction.json
-    # ========================================================
+            all_results[
+                lottery
+            ] = {
+                "lottery":
+                    lottery,
+                "success":
+                    False,
+                "error":
+                    str(exc),
+            }
 
     prediction = {
 
         "version":
-            VERSION,
+            "V7.0 REAL DATA HIT RATE",
 
         "generated_at":
             datetime.now().isoformat(),
 
         "note":
-            "历史统计分析结果，"
-            "不代表真实中奖概率。",
+            "历史统计及Walk-Forward分析结果，不代表真实中奖概率。",
 
         "lotteries":
-            results,
-
+            all_results,
     }
 
-
-    print("=" * 70)
-
-    print(
-        "保存预测结果"
-    )
-
-    print("=" * 70)
-
-
-    prediction_path = save_json(
-
+    prediction_path = os.path.join(
+        OUTPUT_DIR,
         "prediction.json",
-
-        prediction,
-
     )
 
+    with open(
+        prediction_path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+
+        json.dump(
+            prediction,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
 
     print(
-        f"✅ prediction.json 已保存："
+        "=" * 70
+    )
+
+    print(
+        "预测结果已保存："
         f"{prediction_path}"
     )
 
-
-    # ========================================================
-    # backtest.json
-    # ========================================================
-
-    backtest = {
-
-        "version":
-            VERSION,
-
-        "generated_at":
-            datetime.now().isoformat(),
-
-        "method":
-            "Walk-Forward",
-
-        "lotteries": {
-
-            name:
-                data["backtest"]
-
-            for name, data
-            in results.items()
-
-        },
-
-    }
-
-
-    print("=" * 70)
-
     print(
-        "保存 Walk-Forward 回测"
+        "=" * 70
     )
-
-    print("=" * 70)
-
-
-    backtest_path = save_json(
-
-        "backtest.json",
-
-        backtest,
-
-    )
-
-
-    print(
-        f"✅ backtest.json 已保存："
-        f"{backtest_path}"
-    )
-
-
-    # ========================================================
-    # module_performance.json
-    # ========================================================
-
-    module_performance = {
-
-        "version":
-            VERSION,
-
-        "generated_at":
-            datetime.now().isoformat(),
-
-        "lotteries": {
-
-            name:
-                data[
-                    "module_performance"
-                ]
-
-            for name, data
-            in results.items()
-
-        },
-
-    }
-
-
-    print("=" * 70)
-
-    print(
-        "保存模块表现"
-    )
-
-    print("=" * 70)
-
-
-    module_path = save_json(
-
-        "module_performance.json",
-
-        module_performance,
-
-    )
-
-
-    print(
-        f"✅ module_performance.json "
-        f"已保存："
-        f"{module_path}"
-    )
-
-
-    # ========================================================
-    # 文件检查
-    # ========================================================
-
-    print("=" * 70)
-
-    print(
-        "输出文件检查"
-    )
-
-    print("=" * 70)
-
-
-    for path in (
-
-        prediction_path,
-
-        backtest_path,
-
-        module_path,
-
-    ):
-
-        check_json(path)
-
-
-    # ========================================================
-    # 最终输出
-    # ========================================================
-
-    print("=" * 70)
 
     print(
         "三彩种分析完成"
     )
 
-    print("=" * 70)
-
-
-    for lottery_name, result in (
-        results.items()
+    for name, result in (
+        all_results.items()
     ):
 
-        print(
+        if result.get(
+            "success"
+        ):
 
-            f"{lottery_name}："
-            f"最新开奖第 "
-            f"{result['latest_draw_issue']} "
-            f"期"
-
-        )
-
-        print(
-
-            f"{lottery_name}："
-            f"预测下一期第 "
-            f"{result['next_prediction_issue']} "
-            f"期"
-
-        )
-
-        print(
-
-            f"{lottery_name}候选："
-            +
-            " ".join(
-
-                f"{n:02d}"
-
-                for n in result[
-                    "candidates"
-                ]
-
+            print(
+                f"{name}："
+                f"最新第 "
+                f"{result.get('latest_issue', '')} "
+                f"期"
             )
 
-        )
+            print(
+                f"{name}："
+                f"预测下一期第 "
+                f"{result.get('prediction_issue', '')} "
+                f"期"
+            )
 
+            print(
+                f"{name}："
+                "候选 "
+                + " ".join(
+                    f"{x:02d}"
+                    for x in result.get(
+                        "top12",
+                        [],
+                    )
+                )
+            )
 
     print(
-        "说明：候选号码来自历史统计评分，"
-        "不代表真实中奖概率。"
+        "=" * 70
     )
-
-
-    print("=" * 70)
 
     print(
         "系统运行结束"
     )
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
