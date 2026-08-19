@@ -1,15 +1,18 @@
 name: 智能预测系统 V8.3.2
 
+
 on:
 
   workflow_dispatch:
 
   schedule:
+
     - cron: "*/30 * * * *"
 
 
 
 jobs:
+
 
   predict:
 
@@ -17,7 +20,9 @@ jobs:
     runs-on: ubuntu-latest
 
 
+
     steps:
+
 
 
       # ==============================
@@ -25,7 +30,9 @@ jobs:
       # ==============================
 
       - name: 拉取代码
+
         uses: actions/checkout@v4
+
 
 
 
@@ -34,11 +41,13 @@ jobs:
       # ==============================
 
       - name: 设置Python
+
         uses: actions/setup-python@v5
 
         with:
 
           python-version: "3.11"
+
 
 
 
@@ -50,27 +59,31 @@ jobs:
 
         run: |
 
+
           python -m pip install --upgrade pip
+
 
           if [ -f requirements.txt ]; then
 
-            pip install -r requirements.txt
+              pip install -r requirements.txt
 
           fi
 
 
 
+
       # ==============================
-      # 基础检查
+      # 项目检查
       # ==============================
 
       - name: 检查项目
 
         run: |
 
+
           echo "=============================="
 
-          echo "检查项目文件"
+          echo "检查项目"
 
           echo "=============================="
 
@@ -83,18 +96,21 @@ jobs:
           mkdir -p output
 
 
+
           python --version
 
 
 
 
+
       # ==============================
-      # Python语法
+      # 语法检查
       # ==============================
 
       - name: Python语法检查
 
         run: |
+
 
           python -m compileall -q .
 
@@ -104,17 +120,18 @@ jobs:
 
 
 
+
       # ==============================
       # 清理旧输出
-      # 注意：
       # 不删除数据库
       # ==============================
 
-      - name: 清理旧结果
+      - name: 清理旧预测
 
         run: |
 
-          echo "清理旧预测文件"
+
+          echo "清理旧输出"
 
 
           rm -f output/prediction.json
@@ -125,11 +142,13 @@ jobs:
 
 
 
+
+
       # ==============================
-      # 运行系统
+      # 运行预测
       # ==============================
 
-      - name: 开始预测
+      - name: 运行六合预测系统
 
         run: |
 
@@ -147,18 +166,19 @@ jobs:
 
 
 
+
       # ==============================
-      # 检查数据库
+      # 数据库检查
       # ==============================
 
-      - name: 检查数据库
+      - name: 检查数据库文件
 
         run: |
 
 
           echo "=============================="
 
-          echo "数据库检查"
+          echo "数据库文件"
 
           echo "=============================="
 
@@ -170,10 +190,10 @@ jobs:
 
 
       # ==============================
-      # 历史数量检查
+      # 历史检查
       # ==============================
 
-      - name: 检查历史期数
+      - name: 检查历史数据
 
         run: |
 
@@ -183,28 +203,28 @@ jobs:
 
           import sqlite3
 
+          from pathlib import Path
 
 
-          dbs={
+
+          databases={
 
 
-          "新澳门彩":
-          "data/new_macau.db",
+              "新澳门彩":
+              "data/new_macau.db",
 
 
-          "老澳门彩":
-          "data/old_macau.db",
+              "老澳门彩":
+              "data/old_macau.db",
 
 
-          "香港彩":
-          "data/hk.db"
-
+              "香港彩":
+              "data/hk.db"
 
           }
 
 
 
-          print()
 
           print("="*60)
 
@@ -214,17 +234,47 @@ jobs:
 
 
 
-          for name,path in dbs.items():
+
+          for name,path in databases.items():
+
+
+              if not Path(path).exists():
+
+                  raise Exception(
+
+                      name+"数据库不存在"
+
+                  )
+
 
 
               conn=sqlite3.connect(path)
 
 
-              count=conn.execute(
 
-              "select count(*) from draws"
+              try:
 
-              ).fetchone()[0]
+
+                  count=conn.execute(
+
+                      "SELECT COUNT(*) FROM history"
+
+                  ).fetchone()[0]
+
+
+
+              except Exception as e:
+
+
+                  conn.close()
+
+
+                  raise Exception(
+
+                      name+"数据库结构错误:"+str(e)
+
+                  )
+
 
 
               conn.close()
@@ -233,13 +283,15 @@ jobs:
 
               print(
 
-              "✅",
+                  "✅",
 
-              name,
+                  name,
 
-              count,
+                  "历史",
 
-              "期"
+                  count,
+
+                  "期"
 
               )
 
@@ -250,9 +302,11 @@ jobs:
 
                   raise Exception(
 
-                  name+"历史不足30期"
+                      name+"历史不足30期"
 
                   )
+
+
 
 
 
@@ -270,13 +324,17 @@ jobs:
 
 
 
+
       # ==============================
-      # 检查输出
+      # 输出文件检查
       # ==============================
 
       - name: 检查预测文件
 
         run: |
+
+
+          echo "检查输出"
 
 
           test -f output/prediction.json
@@ -288,11 +346,12 @@ jobs:
 
 
 
+
       # ==============================
-      # 中文预测摘要
+      # 中文显示预测
       # ==============================
 
-      - name: 输出预测结果
+      - name: 显示预测结果
 
         run: |
 
@@ -306,14 +365,15 @@ jobs:
 
           with open(
 
-          "output/prediction.json",
+              "output/prediction.json",
 
-          encoding="utf-8"
+              encoding="utf-8"
 
           ) as f:
 
 
               data=json.load(f)
+
 
 
 
@@ -349,27 +409,11 @@ jobs:
 
               print(
 
-              "历史:",
+                  "历史:",
 
-              item["history_size"],
+                  item["history_size"],
 
-              "期"
-
-              )
-
-
-
-              print(
-
-              "最新开奖:",
-
-              " ".join(
-
-              f"{x:02d}"
-
-              for x in item["latest_numbers"]
-
-              )
+                  "期"
 
               )
 
@@ -377,9 +421,25 @@ jobs:
 
               print(
 
-              "预测期:",
+                  "最新开奖:",
 
-              item["prediction_issue"]
+                  " ".join(
+
+                      f"{x:02d}"
+
+                      for x in item["latest_numbers"]
+
+                  )
+
+              )
+
+
+
+              print(
+
+                  "预测期:",
+
+                  item["prediction_issue"]
 
               )
 
@@ -389,34 +449,25 @@ jobs:
 
               print(
 
-              "推荐10码:",
+                  "推荐10码:",
 
-              " ".join(
+                  " ".join(
 
-              f"{x:02d}"
+                      f"{x:02d}"
 
-              for x in item["top10"]
+                      for x in item["top10"]
 
-              )
-
-              )
-
-
-
-
-              attr=item["attributes"]
-
-
-
-              print(
-
-              "生肖:",
-
-              " ".join(
-
-              attr["zodiac"]["top5"]
+                  )
 
               )
+
+
+
+              attr=item.get(
+
+                  "attributes",
+
+                  {}
 
               )
 
@@ -424,27 +475,25 @@ jobs:
 
               print(
 
-              "波色:",
+                  "生肖:",
 
-              " ".join(
+                  " ".join(
 
-              attr["wave"]["rank"]
+                      attr.get(
 
-              )
+                          "zodiac",
 
-              )
+                          {}
 
+                      ).get(
 
+                          "top5",
 
-              print(
+                          []
 
-              "大小:",
+                      )
 
-              " ".join(
-
-              attr["size"]["rank"]
-
-              )
+                  )
 
               )
 
@@ -452,16 +501,79 @@ jobs:
 
               print(
 
-              "单双:",
+                  "波色:",
 
-              " ".join(
+                  " ".join(
 
-              attr["odd_even"]["rank"]
+                      attr.get(
+
+                          "wave",
+
+                          {}
+
+                      ).get(
+
+                          "rank",
+
+                          []
+
+                      )
+
+                  )
 
               )
 
+
+
+              print(
+
+                  "大小:",
+
+                  " ".join(
+
+                      attr.get(
+
+                          "size",
+
+                          {}
+
+                      ).get(
+
+                          "rank",
+
+                          []
+
+                      )
+
+                  )
+
               )
 
+
+
+              print(
+
+                  "单双:",
+
+                  " ".join(
+
+                      attr.get(
+
+                          "odd_even",
+
+                          {}
+
+                      ).get(
+
+                          "rank",
+
+                          []
+
+                      )
+
+                  )
+
+              )
 
 
 
@@ -471,16 +583,28 @@ jobs:
 
 
 
-              for k,v in item["backtest"].items():
+              for k,v in item.get(
+
+                  "backtest",
+
+                  {}
+
+              ).items():
 
 
                   print(
 
-                  k+"期:",
+                      k+"期:",
 
-                  v["hit_rate"],
+                      v.get(
 
-                  "%"
+                          "hit_rate",
+
+                          0
+
+                      ),
+
+                      "%"
 
                   )
 
@@ -492,7 +616,7 @@ jobs:
 
           print("="*70)
 
-          print("运行完成")
+          print("预测完成")
 
           print("="*70)
 
