@@ -1,28 +1,25 @@
 # -*- coding:utf-8 -*-
 
 """
-六合彩 AI V3.2 FINAL
+六合彩 AI V3.3 FINAL
 
-波色分析模块
+波色智能分析模块
 
 
 功能:
 
-红蓝绿判断
-
-历史波色统计
-
-连续波分析
-
-冷热分析
-
-趋势预测
-
+1. 红蓝绿判断
+2. 历史波色统计
+3. 最近趋势
+4. 连续波检测
+5. 波色转移
+6. 反转分析
+7. 综合波色预测
 
 """
 
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 
@@ -68,8 +65,10 @@ GREEN = {
 
 
 
+
+
 # =====================================================
-# 单号波色
+# 单号码波色
 # =====================================================
 
 
@@ -81,17 +80,14 @@ def get_wave(number):
         return "红"
 
 
-
     if number in BLUE:
 
         return "蓝"
 
 
-
     if number in GREEN:
 
         return "绿"
-
 
 
     return "未知"
@@ -113,31 +109,30 @@ def history_wave(history):
     result=[]
 
 
+
     for row in history:
 
 
-        special=row.get(
+        number=row.get(
 
             "special"
 
         )
 
 
-        if special:
+        if number:
 
 
             result.append(
 
-                get_wave(
-
-                    special
-
-                )
+                get_wave(number)
 
             )
 
 
+
     return result
+
 
 
 
@@ -152,27 +147,17 @@ def history_wave(history):
 def wave_statistics(history):
 
 
-    waves=history_wave(
-
-        history
-
-    )
+    waves=history_wave(history)
 
 
 
     if not waves:
 
-
         return {}
 
 
 
-
-    counter=Counter(
-
-        waves
-
-    )
+    counter=Counter(waves)
 
 
 
@@ -183,67 +168,64 @@ def wave_statistics(history):
     return {
 
 
-        "红":
+        "红":{
 
-        {
+            "数量":
 
-        "数量":
-
-        counter["红"],
-
-        "比例":
-
-        round(
-
-            counter["红"]/total,
-
-            3
-
-        )
-
-        },
+                counter["红"],
 
 
+            "比例":
 
-        "蓝":
+                round(
 
-        {
+                    counter["红"]/total,
 
-        "数量":
+                    3
 
-        counter["蓝"],
-
-        "比例":
-
-        round(
-
-            counter["蓝"]/total,
-
-            3
-
-        )
+                )
 
         },
 
 
 
-        "绿":
+        "蓝":{
 
-        {
+            "数量":
 
-        "数量":
+                counter["蓝"],
 
-        counter["绿"],
 
-        "比例":
+            "比例":
 
-        round(
+                round(
 
-            counter["绿"]/total,
+                    counter["蓝"]/total,
 
-            3
+                    3
 
-        )
+                )
+
+        },
+
+
+
+        "绿":{
+
+            "数量":
+
+                counter["绿"],
+
+
+            "比例":
+
+                round(
+
+                    counter["绿"]/total,
+
+                    3
+
+                )
 
         }
 
@@ -263,55 +245,39 @@ def wave_statistics(history):
 def detect_streak(history):
 
 
-    waves=history_wave(
-
-        history
-
-    )
+    waves=history_wave(history)
 
 
 
-    if len(waves)<2:
+    if not waves:
 
 
         return {
 
-
-            "连续":
-
-            0
+            "连续次数":0
 
         }
-
-
 
 
 
     last=waves[-1]
 
 
+
     count=1
 
 
 
-    for x in reversed(
-
-        waves[:-1]
-
-    ):
+    for x in reversed(waves[:-1]):
 
 
         if x==last:
 
-
             count+=1
-
 
         else:
 
-
             break
-
 
 
 
@@ -321,13 +287,12 @@ def detect_streak(history):
 
         "当前波":
 
-        last,
-
+            last,
 
 
         "连续次数":
 
-        count
+            count
 
     }
 
@@ -338,25 +303,245 @@ def detect_streak(history):
 
 
 # =====================================================
-# 波色预测
+# 最近趋势
+# =====================================================
+
+
+def recent_trend(history):
+
+
+    waves=history_wave(history)
+
+
+
+    if not waves:
+
+
+        return {}
+
+
+
+
+    result={}
+
+
+
+    for name,size in [
+
+        ("最近10期",10),
+
+        ("最近50期",50)
+
+    ]:
+
+
+        data=waves[-size:]
+
+
+
+        counter=Counter(data)
+
+
+
+        total=len(data)
+
+
+
+        result[name]={
+
+
+
+            "红":
+
+            round(
+
+                counter["红"]/total,
+
+                3
+
+            ),
+
+
+
+            "蓝":
+
+            round(
+
+                counter["蓝"]/total,
+
+                3
+
+            ),
+
+
+
+            "绿":
+
+            round(
+
+                counter["绿"]/total,
+
+                3
+
+            )
+
+        }
+
+
+
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 波色转移
+# =====================================================
+
+
+def wave_transition(history):
+
+
+    waves=history_wave(history)
+
+
+
+    if len(waves)<2:
+
+
+        return {}
+
+
+
+
+    matrix=defaultdict(
+        Counter
+    )
+
+
+
+    for a,b in zip(
+
+        waves[:-1],
+
+        waves[1:]
+
+    ):
+
+
+        matrix[a][b]+=1
+
+
+
+
+    result={}
+
+
+
+    for k,v in matrix.items():
+
+
+        total=sum(v.values())
+
+
+        result[k]={
+
+
+
+            x:
+
+            round(
+
+                y/total,
+
+                3
+
+            )
+
+            for x,y in v.items()
+
+        }
+
+
+
+    return result
+
+
+
+
+
+
+
+# =====================================================
+# 反转检测
+# =====================================================
+
+
+def detect_reverse(history):
+
+
+    streak=detect_streak(history)
+
+
+
+    if streak.get(
+
+        "连续次数",
+
+        0
+
+    )>=3:
+
+
+        return {
+
+
+            "状态":
+
+                "可能反转",
+
+
+            "当前":
+
+                streak.get(
+
+                    "当前波"
+
+                )
+
+        }
+
+
+
+
+    return {
+
+
+        "状态":
+
+            "正常"
+
+    }
+
+
+
+
+
+
+
+
+# =====================================================
+# 综合预测
 # =====================================================
 
 
 def predict_wave(history):
 
 
-    stats=wave_statistics(
-
-        history
-
-    )
-
-
-    streak=detect_streak(
-
-        history
-
-    )
+    stats=wave_statistics(history)
 
 
 
@@ -368,28 +553,89 @@ def predict_wave(history):
 
             "状态":
 
-            "数据不足"
+                "数据不足"
 
         }
 
 
 
 
+
+
+    recent=recent_trend(history)
+
+
+
+    transition=wave_transition(history)
+
+
+
+    streak=detect_streak(history)
+
+
+
+    reverse=detect_reverse(history)
+
+
+
+
+
+    score={
+
+        "红":0,
+
+        "蓝":0,
+
+        "绿":0
+
+    }
+
+
+
+
+    # 历史权重 30%
+
+    for k,v in stats.items():
+
+        score[k]+=v["比例"]*30
+
+
+
+
+
+
+    # 最近50权重 40%
+
+    if "最近50期" in recent:
+
+
+        for k,v in recent["最近50期"].items():
+
+            score[k]+=v*40
+
+
+
+
+
+
+    # 最近10权重 30%
+
+    if "最近10期" in recent:
+
+
+        for k,v in recent["最近10期"].items():
+
+            score[k]+=v*30
+
+
+
+
+
+
+
     ranking=sorted(
 
-        [
-
-            (
-
-            k,
-
-            v["比例"]
-
-            )
-
-            for k,v in stats.items()
-
-        ],
+        score.items(),
 
         key=lambda x:x[1],
 
@@ -400,32 +646,85 @@ def predict_wave(history):
 
 
 
+
+    probability={}
+
+
+    total=sum(score.values())
+
+
+
+    for k,v in score.items():
+
+
+        probability[k]=round(
+
+            v/total,
+
+            3
+
+        )
+
+
+
+
+
     return {
 
 
         "推荐波色":
 
-        ranking[0][0],
+            ranking[0][0],
 
 
 
         "概率":
 
-        ranking[0][1],
+            probability[
+
+                ranking[0][0]
+
+            ],
 
 
 
-        "统计":
+        "综合概率":
 
-        stats,
+            probability,
 
 
 
-        "连续":
+        "历史统计":
 
-        streak
+            stats,
+
+
+
+        "近期趋势":
+
+            recent,
+
+
+
+        "连续状态":
+
+            streak,
+
+
+
+        "转移":
+
+            transition,
+
+
+
+        "反转检测":
+
+            reverse
 
     }
+
+
 
 
 
