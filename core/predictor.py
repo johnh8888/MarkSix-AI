@@ -1,238 +1,79 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 
 """
-六合AI V10.0 FINAL
+六合彩 AI V3.0 FINAL
 
 预测核心
 
-HMM + Markov + Bayes结构接口
 """
 
-import math
-import random
+
 from collections import Counter
 
-from .zodiac import (
-    get_zodiac,
-    get_5_zodiac
-)
 
 
+from .wave import predict_wave
 
-# ==========================
-# 波色
-# ==========================
+from .zodiac import get_zodiac
 
-RED={
-1,2,7,8,12,13,18,19,
-23,24,29,30,34,35,
-40,45,46
-}
+from .markov import markov_predict
 
-
-BLUE={
-3,4,9,10,14,15,
-20,25,26,31,36,
-37,41,42,47,48
-}
-
-
-GREEN={
-5,6,11,16,17,
-21,22,27,28,32,
-33,38,39,43,44,49
-}
-
-
-
-def get_color(n):
-
-    if n in RED:
-        return "红"
-
-    if n in BLUE:
-        return "蓝"
-
-    if n in GREEN:
-        return "绿"
-
-    return "未知"
+from .hmm import detect_state
 
 
 
 
-def get_size(n):
 
-    return (
-        "大"
-        if n>=25
-        else
-        "小"
+def score_numbers(history):
+
+
+    scores={}
+
+
+
+    freq=Counter(
+
+        x["special"]
+
+        for x in history
+
     )
-
-
-
-
-def get_even(n):
-
-    return (
-        "单"
-        if n%2
-        else
-        "双"
-    )
-
-
-
-
-
-# ==========================
-# 熵
-# ==========================
-
-def entropy(numbers):
-
-    if not numbers:
-
-        return 0
-
-
-    c=Counter(numbers)
-
-
-    total=sum(c.values())
-
-
-    e=0
-
-
-    for v in c.values():
-
-        p=v/total
-
-        e-=p*math.log2(p)
-
-
-
-    return round(e,4)
-
-
-
-
-# ==========================
-# 热度模型
-# ==========================
-
-def hot_score(history):
-
-    nums=[]
-
-
-    for h in history:
-
-        nums.extend(h)
-
-
-
-    count=Counter(nums)
-
-
-
-    result={}
-
-
-    for i in range(1,50):
-
-        result[i]=count[i]
-
-
-    return result
-
-
-
-
-# ==========================
-# Markov简单模型
-# ==========================
-
-def markov_score(history):
-
-
-    score={
-        i:0
-        for i in range(1,50)
-    }
-
-
-    for row in history:
-
-
-        if row:
-
-            last=row[-1]
-
-            for n in range(1,50):
-
-                distance=abs(
-                    n-last
-                )
-
-
-                score[n]+=(
-                    1/
-                    (distance+1)
-                )
-
-
-    return score
-
-
-
-
-
-# ==========================
-# 主预测
-# ==========================
-
-def predict_next(
-    history,
-    lottery=""
-):
-
-
-    if not history:
-
-        raise ValueError(
-            "没有读取到历史号码"
-        )
-
-
-
-    hot=hot_score(
-        history
-    )
-
-
-    markov=markov_score(
-        history
-    )
-
-
-
-    final={}
 
 
 
     for n in range(1,50):
 
 
-        final[n]=round(
+        score=0
 
-            hot[n]*0.6
 
-            +
 
-            markov[n]*0.4,
+        # 历史频率
+
+        score += freq[n]*1.0
+
+
+
+        # 遗漏补偿
+
+        recent=[
+
+            x["special"]
+
+            for x in history[-20:]
+
+        ]
+
+
+        if n not in recent:
+
+            score +=0.5
+
+
+
+        scores[n]=round(
+
+            score,
 
             3
 
@@ -240,9 +81,39 @@ def predict_next(
 
 
 
+    return scores
+
+
+
+
+
+def predict(history):
+
+
+    if not history:
+
+
+        return {
+
+            "error":
+
+            "无历史数据"
+
+        }
+
+
+
+    scores=score_numbers(
+
+        history
+
+    )
+
+
+
     ranking=sorted(
 
-        final.items(),
+        scores.items(),
 
         key=lambda x:x[1],
 
@@ -261,45 +132,45 @@ def predict_next(
     ]
 
 
-    top3=top10[:3]
+
+    top3=[
+
+        x[0]
+
+        for x in ranking[:3]
+
+    ]
 
 
-    first=top3[0]
 
 
 
-    state={
+    markov=markov_predict(
+
+        history
+
+    )
+
+
+
+    state=detect_state(
+
+        history
+
+    )
+
+
+
+    return {
+
+
+        "模型版本":
+
+        "V3.0 FINAL",
+
+
 
         "状态":
-        (
-            "混沌状态"
-            if entropy(
-                top10
-            )>3.5
-
-            else
-
-            "正常状态"
-        ),
-
-        "entropy":
-        entropy(top10)
-
-    }
-
-
-
-
-    result={
-
-
-        "版本":
-
-        "V10.0 FINAL",
-
-
-
-        "市场状态":
 
         state,
 
@@ -319,48 +190,59 @@ def predict_next(
 
         "第一推荐":
 
-        first,
+        top3[0],
 
 
 
-        "生肖5肖":
+        "波色":
 
-        get_5_zodiac(
-            top10
+        predict_wave(
+
+            history
+
         ),
 
 
 
-        "属性":
+        "生肖":
 
-        {
+        [
 
-            "波色":
+            get_zodiac(x)
 
-            get_color(first),
+            for x in top3
 
-
-            "大小":
-
-            get_size(first),
+        ],
 
 
-            "单双":
 
-            get_even(first)
+        "马尔可夫":
 
-        },
+        markov[:5],
 
 
 
         "评分":
 
-        dict(
-            ranking[:10]
-        )
+        {
+
+            str(k):
+
+            v
+
+            for k,v in ranking[:10]
+
+        }
 
     }
 
 
 
-    return result
+
+
+
+__all__=[
+
+"predict"
+
+]
