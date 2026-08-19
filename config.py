@@ -19,16 +19,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 
 
-DATA_DIR = BASE_DIR / "data"
-
 
 OUTPUT_DIR = BASE_DIR / "output"
-
-
-
-DATA_DIR.mkdir(
-    exist_ok=True
-)
 
 
 OUTPUT_DIR.mkdir(
@@ -38,14 +30,23 @@ OUTPUT_DIR.mkdir(
 
 
 # =====================================================
-# SQLite
+# 数据库
 # =====================================================
 
 
 DATABASE_FILE = (
-    DATA_DIR /
-    "lottery.db"
+    BASE_DIR /
+    "marksix.db"
 )
+
+
+
+# =====================================================
+# 版本
+# =====================================================
+
+
+VERSION = "MarkSix AI V3.0 FINAL"
 
 
 
@@ -98,50 +99,38 @@ LOTTERIES = {
 
 
 # =====================================================
-# 预测参数
+# 模型参数
 # =====================================================
 
 
-FEATURE_WINDOWS = {
+MAX_HISTORY = 500
 
 
-    "short":
-
-    12,
+TOP_NUMBER = 10
 
 
-    "medium":
-
-    36,
-
-
-    "long":
-
-    120
-
-}
+TOP_FOCUS = 3
 
 
 
-TOP_NUMBER_COUNT = 10
+__all__=[
 
+    "DATABASE_FILE",
 
-TOP_MAIN_COUNT = 3
+    "OUTPUT_DIR",
 
+    "VERSION",
 
+    "API_HISTORY",
 
-BACKTEST_WINDOWS = [
+    "API_REALTIME",
 
-    10,
+    "LOTTERIES",
 
-    20
+    "MAX_HISTORY",
+
+    "TOP_NUMBER",
+
+    "TOP_FOCUS"
 
 ]
-
-
-
-VERSION = (
-
-    "V3.0 FINAL"
-
-)
