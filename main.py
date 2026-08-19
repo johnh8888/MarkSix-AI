@@ -2,9 +2,9 @@
 
 """
 六合彩综合预测系统
-程序入口
+主程序入口
 
-V6.0 REAL DATA FINAL
+V6.1 REAL DATA FIXED
 """
 
 from __future__ import annotations
@@ -14,62 +14,19 @@ import sys
 from core.engine import run_system
 
 
-def main():
-
+def main() -> None:
     try:
+        run_system()
 
-        result = run_system()
-
-        if not isinstance(
-            result,
-            dict,
-        ):
-
-            print(
-                "❌ 系统返回结果异常"
-            )
-
-            sys.exit(1)
-
-        lotteries = result.get(
-            "lotteries"
-        )
-
-        if not isinstance(
-            lotteries,
-            dict,
-        ):
-
-            print(
-                "❌ prediction结果缺少lotteries"
-            )
-
-            sys.exit(1)
-
-        required = [
-            "新澳门彩",
-            "老澳门彩",
-            "香港彩",
-        ]
-
-        for lottery in required:
-
-            if lottery not in lotteries:
-
-                print(
-                    f"❌ 缺少彩种：{lottery}"
-                )
-
-                sys.exit(1)
-
-        print("")
+    except KeyboardInterrupt:
+        print()
         print("=" * 70)
-        print("主程序执行成功")
+        print("用户中断程序")
         print("=" * 70)
+        sys.exit(130)
 
     except Exception as exc:
-
-        print("")
+        print()
         print("=" * 70)
         print("系统运行异常")
         print("=" * 70)
