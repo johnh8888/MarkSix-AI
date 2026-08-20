@@ -2,14 +2,14 @@
 
 """
 六合彩综合预测系统
-V7.1 REAL DATA HIT RATE FINAL
+V7.2 IMPROVED SCORING
 
 功能：
 
 真实历史数据
 SQLite
 三彩种
-号码预测
+号码预测（多窗口加权 + 遗漏值，目标统一为特别号码）
 Top5 / Top10 / Top12
 生肖
 单双
@@ -19,9 +19,25 @@ Top5 / Top10 / Top12
 波色次推
 波色双色
 Walk-Forward
-历史命中率
+历史命中率（含平均命中数）
 下一期期号
 JSON输出
+
+V7.2 相对 V7.1 的改动：
+
+1. 号码预测模型从"单窗口原始计数"改为"多窗口加权 + 遗漏值"，
+   并且统计目标从"每期全部7个号码"改为"每期特别号码"，
+   与 metrics.py 的 Walk-Forward 验证目标保持一致
+   （之前训练目标和验证目标不是同一个东西，命中率数字口径不一致）。
+
+2. 诚实说明：六合彩本质上是独立随机事件，历史开奖频率不会
+   改变未来任何一期的概率分布。这里的模型改进是让"能从历史
+   数据里提取到的统计信息"更充分地被利用，而不是让预测本身
+   获得真实的、超越随机的统计优势。如果 Walk-Forward 命中率
+   长期稳定维持在随机基准附近
+   （Top5≈10.2% / Top10≈20.4% / Top12≈24.5%），
+   说明模型没有、也不可能有超越随机的预测能力，
+   这是符合随机性假设的正常结果，不代表代码有问题。
 """
 
 from __future__ import annotations
@@ -105,67 +121,162 @@ def next_issue(
 
 
 # ============================================================
-# 号码频率
+# 特别号码提取
 # ============================================================
 
-def count_numbers(
+def get_special(
+    row: dict[str, Any],
+) -> int | None:
+
+    numbers = row.get(
+        "numbers",
+        [],
+    )
+
+    if len(numbers) != 7:
+        return None
+
+    try:
+
+        value = int(
+            numbers[6]
+        )
+
+    except Exception:
+
+        return None
+
+    if not 1 <= value <= 49:
+        return None
+
+    return value
+
+
+def special_history(
     history: list[dict[str, Any]],
-    window: int = 100,
-) -> Counter:
+    window: int | None = None,
+) -> list[int]:
 
-    counter = Counter()
+    rows = (
+        history[-window:]
+        if window
+        else history
+    )
 
-    rows = history[-window:]
+    result = []
 
     for row in rows:
 
-        for number in row.get(
-            "numbers",
-            [],
+        special = get_special(
+            row
+        )
+
+        if special is not None:
+
+            result.append(
+                special
+            )
+
+    return result
+
+
+def missing_periods_all(
+    history: list[dict[str, Any]],
+) -> dict[int, int]:
+
+    """
+    一次遍历，算出全部1~49号码各自的遗漏期数
+    （距离该号码上一次作为特别号码开出，已经过去多少期）。
+
+    比逐个号码单独扫描历史快得多（O(n) 而不是 O(49n)）。
+    """
+
+    result: dict[int, int] = {}
+
+    found: set[int] = set()
+
+    count = 0
+
+    for row in reversed(history):
+
+        if len(found) >= 49:
+            break
+
+        special = get_special(
+            row
+        )
+
+        if (
+            special is not None
+            and special not in found
         ):
 
-            try:
+            result[special] = count
 
-                number = int(
-                    number
-                )
+            found.add(special)
 
-            except Exception:
+        count += 1
 
-                continue
+    for number in range(1, 50):
 
-            if 1 <= number <= 49:
+        if number not in result:
 
-                counter[number] += 1
+            result[number] = min(
+                count,
+                40,
+            )
 
-    return counter
+    return result
 
 
 # ============================================================
 # 号码预测
+#
+# 多窗口加权 + 遗漏值评分。
+# 评分只针对特别号码这一个目标，
+# 与 Walk-Forward 验证口径保持一致。
 # ============================================================
 
 def predict_numbers(
     history: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
-    counter = count_numbers(
-        history,
-        100,
+    recent10 = Counter(
+        special_history(history, 10)
+    )
+
+    recent30 = Counter(
+        special_history(history, 30)
+    )
+
+    recent100 = Counter(
+        special_history(history, 100)
+    )
+
+    missing_map = missing_periods_all(
+        history
     )
 
     scores = {}
 
-    for number in range(
-        1,
-        50,
-    ):
+    for number in range(1, 50):
 
-        scores[number] = (
-            counter.get(
-                number,
-                0,
-            )
+        frequency_score = (
+            recent10.get(number, 0) * 2.5
+            + recent30.get(number, 0) * 1.3
+            + recent100.get(number, 0) * 0.8
+        )
+
+        missing = min(
+            missing_map.get(number, 40),
+            40,
+        )
+
+        missing_score = missing * 0.15
+
+        scores[number] = round(
+            frequency_score + missing_score,
+            4,
         )
 
     ranking = sorted(
@@ -191,7 +302,8 @@ def predict_numbers(
             scores,
 
         "frequency":
-            dict(counter),
+            dict(recent100),
+
     }
 
 
@@ -956,7 +1068,7 @@ def run_system() -> None:
     )
 
     print(
-        "版本：V7.1 REAL DATA HIT RATE FINAL"
+        "版本：V7.2 IMPROVED SCORING"
     )
 
     print(
@@ -1071,7 +1183,7 @@ def run_system() -> None:
     prediction = {
 
         "version":
-            "V7.1 REAL DATA HIT RATE FINAL",
+            "V7.2 IMPROVED SCORING",
 
         "generated_at":
             datetime.now().isoformat(),
@@ -1096,7 +1208,7 @@ def run_system() -> None:
     backtest = {
 
         "version":
-            "V7.1",
+            "V7.2",
 
         "generated_at":
             datetime.now().isoformat(),
@@ -1128,7 +1240,7 @@ def run_system() -> None:
     module_performance = {
 
         "version":
-            "V7.1",
+            "V7.2",
 
         "generated_at":
             datetime.now().isoformat(),
