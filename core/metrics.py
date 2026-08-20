@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩综合预测系统 V7.2
+六合彩综合预测系统 V7.3
 命中率与属性分析模块
 
 规则：
@@ -14,6 +14,19 @@
 6. 大小只推荐1个
 7. 波色主推 / 次推 / 双色
 8. Walk-Forward 严格使用历史数据预测下一期
+
+V7.3 相对 V7.2 的改动：
+
+补全 calculate_performance 里 average_top5_hits /
+average_top10_hits / average_top12_hits 的实际计算。
+之前这三个字段从未被计算，engine.py 打印时用 .get(key, 0)
+兜底显示为0，不是真的算出来是0。
+
+由于号码预测只针对特别号码这一个单一目标，单期最多命中1次，
+所以"平均命中数"在数学上就等于命中率的小数形式
+（例如命中率9.2% = 平均每期命中0.092次）。这不是简化偷懒，
+而是验证目标本身决定的：只要目标是单个号码，就不存在
+"一期命中多个"的情况。
 """
 
 from __future__ import annotations
@@ -368,7 +381,7 @@ def predict_single_attribute(
 
 
 # ============================================================
-# 统一属性预测
+# 统一属性预测（内部使用，全部一次性算好）
 # ============================================================
 
 def predict_attributes(
@@ -464,6 +477,59 @@ def predict_attributes(
 
 
 # ============================================================
+# 单数版本：兼容 engine.py 按字段名逐个调用
+# ============================================================
+
+def predict_attribute(
+    history: list[dict[str, Any]],
+    field: str,
+    limit: int = 100,
+) -> dict[str, Any]:
+
+    """
+    兼容 engine.py：
+
+        predict_attribute(history, "zodiac")
+        predict_attribute(history, "odd_even")
+        predict_attribute(history, "size")
+        predict_attribute(history, "wave")
+
+    单数版本，按字段名单独调用。
+    内部复用 predict_zodiac / predict_single_attribute。
+    """
+
+    if field == "zodiac":
+
+        result = predict_zodiac(
+            history,
+            limit,
+        )
+
+        return {
+            "main": result["main"],
+            "secondary": result["secondary"],
+            "top5": result["top5"],
+            "double": result["top5"],
+        }
+
+    result = predict_single_attribute(
+        history,
+        field,
+        limit,
+    )
+
+    return {
+        "main": result["main"],
+        "secondary": result["secondary"],
+        "double": (
+            [result["main"]]
+            if result["main"]
+            else []
+        ),
+    }
+
+
+# ============================================================
 # 命中率
 # ============================================================
 
@@ -483,24 +549,16 @@ def hit_rate(
 
 
 # ============================================================
-# Walk-Forward 单期评估
+# Walk-Forward 单期评估（内部实现，只接受2个参数）
 # ============================================================
 
-def evaluate_prediction(
+def _evaluate_prediction_core(
     prediction: dict[str, Any],
     actual: dict[str, Any],
 ) -> dict[str, Any]:
 
     """
     注意：
-
-    这里只允许两个参数。
-
-    prediction:
-        当前预测
-
-    actual:
-        下一期真实开奖
 
     特别号永远只使用 numbers[6]。
     """
@@ -700,6 +758,31 @@ def evaluate_prediction(
 
 
 # ============================================================
+# Walk-Forward 单期评估（对外接口：兼容 engine.py 传3个参数）
+# ============================================================
+
+def evaluate_prediction(
+    prediction: dict[str, Any],
+    actual: dict[str, Any],
+    train: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+
+    """
+    兼容 engine.py：
+
+        evaluate_prediction(prediction, actual, train)
+
+    train 参数当前未使用（预留给未来需要训练集上下文的评估逻辑），
+    实际评估逻辑完全复用 _evaluate_prediction_core。
+    """
+
+    return _evaluate_prediction_core(
+        prediction,
+        actual,
+    )
+
+
+# ============================================================
 # Walk-Forward 汇总
 # ============================================================
 
@@ -817,6 +900,27 @@ def calculate_performance(
                     total,
                 ),
 
+            # 平均命中数：单一目标（特别号码），
+            # 每期命中数只会是0或1，
+            # 平均值 = 命中次数 / 验证期数
+            "average_top5_hits":
+                round(
+                    number_top5_hits / total,
+                    4,
+                ),
+
+            "average_top10_hits":
+                round(
+                    number_top10_hits / total,
+                    4,
+                ),
+
+            "average_top12_hits":
+                round(
+                    number_top12_hits / total,
+                    4,
+                ),
+
         },
 
         "zodiac": {
@@ -881,82 +985,3 @@ def calculate_performance(
             "正常",
 
     }
-    # ============================================================
-# 兼容 core/engine.py 调用方式的补丁
-# 追加到 core/metrics.py 文件末尾
-# ============================================================
-
-# 保留原始 evaluate_prediction（2参数版本）的引用，
-# 下面用新的3参数版本覆盖同名函数，内部转调原始逻辑。
-_original_evaluate_prediction = evaluate_prediction
-
-
-def evaluate_prediction(
-    prediction: dict,
-    actual: dict,
-    train: list | None = None,
-) -> dict:
-
-    """
-    兼容 engine.py：
-
-        evaluate_prediction(prediction, actual, train)
-
-    train 参数当前未使用（预留给未来需要训练集上下文的评估逻辑），
-    实际评估仍完全复用原始的2参数版本。
-    """
-
-    return _original_evaluate_prediction(
-        prediction,
-        actual,
-    )
-
-
-def predict_attribute(
-    history: list[dict],
-    field: str,
-    limit: int = 100,
-) -> dict:
-
-    """
-    兼容 engine.py：
-
-        predict_attribute(history, "zodiac")
-        predict_attribute(history, "odd_even")
-        predict_attribute(history, "size")
-        predict_attribute(history, "wave")
-
-    单数版本，按字段名单独调用。
-    内部复用已有的 predict_zodiac / predict_single_attribute。
-    """
-
-    if field == "zodiac":
-
-        result = predict_zodiac(
-            history,
-            limit,
-        )
-
-        return {
-            "main": result["main"],
-            "secondary": result["secondary"],
-            "top5": result["top5"],
-            "double": result["top5"],
-        }
-
-    result = predict_single_attribute(
-        history,
-        field,
-        limit,
-    )
-
-    return {
-        "main": result["main"],
-        "secondary": result["secondary"],
-        "double": (
-            [result["main"]]
-            if result["main"]
-            else []
-        ),
-    }
-
