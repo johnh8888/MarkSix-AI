@@ -1,41 +1,52 @@
 # -*- coding: utf-8 -*-
 
 """
-六合彩数据同步模块 V8.1
+六合彩数据同步模块 V8.2
 
-核心规则：
+改动说明（相对 V8.1）：
 
-1. 三个彩种分别请求独立 API
-2. 不再使用历史总接口作为主数据源
-3. 自动解析历史数据
-4. 自动识别期号
-5. 自动识别 7 个开奖号码
-6. 第 7 个号码 = 特别号码
-7. 数据不足时禁止覆盖数据库
-8. 防止三个彩种错误获得同一份数据
+原 V8.1 使用 api3.marksix6.net/lottery_api.php?type=X
+该接口经实测只返回最新一期数据，不含历史数组，
+导致无法满足最低历史期数要求，数据库永远建不起来。
+
+改回使用 https://marksix6.net/index.php?api=1，
+该接口返回结构为：
+
+{
+    "lottery_data": [
+        {
+            "code": "newMacau" / "oldMacau" / "hk",
+            "expect": "最新期号",
+            "openCode": "39,41,08,09,07,14,49",
+            "openTime": "...",
+            "history": [
+                "期号：号码1,号码2,...",
+                ...
+            ]
+        },
+        ...
+    ]
+}
+
+三个彩种共用一次请求返回全部数据，按 code 字段区分。
 """
 
 from __future__ import annotations
 
 import json
-import re
-import time
 import ssl
+import time
 import urllib.request
 from typing import Any
 
 
-API_URLS = {
-    "新澳门彩":
-        "https://api3.marksix6.net/lottery_api.php?type=newMacau",
+API_URL = "https://marksix6.net/index.php?api=1"
 
-    "老澳门彩":
-        "https://api3.marksix6.net/lottery_api.php?type=oldMacau",
-
-    "香港彩":
-        "https://api3.marksix6.net/lottery_api.php?type=hk",
+CODE_MAP = {
+    "新澳门彩": "newMacau",
+    "老澳门彩": "oldMacau",
+    "香港彩": "hk",
 }
-
 
 MIN_HISTORY = 20
 
@@ -100,7 +111,6 @@ def http_get(
 
     except json.JSONDecodeError:
 
-        # 有些接口可能带 BOM
         text = text.lstrip("\ufeff")
 
         try:
@@ -114,245 +124,34 @@ def http_get(
             )
 
 
-def normalize_number(value: Any) -> int | None:
+def parse_numbers(code: Any) -> list[int]:
 
-    if value is None:
-        return None
+    if isinstance(code, list):
 
-    if isinstance(
-        value,
-        bool,
-    ):
-        return None
+        result = []
 
-    try:
+        for x in code:
 
-        number = int(
-            str(value).strip()
-        )
+            try:
+                result.append(int(x))
+            except Exception:
+                pass
 
-    except Exception:
+        return result[:7]
 
-        return None
-
-    if 1 <= number <= 49:
-        return number
-
-    return None
-
-
-def normalize_issue(value: Any) -> str:
-
-    if value is None:
-        return ""
-
-    text = str(value).strip()
-
-    if not text:
-        return ""
-
-    # 只保留数字
-    digits = re.sub(
-        r"\D",
-        "",
-        text,
-    )
-
-    # 六合常见期号
-    if len(digits) >= 7:
-
-        return digits
-
-    return ""
-
-
-def extract_numbers(
-    item: dict[str, Any],
-) -> list[int]:
-
-    candidates = []
-
-    # 优先寻找 numbers
-    for key in (
-        "numbers",
-        "openCode",
-        "open_code",
-        "code",
-        "codes",
-        "result",
-        "balls",
-    ):
-
-        value = item.get(key)
-
-        if value is None:
-            continue
-
-        if isinstance(
-            value,
-            str,
-        ):
-
-            parts = re.findall(
-                r"\d{1,2}",
-                value,
-            )
-
-        elif isinstance(
-            value,
-            list,
-        ):
-
-            parts = value
-
-        else:
-
-            continue
-
-        parsed = []
-
-        for x in parts:
-
-            number = normalize_number(x)
-
-            if number is not None:
-                parsed.append(number)
-
-        if len(parsed) >= 7:
-
-            candidates = parsed[:7]
-
-            break
-
-    if len(candidates) != 7:
+    if not code:
         return []
-
-    return candidates
-
-
-def extract_issue(
-    item: dict[str, Any],
-) -> str:
-
-    for key in (
-        "expect",
-        "issue",
-        "period",
-        "draw",
-        "drawNo",
-        "drawNumber",
-        "qihao",
-    ):
-
-        if key not in item:
-            continue
-
-        issue = normalize_issue(
-            item.get(key)
-        )
-
-        if issue:
-            return issue
-
-    return ""
-
-
-def find_records(
-    data: Any,
-) -> list[dict[str, Any]]:
 
     result = []
 
-    if isinstance(
-        data,
-        list,
-    ):
+    for x in str(code).split(","):
 
-        for item in data:
+        x = x.strip()
 
-            if isinstance(
-                item,
-                dict,
-            ):
+        if x.isdigit():
+            result.append(int(x))
 
-                result.append(item)
-
-        return result
-
-    if isinstance(
-        data,
-        dict,
-    ):
-
-        # 常见历史字段
-        for key in (
-            "history",
-            "data",
-            "list",
-            "records",
-            "lottery_data",
-            "result",
-        ):
-
-            value = data.get(key)
-
-            if isinstance(
-                value,
-                list,
-            ):
-
-                for item in value:
-
-                    if isinstance(
-                        item,
-                        dict,
-                    ):
-
-                        result.append(item)
-
-                if result:
-                    return result
-
-            if isinstance(
-                value,
-                dict,
-            ):
-
-                nested = find_records(
-                    value
-                )
-
-                if nested:
-                    return nested
-
-        # 单条记录
-        if (
-            extract_issue(data)
-            and extract_numbers(data)
-        ):
-
-            return [data]
-
-        # 深度扫描
-        for value in data.values():
-
-            if isinstance(
-                value,
-                (dict, list),
-            ):
-
-                nested = find_records(
-                    value
-                )
-
-                if nested:
-                    result.extend(
-                        nested
-                    )
-
-        return result
-
-    return []
+    return result[:7]
 
 
 def parse_records(
@@ -360,92 +159,115 @@ def parse_records(
     lottery_name: str,
 ) -> list[dict[str, Any]]:
 
-    raw_records = find_records(
-        raw
+    if lottery_name not in CODE_MAP:
+
+        raise ValueError(
+            f"未知彩种：{lottery_name}"
+        )
+
+    target_code = CODE_MAP[
+        lottery_name
+    ]
+
+    if not raw:
+        return []
+
+    lottery_data = raw.get(
+        "lottery_data",
+        [],
     )
 
     records = []
 
-    seen = set()
+    for item in lottery_data:
 
-    for item in raw_records:
-
-        issue = extract_issue(
-            item
-        )
-
-        numbers = extract_numbers(
-            item
-        )
-
-        if not issue:
+        if item.get("code") != target_code:
             continue
 
-        if len(numbers) != 7:
-            continue
+        # ----------------------------------------
+        # 最新一期
+        # ----------------------------------------
 
-        key = (
-            issue,
-            tuple(numbers),
+        numbers = parse_numbers(
+            item.get("openCode", "")
         )
 
-        if key in seen:
-            continue
+        if len(numbers) == 7:
 
-        seen.add(key)
+            issue = str(
+                item.get("expect", "")
+            ).strip()
 
-        records.append(
-            {
-                "lottery":
-                    lottery_name,
+            if issue:
 
-                "issue":
-                    issue,
+                records.append(
+                    {
+                        "lottery": lottery_name,
+                        "issue": issue,
+                        "numbers": numbers,
+                        "special_number": numbers[6],
+                        "open_time": str(
+                            item.get("openTime", "")
+                        ),
+                        "source": "marksix6.net",
+                    }
+                )
 
-                "numbers":
-                    numbers,
+        # ----------------------------------------
+        # 历史
+        # ----------------------------------------
 
-                "special_number":
-                    numbers[6],
+        for h in item.get("history", []):
 
-                "open_time":
-                    str(
-                        item.get(
-                            "openTime",
-                            item.get(
-                                "open_time",
-                                "",
-                            ),
-                        )
-                    ),
+            if not isinstance(h, str):
+                continue
 
-                "source":
-                    "api3.marksix6.net",
-            }
-        )
+            try:
 
-    # 去重期号
+                issue, code = h.split(
+                    "期：",
+                    1,
+                )
+
+                numbers = parse_numbers(code)
+
+                if len(numbers) != 7:
+                    continue
+
+                issue = issue.strip()
+
+                if not issue:
+                    continue
+
+                records.append(
+                    {
+                        "lottery": lottery_name,
+                        "issue": issue,
+                        "numbers": numbers,
+                        "special_number": numbers[6],
+                        "open_time": "",
+                        "source": "marksix6.net",
+                    }
+                )
+
+            except Exception:
+
+                continue
+
+    # 期号去重
     unique = {}
 
     for row in records:
 
-        issue = row["issue"]
+        unique[row["issue"]] = row
 
-        if issue not in unique:
+    result = list(unique.values())
 
-            unique[issue] = row
-
-    records = list(
-        unique.values()
+    result.sort(
+        key=lambda x: int(x["issue"])
     )
 
-    records.sort(
-        key=lambda x: int(
-            x["issue"]
-        )
-    )
-
-    return records
+    return result
 
 
 def validate_records(
@@ -464,15 +286,8 @@ def validate_records(
 
     for row in records:
 
-        issue = row.get(
-            "issue",
-            "",
-        )
-
-        numbers = row.get(
-            "numbers",
-            [],
-        )
+        issue = row.get("issue", "")
+        numbers = row.get("numbers", [])
 
         if not issue:
             continue
@@ -481,15 +296,11 @@ def validate_records(
             continue
 
         if any(
-            not (
-                isinstance(x, int)
-                and 1 <= x <= 49
-            )
+            not (isinstance(x, int) and 1 <= x <= 49)
             for x in numbers
         ):
             continue
 
-        # 同一期不能出现重复号码
         if len(set(numbers)) != 7:
             continue
 
@@ -516,48 +327,20 @@ def fetch_lottery(
     lottery_name: str,
 ) -> list[dict[str, Any]]:
 
-    if lottery_name not in API_URLS:
-
-        raise ValueError(
-            f"未知彩种：{lottery_name}"
-        )
-
-    url = API_URLS[
-        lottery_name
-    ]
-
-    print(
-        "=" * 70
-    )
-
-    print(
-        f"正在同步：{lottery_name}"
-    )
-
-    print(
-        "=" * 70
-    )
-
-    print(
-        f"[API] {url}"
-    )
+    print("=" * 70)
+    print(f"正在同步：{lottery_name}")
+    print("=" * 70)
+    print(f"[API] {API_URL}")
 
     last_error = None
 
-    for attempt in range(
-        1,
-        4,
-    ):
+    for attempt in range(1, 4):
 
         try:
 
-            print(
-                f"[API] 请求第 {attempt} 次"
-            )
+            print(f"[API] 请求第 {attempt} 次")
 
-            raw = http_get(
-                url
-            )
+            raw = http_get(API_URL)
 
             records = parse_records(
                 raw,
@@ -566,8 +349,7 @@ def fetch_lottery(
 
             print(
                 f"[{lottery_name}] "
-                f"解析有效历史："
-                f"{len(records)} 期"
+                f"解析有效历史：{len(records)} 期"
             )
 
             validate_records(
@@ -575,22 +357,14 @@ def fetch_lottery(
                 lottery_name,
             )
 
-            if not records:
-
-                raise RuntimeError(
-                    "没有有效数据"
-                )
-
             print(
                 f"[{lottery_name}] "
-                f"最早期号："
-                f"{records[0]['issue']}"
+                f"最早期号：{records[0]['issue']}"
             )
 
             print(
                 f"[{lottery_name}] "
-                f"最新期号："
-                f"{records[-1]['issue']}"
+                f"最新期号：{records[-1]['issue']}"
             )
 
             print(
@@ -598,16 +372,8 @@ def fetch_lottery(
                 f"最新号码："
                 + " ".join(
                     f"{x:02d}"
-                    for x in records[-1][
-                        "numbers"
-                    ]
+                    for x in records[-1]["numbers"]
                 )
-            )
-
-            print(
-                f"[{lottery_name}] "
-                f"特别号码："
-                f"{records[-1]['special_number']:02d}"
             )
 
             return records
@@ -616,11 +382,7 @@ def fetch_lottery(
 
             last_error = exc
 
-            print(
-                f"[ERROR] "
-                f"{lottery_name}："
-                f"{exc}"
-            )
+            print(f"[ERROR] {lottery_name}：{exc}")
 
             if attempt < 3:
                 time.sleep(2)
