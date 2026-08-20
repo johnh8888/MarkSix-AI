@@ -391,3 +391,4 @@ def fetch_lottery(
         f"{lottery_name} API同步失败："
         f"{last_error}"
     )
+
