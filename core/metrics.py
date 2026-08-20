@@ -2,37 +2,42 @@
 
 """
 六合彩综合预测系统 V7.3
-命中率与属性分析模块
+命中率 + 概率评分 + 最近10期回测
 
-规则：
+核心规则：
 
 1. 号码只针对第7个特别号码
 2. Top5 / Top10 / Top12 一期最多命中1次
 3. 生肖只针对特别号码
 4. 生肖推荐5个
-5. 单双只推荐1个
-6. 大小只推荐1个
+5. 单双只推荐1个主推
+6. 大小只推荐1个主推
 7. 波色主推 / 次推 / 双色
-8. Walk-Forward 严格使用历史数据预测下一期
+8. 回测严格使用最近10期
+9. 每种属性增加历史概率评分
+10. 数据源与原系统完全兼容
 
-V7.3 相对 V7.2 的改动：
+注意：
 
-补全 calculate_performance 里 average_top5_hits /
-average_top10_hits / average_top12_hits 的实际计算。
-之前这三个字段从未被计算，engine.py 打印时用 .get(key, 0)
-兜底显示为0，不是真的算出来是0。
-
-由于号码预测只针对特别号码这一个单一目标，单期最多命中1次，
-所以"平均命中数"在数学上就等于命中率的小数形式
-（例如命中率9.2% = 平均每期命中0.092次）。这不是简化偷懒，
-而是验证目标本身决定的：只要目标是单个号码，就不存在
-"一期命中多个"的情况。
+这里的 probability 是基于模型历史样本计算出来的
+“历史概率/概率分数”，不是保证未来开奖的真实概率。
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from typing import Any
+
+
+# ============================================================
+# 全局配置
+# ============================================================
+
+# 属性预测使用多少期历史
+ATTRIBUTE_HISTORY_LIMIT = 100
+
+# 回测只使用最新多少期
+BACKTEST_RECENT_N = 10
 
 
 # ============================================================
@@ -137,7 +142,6 @@ def zodiac_by_year(
     number = int(number)
     year = int(year)
 
-    # 2024 = 龙
     base_index = 4
 
     year_index = (
@@ -188,11 +192,9 @@ def get_special_number(
         numbers,
         (list, tuple),
     ):
-
         return None
 
     if len(numbers) != 7:
-
         return None
 
     try:
@@ -206,20 +208,19 @@ def get_special_number(
         return None
 
     if not 1 <= number <= 49:
-
         return None
 
     return number
 
 
 # ============================================================
-# 历史特别号属性
+# 历史特别号属性统计
 # ============================================================
 
 def special_attribute_counter(
     history: list[dict[str, Any]],
     field: str,
-    limit: int = 100,
+    limit: int = ATTRIBUTE_HISTORY_LIMIT,
 ) -> Counter:
 
     counter = Counter()
@@ -280,12 +281,81 @@ def special_attribute_counter(
 
 
 # ============================================================
-# 生肖预测
+# 概率计算
+# ============================================================
+
+def counter_to_probability(
+    counter: Counter,
+) -> dict[str, float]:
+
+    """
+    Counter
+    ↓
+    百分比概率
+
+    例如：
+
+    单：54
+    双：46
+
+    返回：
+
+    {
+        "单": 54.0,
+        "双": 46.0
+    }
+    """
+
+    total = sum(
+        counter.values()
+    )
+
+    if total <= 0:
+        return {}
+
+    result = {}
+
+    for key, value in counter.items():
+
+        result[key] = round(
+            value / total * 100,
+            2,
+        )
+
+    return result
+
+
+# ============================================================
+# 排序后的概率
+# ============================================================
+
+def probability_ranking(
+    counter: Counter,
+) -> list[tuple[str, float]]:
+
+    probabilities = counter_to_probability(
+        counter
+    )
+
+    ranking = sorted(
+        probabilities.items(),
+        key=lambda x: (
+            x[1],
+            counter.get(x[0], 0),
+        ),
+        reverse=True,
+    )
+
+    return ranking
+
+
+# ============================================================
+# 生肖预测 + 概率
 # ============================================================
 
 def predict_zodiac(
     history: list[dict[str, Any]],
-    limit: int = 100,
+    limit: int = ATTRIBUTE_HISTORY_LIMIT,
 ) -> dict[str, Any]:
 
     counter = special_attribute_counter(
@@ -294,13 +364,25 @@ def predict_zodiac(
         limit,
     )
 
-    ranking = [
+    ranking = probability_ranking(
+        counter
+    )
+
+    probability_map = {
+        animal: probability
+        for animal, probability in ranking
+    }
+
+    ranking_names = [
         item[0]
-        for item in counter.most_common()
+        for item in ranking
     ]
 
-    # 确保最多5个
-    top5 = ranking[:5]
+    # ========================================================
+    # Top5
+    # ========================================================
+
+    top5 = ranking_names[:5]
 
     # 不足5个时补齐
     for animal in ANIMALS:
@@ -312,13 +394,39 @@ def predict_zodiac(
         if len(top5) >= 5:
             break
 
+    # ========================================================
+    # 补齐没有出现过的生肖概率
+    # ========================================================
+
+    for animal in ANIMALS:
+
+        if animal not in probability_map:
+
+            probability_map[animal] = 0.0
+
+    # ========================================================
+    # 主推
+    # ========================================================
+
+    main = (
+        top5[0]
+        if top5
+        else ""
+    )
+
+    secondary = (
+        top5[1]
+        if len(top5) > 1
+        else ""
+    )
+
     return {
 
         "main":
-            top5[0] if top5 else "",
+            main,
 
         "secondary":
-            top5[1] if len(top5) > 1 else "",
+            secondary,
 
         "top5":
             top5[:5],
@@ -326,17 +434,41 @@ def predict_zodiac(
         "double":
             top5[:5],
 
+        # 全部生肖概率
+        "probabilities":
+            probability_map,
+
+        # 主推概率
+        "main_probability":
+            probability_map.get(
+                main,
+                0.0,
+            ),
+
+        # Top5概率
+        "top5_probabilities": {
+            animal:
+                probability_map.get(
+                    animal,
+                    0.0,
+                )
+            for animal in top5[:5]
+        },
+
+        "sample_count":
+            sum(counter.values()),
+
     }
 
 
 # ============================================================
-# 单一属性预测
+# 单一属性预测 + 概率
 # ============================================================
 
 def predict_single_attribute(
     history: list[dict[str, Any]],
     field: str,
-    limit: int = 100,
+    limit: int = ATTRIBUTE_HISTORY_LIMIT,
 ) -> dict[str, Any]:
 
     counter = special_attribute_counter(
@@ -348,21 +480,40 @@ def predict_single_attribute(
     if not counter:
 
         return {
+
             "main": "",
+
             "secondary": "",
+
             "double": [],
+
+            "probabilities": {},
+
+            "main_probability": 0.0,
+
+            "sample_count": 0,
+
         }
 
-    ranking = [
+    ranking = probability_ranking(
+        counter
+    )
+
+    ranking_names = [
         item[0]
-        for item in counter.most_common()
+        for item in ranking
     ]
 
-    main = ranking[0]
+    probability_map = {
+        key: probability
+        for key, probability in ranking
+    }
+
+    main = ranking_names[0]
 
     secondary = (
-        ranking[1]
-        if len(ranking) > 1
+        ranking_names[1]
+        if len(ranking_names) > 1
         else ""
     )
 
@@ -375,13 +526,34 @@ def predict_single_attribute(
             secondary,
 
         "double":
-            ranking[:2],
+            ranking_names[:2],
+
+        # 所有状态概率
+        "probabilities":
+            probability_map,
+
+        # 主推概率
+        "main_probability":
+            probability_map.get(
+                main,
+                0.0,
+            ),
+
+        # 次推概率
+        "secondary_probability":
+            probability_map.get(
+                secondary,
+                0.0,
+            ),
+
+        "sample_count":
+            sum(counter.values()),
 
     }
 
 
 # ============================================================
-# 统一属性预测（内部使用，全部一次性算好）
+# 统一属性预测
 # ============================================================
 
 def predict_attributes(
@@ -389,22 +561,26 @@ def predict_attributes(
 ) -> dict[str, Any]:
 
     zodiac = predict_zodiac(
-        history
+        history,
+        ATTRIBUTE_HISTORY_LIMIT,
     )
 
     odd_even = predict_single_attribute(
         history,
         "odd_even",
+        ATTRIBUTE_HISTORY_LIMIT,
     )
 
     size = predict_single_attribute(
         history,
         "size",
+        ATTRIBUTE_HISTORY_LIMIT,
     )
 
     wave = predict_single_attribute(
         history,
         "wave",
+        ATTRIBUTE_HISTORY_LIMIT,
     )
 
     wave_double = wave.get(
@@ -412,7 +588,31 @@ def predict_attributes(
         [],
     )[:2]
 
+    # ========================================================
+    # 波色双色概率
+    # ========================================================
+
+    wave_probabilities = wave.get(
+        "probabilities",
+        {},
+    )
+
+    wave_double_probability = round(
+        sum(
+            wave_probabilities.get(
+                color,
+                0.0,
+            )
+            for color in wave_double
+        ),
+        2,
+    )
+
     return {
+
+        # ====================================================
+        # 生肖
+        # ====================================================
 
         "zodiac": {
 
@@ -428,13 +628,28 @@ def predict_attributes(
             "double":
                 zodiac["top5"],
 
+            "probabilities":
+                zodiac["probabilities"],
+
+            "main_probability":
+                zodiac["main_probability"],
+
+            "top5_probabilities":
+                zodiac["top5_probabilities"],
+
         },
+
+        # ====================================================
+        # 单双
+        # ====================================================
 
         "odd_even": {
 
+            # 只推荐主推
             "main":
                 odd_even["main"],
 
+            # 保留内部数据，兼容旧代码
             "secondary":
                 odd_even["secondary"],
 
@@ -443,13 +658,26 @@ def predict_attributes(
                 if odd_even["main"]
                 else [],
 
+            # 概率
+            "probabilities":
+                odd_even["probabilities"],
+
+            "main_probability":
+                odd_even["main_probability"],
+
         },
+
+        # ====================================================
+        # 大小
+        # ====================================================
 
         "size": {
 
+            # 只推荐主推
             "main":
                 size["main"],
 
+            # 保留内部数据
             "secondary":
                 size["secondary"],
 
@@ -458,7 +686,18 @@ def predict_attributes(
                 if size["main"]
                 else [],
 
+            # 概率
+            "probabilities":
+                size["probabilities"],
+
+            "main_probability":
+                size["main_probability"],
+
         },
+
+        # ====================================================
+        # 波色
+        # ====================================================
 
         "wave": {
 
@@ -471,31 +710,40 @@ def predict_attributes(
             "double":
                 wave_double,
 
+            "probabilities":
+                wave["probabilities"],
+
+            "main_probability":
+                wave["main_probability"],
+
+            "secondary_probability":
+                wave["secondary_probability"],
+
+            "double_probability":
+                wave_double_probability,
+
         },
 
     }
 
 
 # ============================================================
-# 单数版本：兼容 engine.py 按字段名逐个调用
+# 单数版本：兼容 engine.py
 # ============================================================
 
 def predict_attribute(
     history: list[dict[str, Any]],
     field: str,
-    limit: int = 100,
+    limit: int = ATTRIBUTE_HISTORY_LIMIT,
 ) -> dict[str, Any]:
 
     """
-    兼容 engine.py：
+    兼容：
 
         predict_attribute(history, "zodiac")
         predict_attribute(history, "odd_even")
         predict_attribute(history, "size")
         predict_attribute(history, "wave")
-
-    单数版本，按字段名单独调用。
-    内部复用 predict_zodiac / predict_single_attribute。
     """
 
     if field == "zodiac":
@@ -506,10 +754,28 @@ def predict_attribute(
         )
 
         return {
-            "main": result["main"],
-            "secondary": result["secondary"],
-            "top5": result["top5"],
-            "double": result["top5"],
+
+            "main":
+                result["main"],
+
+            "secondary":
+                result["secondary"],
+
+            "top5":
+                result["top5"],
+
+            "double":
+                result["top5"],
+
+            "probabilities":
+                result["probabilities"],
+
+            "main_probability":
+                result["main_probability"],
+
+            "top5_probabilities":
+                result["top5_probabilities"],
+
         }
 
     result = predict_single_attribute(
@@ -518,16 +784,26 @@ def predict_attribute(
         limit,
     )
 
-    # 注意：result["double"] 本身就已经是
-    # ranking[:2]（即 [主推, 次推]），
-    # 不能在这里重新包装成只含 main 的单元素列表，
-    # 否则"双推"命中判定会退化成跟"主推"完全一样，
-    # 波色双色命中率就失去了意义（这里之前有bug，已修复）。
-
     return {
-        "main": result["main"],
-        "secondary": result["secondary"],
-        "double": result["double"],
+
+        "main":
+            result["main"],
+
+        "secondary":
+            result["secondary"],
+
+        "double":
+            result["double"],
+
+        "probabilities":
+            result["probabilities"],
+
+        "main_probability":
+            result["main_probability"],
+
+        "secondary_probability":
+            result["secondary_probability"],
+
     }
 
 
@@ -551,19 +827,13 @@ def hit_rate(
 
 
 # ============================================================
-# Walk-Forward 单期评估（内部实现，只接受2个参数）
+# Walk-Forward 单期评估
 # ============================================================
 
 def _evaluate_prediction_core(
     prediction: dict[str, Any],
     actual: dict[str, Any],
 ) -> dict[str, Any]:
-
-    """
-    注意：
-
-    特别号永远只使用 numbers[6]。
-    """
 
     actual_special = get_special_number(
         actual
@@ -622,7 +892,7 @@ def _evaluate_prediction_core(
     )
 
     # ========================================================
-    # 真实特别号属性
+    # 真实属性
     # ========================================================
 
     actual_zodiac = get_zodiac(
@@ -760,7 +1030,7 @@ def _evaluate_prediction_core(
 
 
 # ============================================================
-# Walk-Forward 单期评估（对外接口：兼容 engine.py 传3个参数）
+# Walk-Forward 单期评估
 # ============================================================
 
 def evaluate_prediction(
@@ -768,15 +1038,6 @@ def evaluate_prediction(
     actual: dict[str, Any],
     train: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-
-    """
-    兼容 engine.py：
-
-        evaluate_prediction(prediction, actual, train)
-
-    train 参数当前未使用（预留给未来需要训练集上下文的评估逻辑），
-    实际评估逻辑完全复用 _evaluate_prediction_core。
-    """
 
     return _evaluate_prediction_core(
         prediction,
@@ -792,8 +1053,23 @@ def calculate_performance(
     evaluations: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
+    """
+    只使用最近10期进行回测。
+
+    evaluations 必须按照开奖时间/期号从旧到新排列。
+    """
+
+    # ========================================================
+    # 核心修改：
+    # 只取最新10期
+    # ========================================================
+
+    recent_evaluations = evaluations[
+        -BACKTEST_RECENT_N:
+    ]
+
     total = len(
-        evaluations
+        recent_evaluations
     )
 
     if total <= 0:
@@ -801,6 +1077,9 @@ def calculate_performance(
         return {
 
             "samples": 0,
+
+            "backtest_period":
+                BACKTEST_RECENT_N,
 
             "status":
                 "历史数据不足",
@@ -813,7 +1092,7 @@ def calculate_performance(
 
         return sum(
             1
-            for item in evaluations
+            for item in recent_evaluations
             if item.get(key)
         )
 
@@ -877,10 +1156,21 @@ def calculate_performance(
         "wave_double"
     )
 
+    # ========================================================
+    # 返回
+    # ========================================================
+
     return {
 
         "samples":
             total,
+
+        "backtest_period":
+            BACKTEST_RECENT_N,
+
+        # ====================================================
+        # 号码
+        # ====================================================
 
         "numbers": {
 
@@ -902,9 +1192,6 @@ def calculate_performance(
                     total,
                 ),
 
-            # 平均命中数：单一目标（特别号码），
-            # 每期命中数只会是0或1，
-            # 平均值 = 命中次数 / 验证期数
             "average_top5_hits":
                 round(
                     number_top5_hits / total,
@@ -925,6 +1212,10 @@ def calculate_performance(
 
         },
 
+        # ====================================================
+        # 生肖
+        # ====================================================
+
         "zodiac": {
 
             "main":
@@ -941,6 +1232,10 @@ def calculate_performance(
 
         },
 
+        # ====================================================
+        # 单双
+        # ====================================================
+
         "odd_even": {
 
             "main":
@@ -951,6 +1246,10 @@ def calculate_performance(
 
         },
 
+        # ====================================================
+        # 大小
+        # ====================================================
+
         "size": {
 
             "main":
@@ -960,6 +1259,10 @@ def calculate_performance(
                 ),
 
         },
+
+        # ====================================================
+        # 波色
+        # ====================================================
 
         "wave": {
 
