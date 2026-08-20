@@ -518,14 +518,16 @@ def predict_attribute(
         limit,
     )
 
+    # 注意：result["double"] 本身就已经是
+    # ranking[:2]（即 [主推, 次推]），
+    # 不能在这里重新包装成只含 main 的单元素列表，
+    # 否则"双推"命中判定会退化成跟"主推"完全一样，
+    # 波色双色命中率就失去了意义（这里之前有bug，已修复）。
+
     return {
         "main": result["main"],
         "secondary": result["secondary"],
-        "double": (
-            [result["main"]]
-            if result["main"]
-            else []
-        ),
+        "double": result["double"],
     }
 
 
