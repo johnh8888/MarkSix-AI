@@ -1,15 +1,4 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-"""
-生成完整的 engine.py 文件（包含平特一肖功能）
-"""
-
-def generate_engine_file():
-    """生成完整的engine.py文件内容"""
-    
-    # 这里会包含完整的代码
-    full_code = '''# -*- coding: utf-8 -*-
 
 """
 ============================================================
@@ -3320,17 +3309,3 @@ def run_system() -> None:
 if __name__ == "__main__":
 
     run_system()
-'''
-    
-    # 写入文件
-    output_path = "core/engine_with_pingte.py"
-    
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(full_code)
-    
-    print(f"✅ 完整文件已生成: {output_path}")
-    print(f"📝 文件大小: {len(full_code)} 字符")
-    print(f"📄 文件行数: {full_code.count(chr(10)) + 1} 行")
-
-if __name__ == "__main__":
-    generate_engine_file()
