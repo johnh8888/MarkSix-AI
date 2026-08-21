@@ -24,15 +24,16 @@ MULTI-WINDOW + TREND + MISSING + WALK-FORWARD + MONTE CARLO + REPORT
 14. 波色统计
 15. 平特一肖
 16. Walk-Forward回测
-17. 多窗口性能评估
-18. 模型稳定性评分
-19. 统计显著性检验
-20. 蒙特卡洛模拟
-21. Markdown报告生成
-22. 期望值分析
-23. 风险提示
-24. JSON 输出
-25. 提供 run_system() 给 main.py 调用
+17. 最近10期预测对错情况
+18. 多窗口性能评估
+19. 模型稳定性评分
+20. 统计显著性检验
+21. 蒙特卡洛模拟
+22. Markdown报告生成
+23. 期望值分析
+24. 风险提示
+25. JSON 输出
+26. 提供 run_system() 给 main.py 调用
 
 重要声明：
 
@@ -811,6 +812,8 @@ def walk_forward(
 ) -> dict[str, Any]:
     history = sorted(history, key=issue_value)
     evaluations = []
+    detailed_evaluations = []
+    
     if len(history) <= minimum_train:
         return {
             "method": "Walk-Forward",
@@ -819,12 +822,16 @@ def walk_forward(
             "status": "历史数据不足",
             "performance": {"samples": 0, "status": "历史数据不足"},
             "multi_performance": {"status": "历史数据不足", "windows": {}},
+            "evaluations": [],
         }
+    
     for index in range(minimum_train, len(history)):
         train = history[:index]
         actual = history[index]
+        
         number_prediction = predict_numbers(train)
         attributes = predict_attributes(train)
+        
         prediction = {
             "candidates": number_prediction["top12"],
             "top5": number_prediction["top5"],
@@ -832,17 +839,40 @@ def walk_forward(
             "top12": number_prediction["top12"],
             "attributes": attributes,
         }
+        
         evaluation = evaluate_prediction(prediction, actual, train)
+        
         if evaluation:
             evaluations.append(evaluation)
+            
+            detailed_evaluations.append({
+                "issue": str(actual.get("issue", "")),
+                "actual_special": get_special_number(actual),
+                "predicted_top5": number_prediction["top5"],
+                "predicted_top10": number_prediction["top10"],
+                "predicted_top12": number_prediction["top12"],
+                "number_top5": evaluation.get("number_top5", False),
+                "number_top10": evaluation.get("number_top10", False),
+                "number_top12": evaluation.get("number_top12", False),
+                "zodiac_main": evaluation.get("zodiac_main", False),
+                "zodiac_top5": evaluation.get("zodiac_top5", False),
+                "odd_even_main": evaluation.get("odd_even_main", False),
+                "size_main": evaluation.get("size_main", False),
+                "wave_main": evaluation.get("wave_main", False),
+                "wave_secondary": evaluation.get("wave_secondary", False),
+                "wave_double": evaluation.get("wave_double", False),
+            })
+    
     performance = calculate_performance(evaluations, 10)
     multi_performance = calculate_multi_performance(evaluations)
+    
     return {
         "method": "Walk-Forward",
         "minimum_train": minimum_train,
         "samples": len(evaluations),
         "performance": performance,
         "multi_performance": multi_performance,
+        "evaluations": detailed_evaluations,
         "status": "正常",
     }
 
@@ -887,35 +917,24 @@ def monte_carlo_simulation(
     history: list[dict[str, Any]],
     n_simulations: int = 10000,
 ) -> dict[str, Any]:
-    """
-    蒙特卡洛模拟：验证模型是否真的优于随机猜测。
-    """
-    
-    # 计算实际Walk-Forward命中率
     walk = walk_forward(history)
     performance = walk.get("performance", {})
     numbers = performance.get("numbers", {})
     actual_top10_rate = numbers.get("top10", 0) / 100.0
     
-    # 模拟随机猜测Top10
     random_hits = []
     for _ in range(n_simulations):
-        # 随机选10个号码
         random_pick = set(random.sample(range(1, 50), 10))
-        # 随机开奖特别号码
         actual = random.randint(1, 49)
         random_hits.append(actual in random_pick)
     
     sim_hit_rate = sum(random_hits) / n_simulations
     
-    # 计算实际命中率在随机分布中的百分位
-    actual_hits = int(actual_top10_rate * n_simulations)
     percentile = sum(
         1 for h in random_hits
         if h <= actual_top10_rate
     ) / n_simulations * 100
     
-    # 计算p值（模拟实际命中率是否显著高于随机）
     p_value = sum(
         1 for h in random_hits
         if h >= actual_top10_rate
@@ -1050,8 +1069,6 @@ def print_probability(name: str, probability: dict[str, float]) -> None:
 def generate_markdown_report(
     result: dict[str, Any],
 ) -> str:
-    """生成Markdown格式的统计报告"""
-    
     lottery = result.get("lottery", "")
     report = f"""# 六合彩统计分析报告
 
@@ -1082,17 +1099,6 @@ def generate_markdown_report(
 
 ---
 
-### 属性统计
-
-| 属性 | 出现频率最高 | 概率 |
-|------|-------------|------|
-| 生肖 | {result.get('attributes', {}).get('zodiac', {}).get('main', '')} | {result.get('attributes', {}).get('zodiac', {}).get('probability', {}).get(result.get('attributes', {}).get('zodiac', {}).get('main', ''), 0)}% |
-| 单双 | {result.get('attributes', {}).get('odd_even', {}).get('main', '')} | {result.get('attributes', {}).get('odd_even', {}).get('probability', {}).get(result.get('attributes', {}).get('odd_even', {}).get('main', ''), 0)}% |
-| 大小 | {result.get('attributes', {}).get('size', {}).get('main', '')} | {result.get('attributes', {}).get('size', {}).get('probability', {}).get(result.get('attributes', {}).get('size', {}).get('main', ''), 0)}% |
-| 波色 | {result.get('attributes', {}).get('wave', {}).get('main', '')} | {result.get('attributes', {}).get('wave', {}).get('probability', {}).get(result.get('attributes', {}).get('wave', {}).get('main', ''), 0)}% |
-
----
-
 ### Walk-Forward验证
 
 | 指标 | 实际值 | 随机基准 |
@@ -1113,7 +1119,6 @@ def generate_markdown_report(
 | 实际Top10命中率 | {result.get('monte_carlo', {}).get('actual_top10_rate', 0)}% |
 | 随机模拟命中率 | {result.get('monte_carlo', {}).get('simulated_random_rate', 0)}% |
 | 理论命中率 | {result.get('monte_carlo', {}).get('theoretical_rate', 0)}% |
-| 百分位 | {result.get('monte_carlo', {}).get('percentile', 0)}% |
 | p值 | {result.get('monte_carlo', {}).get('p_value', 1.0)} |
 
 **结论**：{result.get('monte_carlo', {}).get('interpretation', '')}
@@ -1124,18 +1129,8 @@ def generate_markdown_report(
 
 | 项目 | 值 |
 |------|-----|
-| 单注成本 | {result.get('expected_value', {}).get('special_number', {}).get('cost', 1)}元 |
 | 期望值 | {result.get('expected_value', {}).get('special_number', {}).get('expected_value_pct', 0)}% |
 | 说明 | {result.get('expected_value', {}).get('special_number', {}).get('interpretation', '')} |
-
----
-
-### 模型稳定性
-
-| 指标 | 值 |
-|------|-----|
-| 评分 | {result.get('model_stability', {}).get('score', 0)}/100 |
-| 状态 | {result.get('model_stability', {}).get('level', '')} |
 
 ---
 
@@ -1152,7 +1147,6 @@ def generate_markdown_report(
 *报告由自动化系统生成*
 """
     
-    # 保存报告
     report_dir = os.path.join(OUTPUT_DIR, "reports")
     os.makedirs(report_dir, exist_ok=True)
     report_path = os.path.join(
@@ -1199,6 +1193,55 @@ def print_result(result: dict[str, Any]) -> None:
     print(f"大小：{size.get('main', '')} (出现频率较高)")
     wave = attrs.get("wave", {})
     print(f"波色：{wave.get('main', '')} (出现频率最高)")
+    print()
+    
+    # ========================================================
+    # 最近10期预测对错情况
+    # ========================================================
+    print("【最近10期预测对错情况】")
+    print("-" * 70)
+    
+    backtest = result.get("backtest", {})
+    evaluations = backtest.get("evaluations", [])
+    
+    if evaluations:
+        recent_evals = evaluations[-10:]
+        
+        print(f"{'期数':<10} {'特别号':<8} {'Top5':<6} {'Top10':<6} {'Top12':<6} {'生肖':<6} {'单双':<6} {'大小':<6} {'波色':<6}")
+        print("-" * 70)
+        
+        for eval_item in recent_evals:
+            issue = eval_item.get("issue", "")
+            actual = eval_item.get("actual_special", "")
+            
+            top5 = "✓" if eval_item.get("number_top5") else "✗"
+            top10 = "✓" if eval_item.get("number_top10") else "✗"
+            top12 = "✓" if eval_item.get("number_top12") else "✗"
+            zodiac_hit = "✓" if eval_item.get("zodiac_main") else "✗"
+            odd_even_hit = "✓" if eval_item.get("odd_even_main") else "✗"
+            size_hit = "✓" if eval_item.get("size_main") else "✗"
+            wave_hit = "✓" if eval_item.get("wave_main") else "✗"
+            
+            print(f"{issue:<10} {actual:<8} {top5:<6} {top10:<6} {top12:<6} {zodiac_hit:<6} {odd_even_hit:<6} {size_hit:<6} {wave_hit:<6}")
+        
+        print("-" * 70)
+        total = len(recent_evals)
+        
+        hits = {
+            "Top5": sum(1 for e in recent_evals if e.get("number_top5")),
+            "Top10": sum(1 for e in recent_evals if e.get("number_top10")),
+            "Top12": sum(1 for e in recent_evals if e.get("number_top12")),
+            "生肖": sum(1 for e in recent_evals if e.get("zodiac_main")),
+            "单双": sum(1 for e in recent_evals if e.get("odd_even_main")),
+            "大小": sum(1 for e in recent_evals if e.get("size_main")),
+            "波色": sum(1 for e in recent_evals if e.get("wave_main")),
+        }
+        
+        print(f"{'命中':<10} {'':<8} {hits['Top5']}/{total:<5} {hits['Top10']}/{total:<5} {hits['Top12']}/{total:<5} {hits['生肖']}/{total:<5} {hits['单双']}/{total:<5} {hits['大小']}/{total:<5} {hits['波色']}/{total}")
+        print(f"{'命中率':<10} {'':<8} {hits['Top5']/total*100:.1f}%{'':<3} {hits['Top10']/total*100:.1f}%{'':<3} {hits['Top12']/total*100:.1f}%{'':<3} {hits['生肖']/total*100:.1f}%{'':<3} {hits['单双']/total*100:.1f}%{'':<3} {hits['大小']/total*100:.1f}%{'':<3} {hits['波色']/total*100:.1f}%")
+    else:
+        print("历史数据不足，暂无预测对错记录")
+    
     print()
     
     # Walk-Forward
@@ -1352,7 +1395,6 @@ def run_system() -> None:
             print_result(result)
             all_results[lottery] = result
             
-            # 生成Markdown报告
             report_path = generate_markdown_report(result)
             report_paths.append(report_path)
             print(f"[{lottery}] 报告已生成：{report_path}")
