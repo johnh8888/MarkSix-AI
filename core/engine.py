@@ -2,8 +2,8 @@
 
 """
 ============================================================
-六合彩统计分析系统 V7.7
-MULTI-WINDOW + TREND + MISSING + WALK-FORWARD + SCIENTIFIC
+六合彩统计分析系统 V7.8
+MULTI-WINDOW + TREND + MISSING + WALK-FORWARD + MONTE CARLO + REPORT
 ============================================================
 
 主要功能：
@@ -27,12 +27,19 @@ MULTI-WINDOW + TREND + MISSING + WALK-FORWARD + SCIENTIFIC
 17. 多窗口性能评估
 18. 模型稳定性评分
 19. 统计显著性检验
-20. 随机基准对比
-21. 期望值分析
-22. 风险提示
-23. JSON 输出
-24. 提供 run_system() 给 main.py 调用
+20. 蒙特卡洛模拟
+21. Markdown报告生成
+22. 期望值分析
+23. 风险提示
+24. JSON 输出
+25. 提供 run_system() 给 main.py 调用
 
+重要声明：
+
+本系统是【统计分析工具】，不是【预测工具】。
+六合彩是独立随机事件，每个号码每期概率固定。
+历史统计不能改变未来概率。
+任何命中率波动都是统计噪声。
 ============================================================
 """
 
@@ -41,6 +48,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 from datetime import datetime
 from collections import Counter
 from typing import Any
@@ -136,6 +144,7 @@ WEIGHT_COLD = 1.00
 def ensure_dirs() -> None:
     os.makedirs("data", exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "reports"), exist_ok=True)
 
 
 # ============================================================
@@ -663,7 +672,7 @@ def confidence_interval(
 
 
 # ============================================================
-# 统计显著性检验（二项检验近似）
+# 统计显著性检验
 # ============================================================
 
 def statistical_test(
@@ -671,29 +680,17 @@ def statistical_test(
     samples: int,
     expected_rate: float,
 ) -> dict[str, Any]:
-    """
-    使用正态近似的二项检验。
-    返回z值和p值。
-    """
     if samples <= 0:
         return {"z_score": 0, "p_value": 1.0, "significant": False}
-    
     p_hat = actual_hits / samples
     p0 = expected_rate
-    
     if p0 <= 0 or p0 >= 1:
         return {"z_score": 0, "p_value": 1.0, "significant": False}
-    
     se = math.sqrt(p0 * (1 - p0) / samples)
-    
     if se <= 0:
         return {"z_score": 0, "p_value": 1.0, "significant": False}
-    
     z = (p_hat - p0) / se
-    
-    # 正态分布p值（双尾）
     p_value = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
-    
     return {
         "z_score": round(z, 4),
         "p_value": round(p_value, 4),
@@ -720,13 +717,11 @@ def _performance_window(
     def count(key: str) -> int:
         return sum(1 for item in evaluations if item.get(key))
     
-    # Top10统计检验
     top10_hits = count("number_top10")
     top10_rate = hit_rate(top10_hits, total)
     top10_ci = confidence_interval(top10_rate, total)
     top10_test = statistical_test(top10_hits, total, 10/49)
     
-    # 生肖主推统计检验
     zodiac_hits = count("zodiac_main")
     zodiac_rate = hit_rate(zodiac_hits, total)
     zodiac_test = statistical_test(zodiac_hits, total, 1/12)
@@ -885,22 +880,70 @@ def calculate_model_stability(
 
 
 # ============================================================
+# 蒙特卡洛模拟
+# ============================================================
+
+def monte_carlo_simulation(
+    history: list[dict[str, Any]],
+    n_simulations: int = 10000,
+) -> dict[str, Any]:
+    """
+    蒙特卡洛模拟：验证模型是否真的优于随机猜测。
+    """
+    
+    # 计算实际Walk-Forward命中率
+    walk = walk_forward(history)
+    performance = walk.get("performance", {})
+    numbers = performance.get("numbers", {})
+    actual_top10_rate = numbers.get("top10", 0) / 100.0
+    
+    # 模拟随机猜测Top10
+    random_hits = []
+    for _ in range(n_simulations):
+        # 随机选10个号码
+        random_pick = set(random.sample(range(1, 50), 10))
+        # 随机开奖特别号码
+        actual = random.randint(1, 49)
+        random_hits.append(actual in random_pick)
+    
+    sim_hit_rate = sum(random_hits) / n_simulations
+    
+    # 计算实际命中率在随机分布中的百分位
+    actual_hits = int(actual_top10_rate * n_simulations)
+    percentile = sum(
+        1 for h in random_hits
+        if h <= actual_top10_rate
+    ) / n_simulations * 100
+    
+    # 计算p值（模拟实际命中率是否显著高于随机）
+    p_value = sum(
+        1 for h in random_hits
+        if h >= actual_top10_rate
+    ) / n_simulations
+    
+    return {
+        "n_simulations": n_simulations,
+        "actual_top10_rate": round(actual_top10_rate * 100, 2),
+        "simulated_random_rate": round(sim_hit_rate * 100, 2),
+        "theoretical_rate": round(10/49 * 100, 2),
+        "percentile": round(percentile, 2),
+        "p_value": round(p_value, 4),
+        "interpretation": (
+            f"实际命中率({actual_top10_rate*100:.2f}%)处于随机模拟的"
+            f"第{percentile:.1f}百分位。"
+            f"p值={p_value:.4f}，"
+            f"{'显著优于随机' if p_value < 0.05 else '与随机无显著差异'}"
+        ),
+    }
+
+
+# ============================================================
 # 期望值分析
 # ============================================================
 
 def expected_value_analysis() -> dict[str, Any]:
-    """
-    六合彩期望值分析。
-    假设每注成本为1单位。
-    """
-    # 特别号码单注期望值
-    # 赔率假设：特别号码赔率约40倍（实际以彩票公司为准）
     special_ev = (1/49) * 40 - (48/49) * 1
     special_ev_pct = special_ev * 100
-    
-    # Top5投注期望值（假设每个号码等额投注）
-    top5_ev = (5/49) * 40 - (44/49) * 5
-    top5_ev_pct = (top5_ev / 5) * 100
     
     return {
         "special_number": {
@@ -909,17 +952,15 @@ def expected_value_analysis() -> dict[str, Any]:
             "win_probability": round(1/49*100, 4),
             "expected_value": round(special_ev, 4),
             "expected_value_pct": round(special_ev_pct, 2),
-            "interpretation": "长期每投注1元，期望损失约" + str(abs(round(special_ev_pct, 2))) + "%",
+            "interpretation": (
+                "长期每投注1元，期望损失约"
+                f"{abs(round(special_ev_pct, 2))}%"
+            ),
         },
-        "top5": {
-            "cost": 5,
-            "payout": 40,
-            "win_probability": round(5/49*100, 4),
-            "expected_value": round(top5_ev, 4),
-            "expected_value_pct": round(top5_ev_pct, 2),
-            "interpretation": "长期每投注5元，期望损失约" + str(abs(round(top5_ev_pct, 2))) + "%",
-        },
-        "disclaimer": "以上期望值基于假设赔率，实际赔率以彩票公司公布为准。六合彩期望值始终为负，长期投注必然亏损。",
+        "disclaimer": (
+            "以上期望值基于假设赔率，实际赔率以彩票公司公布为准。"
+            "六合彩期望值始终为负，长期投注必然亏损。"
+        ),
     }
 
 
@@ -936,16 +977,19 @@ def analyze(
     latest_issue = str(latest.get("issue", ""))
     latest_numbers = latest.get("numbers", [])
     prediction_issue = next_issue(latest_issue) if latest_issue else ""
+    
     number_prediction = predict_numbers(history)
     attributes = predict_attributes(history)
     walk = walk_forward(history)
     performance = walk.get("performance", {})
     multi_performance = walk.get("multi_performance", {})
     stability = calculate_model_stability(multi_performance)
+    monte_carlo = monte_carlo_simulation(history)
+    expected_value = expected_value_analysis()
     
     return {
         "lottery": lottery_name,
-        "version": "V7.7",
+        "version": "V7.8",
         "latest_issue": latest_issue,
         "latest_draw_issue": latest_issue,
         "prediction_issue": prediction_issue,
@@ -971,7 +1015,8 @@ def analyze(
         "performance": performance,
         "multi_performance": multi_performance,
         "model_stability": stability,
-        "expected_value": expected_value_analysis(),
+        "monte_carlo": monte_carlo,
+        "expected_value": expected_value,
         "backtest": walk,
         "success": bool(history),
     }
@@ -999,6 +1044,129 @@ def print_probability(name: str, probability: dict[str, float]) -> None:
 
 
 # ============================================================
+# 生成Markdown报告
+# ============================================================
+
+def generate_markdown_report(
+    result: dict[str, Any],
+) -> str:
+    """生成Markdown格式的统计报告"""
+    
+    lottery = result.get("lottery", "")
+    report = f"""# 六合彩统计分析报告
+
+## {lottery}
+
+**生成时间**：{datetime.now().isoformat()}
+
+---
+
+### 基本信息
+
+| 项目 | 值 |
+|------|-----|
+| 历史期数 | {result.get('history_size', 0)} |
+| 最新期号 | {result.get('latest_issue', '')} |
+| 下一期号 | {result.get('prediction_issue', '')} |
+| 最新号码 | {format_numbers(result.get('latest_numbers', []))} |
+
+---
+
+### 号码排名统计
+
+| 排名 | 号码 |
+|------|------|
+| Top5 | {format_numbers(result.get('top5', []))} |
+| Top10 | {format_numbers(result.get('top10', []))} |
+| Top12 | {format_numbers(result.get('top12', []))} |
+
+---
+
+### 属性统计
+
+| 属性 | 出现频率最高 | 概率 |
+|------|-------------|------|
+| 生肖 | {result.get('attributes', {}).get('zodiac', {}).get('main', '')} | {result.get('attributes', {}).get('zodiac', {}).get('probability', {}).get(result.get('attributes', {}).get('zodiac', {}).get('main', ''), 0)}% |
+| 单双 | {result.get('attributes', {}).get('odd_even', {}).get('main', '')} | {result.get('attributes', {}).get('odd_even', {}).get('probability', {}).get(result.get('attributes', {}).get('odd_even', {}).get('main', ''), 0)}% |
+| 大小 | {result.get('attributes', {}).get('size', {}).get('main', '')} | {result.get('attributes', {}).get('size', {}).get('probability', {}).get(result.get('attributes', {}).get('size', {}).get('main', ''), 0)}% |
+| 波色 | {result.get('attributes', {}).get('wave', {}).get('main', '')} | {result.get('attributes', {}).get('wave', {}).get('probability', {}).get(result.get('attributes', {}).get('wave', {}).get('main', ''), 0)}% |
+
+---
+
+### Walk-Forward验证
+
+| 指标 | 实际值 | 随机基准 |
+|------|--------|---------|
+| Top5 | {result.get('performance', {}).get('numbers', {}).get('top5', 0)}% | 10.20% |
+| Top10 | {result.get('performance', {}).get('numbers', {}).get('top10', 0)}% | 20.41% |
+| Top12 | {result.get('performance', {}).get('numbers', {}).get('top12', 0)}% | 24.49% |
+
+**统计检验**：{result.get('performance', {}).get('numbers', {}).get('top10_statistical_test', {}).get('interpretation', '')}
+
+---
+
+### 蒙特卡洛模拟
+
+| 指标 | 值 |
+|------|-----|
+| 模拟次数 | {result.get('monte_carlo', {}).get('n_simulations', 0)} |
+| 实际Top10命中率 | {result.get('monte_carlo', {}).get('actual_top10_rate', 0)}% |
+| 随机模拟命中率 | {result.get('monte_carlo', {}).get('simulated_random_rate', 0)}% |
+| 理论命中率 | {result.get('monte_carlo', {}).get('theoretical_rate', 0)}% |
+| 百分位 | {result.get('monte_carlo', {}).get('percentile', 0)}% |
+| p值 | {result.get('monte_carlo', {}).get('p_value', 1.0)} |
+
+**结论**：{result.get('monte_carlo', {}).get('interpretation', '')}
+
+---
+
+### 期望值分析
+
+| 项目 | 值 |
+|------|-----|
+| 单注成本 | {result.get('expected_value', {}).get('special_number', {}).get('cost', 1)}元 |
+| 期望值 | {result.get('expected_value', {}).get('special_number', {}).get('expected_value_pct', 0)}% |
+| 说明 | {result.get('expected_value', {}).get('special_number', {}).get('interpretation', '')} |
+
+---
+
+### 模型稳定性
+
+| 指标 | 值 |
+|------|-----|
+| 评分 | {result.get('model_stability', {}).get('score', 0)}/100 |
+| 状态 | {result.get('model_stability', {}).get('level', '')} |
+
+---
+
+## ⚠️ 重要声明
+
+1. **本报告是统计分析结果，不是预测**
+2. **六合彩是独立随机事件，历史数据不能预测未来**
+3. **所有命中率波动都在随机范围内**
+4. **长期投注期望值为负，必然亏损**
+5. **请理性对待，不要将统计结果作为投注依据**
+
+---
+
+*报告由自动化系统生成*
+"""
+    
+    # 保存报告
+    report_dir = os.path.join(OUTPUT_DIR, "reports")
+    os.makedirs(report_dir, exist_ok=True)
+    report_path = os.path.join(
+        report_dir,
+        f"report_{lottery}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    )
+    
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report)
+    
+    return report_path
+
+
+# ============================================================
 # 打印结果
 # ============================================================
 
@@ -1012,14 +1180,14 @@ def print_result(result: dict[str, Any]) -> None:
     print("最新号码：" + format_numbers(result.get("latest_numbers", [])))
     print()
     
-    # 号码预测
+    # 号码排名
     print("【统计分析 - 号码排名】")
     print("Top5：" + format_numbers(result.get("top5", [])))
     print("Top10：" + format_numbers(result.get("top10", [])))
     print("Top12：" + format_numbers(result.get("top12", [])))
     print()
     
-    # 属性
+    # 属性统计
     attrs = result.get("attributes", {})
     print("【属性统计】")
     zodiac = attrs.get("zodiac", {})
@@ -1033,69 +1201,34 @@ def print_result(result: dict[str, Any]) -> None:
     print(f"波色：{wave.get('main', '')} (出现频率最高)")
     print()
     
-    # 平特一肖
-    pingte = result.get("pingte_zodiac", {})
-    print("【平特一肖统计】")
-    print(f"历史出现频率最高：{pingte.get('recommend', '')}")
-    if pingte.get("samples", 0) > 0:
-        print(
-            f"历史命中率：{pingte.get('hit_rate', 0)}% "
-            f"（随机基准8.33%，差异不显著）"
-        )
-    print()
-    
     # Walk-Forward
     performance = result.get("performance", {})
     if performance.get("status") == "正常":
         print("【Walk-Forward 最近10期验证】")
         print(f"验证期数：{performance.get('samples', 0)}")
         numbers = performance.get("numbers", {})
-        print(
-            f"Top5：{numbers.get('top5', 0)}% "
-            f"（随机基准10.20%）"
-        )
-        print(
-            f"Top10：{numbers.get('top10', 0)}% "
-            f"（随机基准20.41%）"
-        )
-        print(
-            f"Top12：{numbers.get('top12', 0)}% "
-            f"（随机基准24.49%）"
-        )
+        print(f"Top5：{numbers.get('top5', 0)}% （随机基准10.20%）")
+        print(f"Top10：{numbers.get('top10', 0)}% （随机基准20.41%）")
+        print(f"Top12：{numbers.get('top12', 0)}% （随机基准24.49%）")
         
-        # 统计检验
         top10_test = numbers.get("top10_statistical_test", {})
         if top10_test:
-            print(f"Top10统计检验：{top10_test.get('interpretation', '')}")
+            print(f"统计检验：{top10_test.get('interpretation', '')}")
             print(f"  z值：{top10_test.get('z_score', 0)}")
             print(f"  p值：{top10_test.get('p_value', 1.0)}")
-        
         print()
     
-    # 多窗口
-    multi = result.get("multi_performance", {})
-    windows = multi.get("windows", {})
-    if windows:
-        print("【多窗口验证】")
-        for window in ("10", "30", "50", "100"):
-            item = windows.get(window)
-            if not item:
-                continue
-            nums = item.get("numbers", {})
-            print(
-                f"{window}期：Top10 {nums.get('top10', 0)}% "
-                f"（基准20.41%）"
-            )
-        print()
-    
-    # 稳定性
-    stability = result.get("model_stability", {})
-    if stability:
-        print("【模型稳定性】")
-        print(
-            f"评分：{stability.get('score', 0)}/100 "
-            f"{stability.get('level', '')}"
-        )
+    # 蒙特卡洛
+    monte_carlo = result.get("monte_carlo", {})
+    if monte_carlo:
+        print("【蒙特卡洛模拟】")
+        print(f"模拟次数：{monte_carlo.get('n_simulations', 0)}")
+        print(f"实际Top10命中率：{monte_carlo.get('actual_top10_rate', 0)}%")
+        print(f"随机模拟命中率：{monte_carlo.get('simulated_random_rate', 0)}%")
+        print(f"理论命中率：{monte_carlo.get('theoretical_rate', 0)}%")
+        print(f"百分位：{monte_carlo.get('percentile', 0)}%")
+        print(f"p值：{monte_carlo.get('p_value', 1.0)}")
+        print(f"结论：{monte_carlo.get('interpretation', '')}")
         print()
     
     # 期望值
@@ -1103,10 +1236,14 @@ def print_result(result: dict[str, Any]) -> None:
     if ev:
         print("【期望值分析】")
         special_ev = ev.get("special_number", {})
-        print(
-            f"特别号码单注：期望值 {special_ev.get('expected_value_pct', 0)}%"
-        )
+        print(f"特别号码单注：期望值 {special_ev.get('expected_value_pct', 0)}%")
         print(f"  {special_ev.get('interpretation', '')}")
+        print()
+    
+    # 稳定性
+    stability = result.get("model_stability", {})
+    if stability:
+        print(f"【模型稳定性】{stability.get('score', 0)}/100 {stability.get('level', '')}")
         print()
     
     # 重要声明
@@ -1159,6 +1296,7 @@ def build_summary(all_results: dict[str, Any]) -> dict[str, Any]:
             "wave": attrs.get("wave", {}),
             "pingte_zodiac": result.get("pingte_zodiac", {}),
             "model_stability": result.get("model_stability", {}),
+            "monte_carlo": result.get("monte_carlo", {}),
         }
     return summary
 
@@ -1171,7 +1309,7 @@ def run_system() -> None:
     ensure_dirs()
     
     print("=" * 70)
-    print("六合彩统计分析系统 V7.7")
+    print("六合彩统计分析系统 V7.8")
     print("=" * 70)
     print()
     print("【系统声明】")
@@ -1189,6 +1327,7 @@ def run_system() -> None:
         raise
     
     all_results: dict[str, Any] = {}
+    report_paths: list[str] = []
     
     for lottery in LOTTERIES:
         print()
@@ -1213,18 +1352,23 @@ def run_system() -> None:
             print_result(result)
             all_results[lottery] = result
             
+            # 生成Markdown报告
+            report_path = generate_markdown_report(result)
+            report_paths.append(report_path)
+            print(f"[{lottery}] 报告已生成：{report_path}")
+            
         except Exception as exc:
             print(f"[ERROR] {lottery}: {exc}")
             all_results[lottery] = {
                 "lottery": lottery,
-                "version": "V7.7",
+                "version": "V7.8",
                 "success": False,
                 "error": str(exc),
             }
     
     # 保存输出
     prediction = {
-        "version": "V7.7",
+        "version": "V7.8",
         "generated_at": datetime.now().isoformat(),
         "disclaimer": "本系统输出仅供统计分析参考，不构成任何投注建议。六合彩是随机事件，长期投注期望值为负。",
         "lotteries": all_results,
@@ -1232,7 +1376,7 @@ def run_system() -> None:
     prediction_path = save_json("prediction.json", prediction)
     
     backtest = {
-        "version": "V7.7",
+        "version": "V7.8",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: result.get("backtest", {})
@@ -1242,13 +1386,14 @@ def run_system() -> None:
     backtest_path = save_json("backtest.json", backtest)
     
     module_performance = {
-        "version": "V7.7",
+        "version": "V7.8",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: {
                 "performance": result.get("performance", {}),
                 "multi_performance": result.get("multi_performance", {}),
                 "model_stability": result.get("model_stability", {}),
+                "monte_carlo": result.get("monte_carlo", {}),
             }
             for name, result in all_results.items()
         },
@@ -1256,7 +1401,7 @@ def run_system() -> None:
     performance_path = save_json("module_performance.json", module_performance)
     
     summary = {
-        "version": "V7.7",
+        "version": "V7.8",
         "generated_at": datetime.now().isoformat(),
         "summary": build_summary(all_results),
     }
@@ -1270,6 +1415,10 @@ def run_system() -> None:
     print(f"  - {backtest_path}")
     print(f"  - {performance_path}")
     print(f"  - {summary_path}")
+    print()
+    print("统计报告已生成：")
+    for path in report_paths:
+        print(f"  - {path}")
     print("=" * 70)
     print()
     print("=" * 70)
