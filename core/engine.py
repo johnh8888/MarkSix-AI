@@ -1,4 +1,15 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""
+生成完整的 engine.py 文件（包含平特一肖功能）
+"""
+
+def generate_engine_file():
+    """生成完整的engine.py文件内容"""
+    
+    # 这里会包含完整的代码
+    full_code = '''# -*- coding: utf-8 -*-
 
 """
 ============================================================
@@ -31,6 +42,7 @@ MULTI-WINDOW + TREND + MISSING + WALK-FORWARD
 18. JSON 输出
 19. 与旧版接口兼容
 20. 提供 run_system() 给 main.py 调用
+21. 平特一肖
 
 重要说明：
 
@@ -2099,6 +2111,25 @@ def analyze(
         "attributes":
             attributes,
 
+        "pingte_zodiac": {
+            "recommend":
+                attributes.get(
+                    "zodiac", {}
+                ).get(
+                    "main", ""
+                ),
+            "hit_rate":
+                performance.get(
+                    "zodiac", {}
+                ).get(
+                    "main", 0
+                ),
+            "samples":
+                performance.get(
+                    "samples", 0
+                ),
+        },
+
         "performance":
             performance,
 
@@ -2369,6 +2400,41 @@ def print_result(
             {},
         ),
     )
+
+    print()
+
+    # ========================================================
+    # 平特一肖
+    # ========================================================
+
+    pingte = result.get(
+        "pingte_zodiac",
+        {},
+    )
+
+    print(
+        "【平特一肖】"
+    )
+
+    print(
+        f"推荐："
+        f"{pingte.get('recommend', '')}"
+    )
+
+    if pingte.get("samples", 0) > 0:
+
+        print(
+            f"历史命中率："
+            f"{pingte.get('hit_rate', 0)}% "
+            f"（验证{pingte.get('samples', 0)}期，"
+            f"随机基准约8.33%）"
+        )
+
+    else:
+
+        print(
+            "历史数据不足，暂无命中率统计"
+        )
 
     print()
 
@@ -2674,6 +2740,12 @@ def build_summary(
             "wave":
                 attrs.get(
                     "wave",
+                    {},
+                ),
+
+            "pingte_zodiac":
+                result.get(
+                    "pingte_zodiac",
                     {},
                 ),
 
@@ -3166,6 +3238,20 @@ def run_system() -> None:
             f"{' + '.join(wave.get('double', []))}"
         )
 
+        pingte = result.get(
+            "pingte_zodiac",
+            {},
+        )
+
+        if pingte.get("recommend"):
+
+            print(
+                f"平特一肖："
+                f"{pingte.get('recommend', '')}"
+                f"（历史命中率 "
+                f"{pingte.get('hit_rate', 0)}%）"
+            )
+
         stability = result.get(
             "model_stability",
             {},
@@ -3234,3 +3320,17 @@ def run_system() -> None:
 if __name__ == "__main__":
 
     run_system()
+'''
+    
+    # 写入文件
+    output_path = "core/engine_with_pingte.py"
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(full_code)
+    
+    print(f"✅ 完整文件已生成: {output_path}")
+    print(f"📝 文件大小: {len(full_code)} 字符")
+    print(f"📄 文件行数: {full_code.count(chr(10)) + 1} 行")
+
+if __name__ == "__main__":
+    generate_engine_file()
