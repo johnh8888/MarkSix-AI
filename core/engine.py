@@ -2,16 +2,22 @@
 
 """
 ============================================================
-六合彩统计分析系统 V7.9
-ENHANCED INDEPENDENT MODULES
+六合彩统计分析系统 V8.0
+ENHANCED MODULES + SCIENTIFIC EVALUATION
 ============================================================
 
+特点：
+1. 保留V7.9的增强独立模块（短期预测能力强）
+2. 保留V7.7的科学评估体系（统计检验+置信区间）
+3. 同时显示短期和长期视角
+4. 明确标注短期高命中率可能是统计波动
+
 每个独立模块增强：
-1. 号码预测：+间隔分析+尾数分析+连号分析
-2. 生肖预测：+趋势+遗漏+周期分析
-3. 单双预测：+连续趋势+交替模式
-4. 大小预测：+区间分布+边界分析
-5. 波色预测：+连续波色+转换矩阵
+- 号码预测：+间隔分析+尾数分析+连号分析
+- 生肖预测：+趋势+遗漏+周期分析
+- 单双预测：+连续趋势+交替模式
+- 大小预测：+近期趋势
+- 波色预测：+近期趋势+综合评分
 
 重要声明：
 本系统是【统计分析工具】，不是【预测工具】。
@@ -378,7 +384,6 @@ def get_dynamic_weights(
 # ============================================================
 
 def calculate_intervals(history: list[dict[str, Any]]) -> dict[int, float]:
-    """计算每个号码的平均出现间隔"""
     intervals: dict[int, list[int]] = {}
     last_seen: dict[int, int] = {}
     
@@ -400,7 +405,6 @@ def calculate_intervals(history: list[dict[str, Any]]) -> dict[int, float]:
 
 
 def calculate_interval_score(interval: float) -> float:
-    """间隔评分：接近理论间隔（49期）的号码加分"""
     if interval <= 0:
         return 0.0
     theoretical = 49
@@ -416,7 +420,6 @@ def calculate_tail_frequency(
     history: list[dict[str, Any]],
     window: int = 50,
 ) -> Counter:
-    """尾数频率统计"""
     tail_counter = Counter()
     for num in special_history(history, window):
         tail_counter[num % 10] += 1
@@ -431,7 +434,6 @@ def calculate_consecutive_bonus(
     history: list[dict[str, Any]],
     window: int = 10,
 ) -> dict[int, float]:
-    """连号分析：最近出现过的号码附近号码加分"""
     recent = special_history(history, window)
     bonus: dict[int, float] = {}
     
@@ -463,7 +465,6 @@ def predict_numbers(
     recent100 = Counter(special_history(history, WINDOW_100))
     missing_map = missing_periods_all(history)
     
-    # 新增分析
     interval_map = calculate_intervals(history)
     tail_counter = calculate_tail_frequency(history)
     consecutive_bonus = calculate_consecutive_bonus(history)
@@ -482,7 +483,6 @@ def predict_numbers(
         trend = trend_score(number, history)
         hot_cold = hot_cold_bonus(number, recent30, recent100)
         
-        # 新增分数
         interval = interval_map.get(number, 0.0)
         interval_score = calculate_interval_score(interval) * WEIGHT_INTERVAL
         
@@ -571,7 +571,6 @@ def calculate_zodiac_missing(
 def calculate_zodiac_cycle(
     history: list[dict[str, Any]],
 ) -> dict[str, float]:
-    """生肖周期分析：12期前出现的生肖"""
     cycle = {animal: 0.0 for animal in ANIMALS}
     
     if len(history) < 12:
@@ -1241,7 +1240,7 @@ def analyze(
     
     return {
         "lottery": lottery_name,
-        "version": "V7.9",
+        "version": "V8.0",
         "latest_issue": latest_issue,
         "latest_draw_issue": latest_issue,
         "prediction_issue": prediction_issue,
@@ -1291,7 +1290,7 @@ def format_numbers(numbers: list[int]) -> str:
 
 def print_result(result: dict[str, Any]) -> None:
     print("=" * 70)
-    print(f"【{result.get('lottery', '')}】")
+    print(f"【{result.get('lottery', '')}】 V8.0")
     print("=" * 70)
     print(f"历史期数：{result.get('history_size', 0)}")
     print(f"最新开奖期数：{result.get('latest_issue', '')}")
@@ -1300,28 +1299,28 @@ def print_result(result: dict[str, Any]) -> None:
     print()
     
     # 号码排名
-    print("【号码统计分析（增强版）】")
+    print("【号码预测（增强版）】")
     print("Top5：" + format_numbers(result.get("top5", [])))
     print("Top10：" + format_numbers(result.get("top10", [])))
     print("Top12：" + format_numbers(result.get("top12", [])))
     print()
     
-    # 属性统计
+    # 属性预测
     attrs = result.get("attributes", {})
-    print("【属性统计（增强版）】")
+    print("【属性预测（增强版）】")
     
     zodiac = attrs.get("zodiac", {})
-    print(f"生肖：{zodiac.get('main', '')} (综合评分最高)")
+    print(f"生肖主推：{zodiac.get('main', '')}")
     print(f"生肖Top5：{' / '.join(zodiac.get('top5', []))}")
     
     odd_even = attrs.get("odd_even", {})
-    print(f"单双：{odd_even.get('main', '')}")
+    print(f"单双主推：{odd_even.get('main', '')}")
     
     size = attrs.get("size", {})
-    print(f"大小：{size.get('main', '')}")
+    print(f"大小主推：{size.get('main', '')}")
     
     wave = attrs.get("wave", {})
-    print(f"波色：{wave.get('main', '')} / 次推 {wave.get('secondary', '')}")
+    print(f"波色主推：{wave.get('main', '')} / 次推：{wave.get('secondary', '')}")
     print()
     
     # 最近10期对错
@@ -1365,45 +1364,43 @@ def print_result(result: dict[str, Any]) -> None:
         print("历史数据不足")
     print()
     
-    # Walk-Forward
+    # 短期vs长期
     performance = result.get("performance", {})
+    multi = result.get("multi_performance", {})
+    
     if performance.get("status") == "正常":
-        print("【Walk-Forward验证】")
-        print(f"验证期数：{performance.get('samples', 0)}")
+        print("【短期表现（最近10期）】")
         numbers = performance.get("numbers", {})
-        print(f"Top5：{numbers.get('top5', 0)}% （随机基准10.20%）")
-        print(f"Top10：{numbers.get('top10', 0)}% （随机基准20.41%）")
-        print(f"Top12：{numbers.get('top12', 0)}% （随机基准24.49%）")
-        top10_test = numbers.get("top10_statistical_test", {})
-        if top10_test:
-            print(f"统计检验：{top10_test.get('interpretation', '')}")
+        print(f"Top5：{numbers.get('top5', 0)}% | Top10：{numbers.get('top10', 0)}% | Top12：{numbers.get('top12', 0)}%")
+        print()
+    
+    windows = multi.get("windows", {})
+    if windows:
+        print("【长期表现（多窗口）】")
+        for window in ("10", "30", "50", "100"):
+            item = windows.get(window)
+            if item:
+                nums = item.get("numbers", {})
+                print(f"{window}期：Top10 {nums.get('top10', 0)}% (基准20.41%)")
         print()
     
     # 蒙特卡洛
     monte_carlo = result.get("monte_carlo", {})
     if monte_carlo:
-        print("【蒙特卡洛模拟】")
-        print(f"p值：{monte_carlo.get('p_value', 1.0)}")
-        print(f"结论：{monte_carlo.get('interpretation', '')}")
-        print()
-    
-    # 期望值
-    ev = result.get("expected_value", {})
-    if ev:
-        print(f"【期望值】{ev.get('special_number', {}).get('expected_value_pct', 0)}%")
+        print(f"【蒙特卡洛验证】p值：{monte_carlo.get('p_value', 1.0)} - {monte_carlo.get('interpretation', '')}")
         print()
     
     # 稳定性
     stability = result.get("model_stability", {})
     if stability:
-        print(f"【稳定性】{stability.get('score', 0)}/100 {stability.get('level', '')}")
+        print(f"【模型稳定性】{stability.get('score', 0)}/100 {stability.get('level', '')}")
         print()
     
     # 声明
     print("=" * 70)
-    print("【重要声明】本系统是统计分析工具，不是预测工具。")
-    print("六合彩是独立随机事件，历史统计不能预测未来。")
-    print("长期投注期望值为负，必然亏损。")
+    print("⚠️ 短期高命中率可能是统计波动，不代表真实预测能力")
+    print("⚠️ 本系统是统计分析工具，不是预测工具")
+    print("⚠️ 长期投注期望值为负，必然亏损")
     print("=" * 70)
     print()
 
@@ -1456,12 +1453,13 @@ def run_system() -> None:
     ensure_dirs()
     
     print("=" * 70)
-    print("六合彩统计分析系统 V7.9 - 增强独立模块版")
+    print("六合彩统计分析系统 V8.0 - 增强模块+科学评估")
     print("=" * 70)
     print()
     print("【系统声明】")
     print("本系统是统计分析工具，用于研究六合彩的历史统计特征。")
     print("六合彩是独立随机事件，历史数据不能预测未来结果。")
+    print("短期高命中率可能是统计波动，不代表真实预测能力。")
     print("=" * 70)
     print()
     
@@ -1501,22 +1499,22 @@ def run_system() -> None:
             print(f"[ERROR] {lottery}: {exc}")
             all_results[lottery] = {
                 "lottery": lottery,
-                "version": "V7.9",
+                "version": "V8.0",
                 "success": False,
                 "error": str(exc),
             }
     
     # 保存输出
     prediction = {
-        "version": "V7.9",
+        "version": "V8.0",
         "generated_at": datetime.now().isoformat(),
-        "disclaimer": "本系统输出仅供统计分析参考，不构成任何投注建议。",
+        "disclaimer": "本系统输出仅供统计分析参考，不构成任何投注建议。短期高命中率可能是统计波动。",
         "lotteries": all_results,
     }
     prediction_path = save_json("prediction.json", prediction)
     
     backtest = {
-        "version": "V7.9",
+        "version": "V8.0",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: result.get("backtest", {})
@@ -1526,7 +1524,7 @@ def run_system() -> None:
     backtest_path = save_json("backtest.json", backtest)
     
     module_performance = {
-        "version": "V7.9",
+        "version": "V8.0",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: {
@@ -1541,7 +1539,7 @@ def run_system() -> None:
     performance_path = save_json("module_performance.json", module_performance)
     
     summary = {
-        "version": "V7.9",
+        "version": "V8.0",
         "generated_at": datetime.now().isoformat(),
         "summary": build_summary(all_results),
     }
@@ -1560,7 +1558,7 @@ def run_system() -> None:
     print("【最终声明】")
     print("1. 本系统是统计分析工具，不是预测工具")
     print("2. 六合彩是独立随机事件")
-    print("3. 历史统计不能改变未来概率")
+    print("3. 短期高命中率可能是运气")
     print("4. 长期投注期望值为负，必然亏损")
     print("5. 请理性对待，不要将统计结果作为投注依据")
     print("=" * 70)
