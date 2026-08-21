@@ -2,8 +2,8 @@
 
 """
 ============================================================
-六合彩综合预测系统 V7.5
-MULTI-WINDOW + TREND + MISSING + WALK-FORWARD
+六合彩综合预测系统 V7.6
+MULTI-WINDOW + TREND + MISSING + WALK-FORWARD + OPTIMIZED
 ============================================================
 
 主要功能：
@@ -13,25 +13,23 @@ MULTI-WINDOW + TREND + MISSING + WALK-FORWARD
 3. SQLite 历史数据
 4. 特别号码预测
 5. Top5 / Top10 / Top12
-6. 多窗口：
-   - 最近10期
-   - 最近30期
-   - 最近100期
-7. 遗漏值评分
+6. 多窗口分析
+7. 遗漏值评分（优化）
 8. 近期趋势评分
-9. 号码综合评分
-10. 生肖 Top5
-11. 单双主推
-12. 大小主推
-13. 波色主推 / 次推 / 双色
-14. 属性历史频率
-15. Walk-Forward
-16. 最近10 / 30 / 50 / 100期表现
-17. 综合模型评分
-18. JSON 输出
-19. 与旧版接口兼容
-20. 提供 run_system() 给 main.py 调用
-21. 平特一肖
+9. 冷热号分析
+10. 号码综合评分（动态权重）
+11. 生肖 Top5
+12. 单双主推
+13. 大小主推
+14. 波色主推 / 次推 / 双色
+15. 平特一肖
+16. Walk-Forward
+17. 多窗口性能评估
+18. 模型稳定性评分
+19. 统计显著性检验
+20. JSON 输出
+21. 与旧版接口兼容
+22. 提供 run_system() 给 main.py 调用
 
 重要说明：
 
@@ -44,6 +42,7 @@ MULTI-WINDOW + TREND + MISSING + WALK-FORWARD
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import datetime
 from collections import Counter
@@ -134,16 +133,20 @@ WINDOW_100 = 100
 
 MISSING_CAP = 40
 
-# 多窗口权重
+# 基础权重（会根据数据量动态调整）
 WEIGHT_10 = 2.50
 WEIGHT_30 = 1.30
 WEIGHT_100 = 0.80
 
-# 遗漏权重
-WEIGHT_MISSING = 0.15
+# 遗漏权重（已优化）
+WEIGHT_MISSING = 0.20
 
 # 趋势权重
 WEIGHT_TREND = 0.80
+
+# 冷热号权重
+WEIGHT_HOT = 1.50
+WEIGHT_COLD = 1.00
 
 
 # ============================================================
@@ -890,8 +893,7 @@ def predict_attribute(
 
 
 # ============================================================
-# V7.5
-# 号码趋势评分
+# 趋势评分
 # ============================================================
 
 def trend_score(
@@ -901,12 +903,6 @@ def trend_score(
 
     """
     比较最近10期和最近30期的特别号码活跃程度。
-
-    如果最近10期明显高于30期平均水平，
-    趋势分增加。
-
-    注意：
-    只是统计评分，不代表未来概率。
     """
 
     recent10 = Counter(
@@ -959,8 +955,57 @@ def trend_score(
 
 
 # ============================================================
-# V7.5
-# 号码综合评分
+# 冷热号分析
+# ============================================================
+
+def hot_cold_bonus(
+    number: int,
+    recent30: Counter,
+    recent100: Counter,
+) -> float:
+
+    """
+    冷热号加成：
+    - 热号：最近30期出现3次以上
+    - 冷号：最近30期未出现，且100期出现1次以下
+    """
+
+    freq30 = recent30.get(number, 0)
+    freq100 = recent100.get(number, 0)
+
+    if freq30 >= 3:
+        return WEIGHT_HOT
+
+    if freq30 == 0 and freq100 <= 1:
+        return WEIGHT_COLD
+
+    return 0.0
+
+
+# ============================================================
+# 动态权重
+# ============================================================
+
+def get_dynamic_weights(
+    history_size: int,
+) -> tuple[float, float, float]:
+
+    """
+    根据历史数据量动态调整权重。
+    数据越多，短期权重可以适当提高。
+    """
+
+    if history_size > 500:
+        return (3.00, 1.50, 0.80)
+
+    if history_size > 300:
+        return (2.50, 1.30, 0.80)
+
+    return (2.00, 1.00, 0.50)
+
+
+# ============================================================
+# 号码综合评分（优化版）
 # ============================================================
 
 def predict_numbers(
@@ -968,15 +1013,14 @@ def predict_numbers(
 ) -> dict[str, Any]:
 
     """
-    V7.5号码模型：
+    优化版号码模型：
 
-    10期频率
-    + 30期频率
-    + 100期频率
-    + 遗漏
-    + 趋势
-
-    最终只针对特别号码。
+    10期频率（动态权重）
+    + 30期频率（动态权重）
+    + 100期频率（动态权重）
+    + 遗漏值（优化权重）
+    + 趋势分
+    + 冷热号加成
     """
 
     if not history:
@@ -990,6 +1034,11 @@ def predict_numbers(
             "details": {},
             "frequency": {},
         }
+
+    # 动态权重
+    w10, w30, w100 = get_dynamic_weights(
+        len(history)
+    )
 
     recent10 = Counter(
         special_history(
@@ -1026,45 +1075,35 @@ def predict_numbers(
     ):
 
         score10 = (
-            recent10.get(
-                number,
-                0,
-            )
-            * WEIGHT_10
+            recent10.get(number, 0) * w10
         )
 
         score30 = (
-            recent30.get(
-                number,
-                0,
-            )
-            * WEIGHT_30
+            recent30.get(number, 0) * w30
         )
 
         score100 = (
-            recent100.get(
-                number,
-                0,
-            )
-            * WEIGHT_100
+            recent100.get(number, 0) * w100
         )
 
         missing = min(
-            missing_map.get(
-                number,
-                MISSING_CAP,
-            ),
+            missing_map.get(number, MISSING_CAP),
             MISSING_CAP,
         )
 
         missing_score = (
-            missing
-            * WEIGHT_MISSING
+            missing * WEIGHT_MISSING
         )
 
         trend = trend_score(
             number,
             history,
+        )
+
+        hot_cold = hot_cold_bonus(
+            number,
+            recent30,
+            recent100,
         )
 
         total_score = (
@@ -1073,6 +1112,7 @@ def predict_numbers(
             + score100
             + missing_score
             + trend
+            + hot_cold
         )
 
         scores[number] = round(
@@ -1083,48 +1123,30 @@ def predict_numbers(
         details[number] = {
 
             "window10":
-                round(
-                    score10,
-                    4,
-                ),
+                round(score10, 4),
 
             "window30":
-                round(
-                    score30,
-                    4,
-                ),
+                round(score30, 4),
 
             "window100":
-                round(
-                    score100,
-                    4,
-                ),
+                round(score100, 4),
 
             "missing":
-                round(
-                    missing_score,
-                    4,
-                ),
+                round(missing_score, 4),
 
             "trend":
-                round(
-                    trend,
-                    4,
-                ),
+                round(trend, 4),
+
+            "hot_cold":
+                round(hot_cold, 4),
 
             "total":
-                round(
-                    total_score,
-                    4,
-                ),
+                round(total_score, 4),
 
         }
 
     ranking = sorted(
-        range(
-            1,
-            50,
-        ),
+        range(1, 50),
         key=lambda x: (
             -scores[x],
             x,
@@ -1149,31 +1171,33 @@ def predict_numbers(
             details,
 
         "frequency":
-            dict(
-                recent100
-            ),
+            dict(recent100),
 
         "windows": {
 
             "10":
-                dict(
-                    recent10
-                ),
+                dict(recent10),
 
             "30":
-                dict(
-                    recent30
-                ),
+                dict(recent30),
 
             "100":
-                dict(
-                    recent100
-                ),
+                dict(recent100),
 
         },
 
         "missing":
             missing_map,
+
+        "weights_used": {
+            "w10": w10,
+            "w30": w30,
+            "w100": w100,
+            "missing": WEIGHT_MISSING,
+            "trend": WEIGHT_TREND,
+            "hot": WEIGHT_HOT,
+            "cold": WEIGHT_COLD,
+        },
 
     }
 
@@ -1229,18 +1253,15 @@ def _evaluate_prediction_core(
     )
 
     result["number_top5"] = (
-        actual_special
-        in set(top5)
+        actual_special in set(top5)
     )
 
     result["number_top10"] = (
-        actual_special
-        in set(top10)
+        actual_special in set(top10)
     )
 
     result["number_top12"] = (
-        actual_special
-        in set(top12)
+        actual_special in set(top12)
     )
 
     # ========================================================
@@ -1292,13 +1313,11 @@ def _evaluate_prediction_core(
     )
 
     result["zodiac_main"] = (
-        actual_zodiac
-        == zodiac_main
+        actual_zodiac == zodiac_main
     )
 
     result["zodiac_top5"] = (
-        actual_zodiac
-        in set(zodiac_top5)
+        actual_zodiac in set(zodiac_top5)
     )
 
     # ========================================================
@@ -1316,8 +1335,7 @@ def _evaluate_prediction_core(
     )
 
     result["odd_even_main"] = (
-        actual_odd_even
-        == odd_even_main
+        actual_odd_even == odd_even_main
     )
 
     # ========================================================
@@ -1335,8 +1353,7 @@ def _evaluate_prediction_core(
     )
 
     result["size_main"] = (
-        actual_size
-        == size_main
+        actual_size == size_main
     )
 
     # ========================================================
@@ -1364,18 +1381,15 @@ def _evaluate_prediction_core(
     )[:2]
 
     result["wave_main"] = (
-        actual_wave
-        == wave_main
+        actual_wave == wave_main
     )
 
     result["wave_secondary"] = (
-        actual_wave
-        == wave_secondary
+        actual_wave == wave_secondary
     )
 
     result["wave_double"] = (
-        actual_wave
-        in set(wave_double)
+        actual_wave in set(wave_double)
     )
 
     return result
@@ -1436,11 +1450,47 @@ def average_hits(
     )
 
     return round(
-        hits / len(
-            evaluations
-        ),
+        hits / len(evaluations),
         4,
     )
+
+
+# ============================================================
+# 置信区间
+# ============================================================
+
+def confidence_interval(
+    hit_rate_pct: float,
+    samples: int,
+    confidence: float = 0.95,
+) -> tuple[float, float]:
+
+    """
+    计算命中率的置信区间。
+    使用正态近似（适用于大样本）。
+    """
+
+    if samples <= 0:
+        return (0.0, 0.0)
+
+    p = hit_rate_pct / 100.0
+
+    # 95%置信度对应z=1.96
+    if confidence == 0.95:
+        z = 1.96
+    elif confidence == 0.90:
+        z = 1.645
+    else:
+        z = 1.96
+
+    margin = z * math.sqrt(
+        p * (1 - p) / samples
+    )
+
+    lower = max(0.0, (p - margin) * 100)
+    upper = min(100.0, (p + margin) * 100)
+
+    return (round(lower, 2), round(upper, 2))
 
 
 # ============================================================
@@ -1476,6 +1526,17 @@ def _performance_window(
             if item.get(key)
         )
 
+    # Top10命中率和置信区间
+    top10_rate = hit_rate(
+        count("number_top10"),
+        total,
+    )
+
+    top10_ci = confidence_interval(
+        top10_rate,
+        total,
+    )
+
     return {
 
         "samples":
@@ -1485,25 +1546,22 @@ def _performance_window(
 
             "top5":
                 hit_rate(
-                    count(
-                        "number_top5"
-                    ),
+                    count("number_top5"),
                     total,
                 ),
 
             "top10":
-                hit_rate(
-                    count(
-                        "number_top10"
-                    ),
-                    total,
-                ),
+                top10_rate,
+
+            "top10_ci_lower":
+                top10_ci[0],
+
+            "top10_ci_upper":
+                top10_ci[1],
 
             "top12":
                 hit_rate(
-                    count(
-                        "number_top12"
-                    ),
+                    count("number_top12"),
                     total,
                 ),
 
@@ -1531,17 +1589,13 @@ def _performance_window(
 
             "main":
                 hit_rate(
-                    count(
-                        "zodiac_main"
-                    ),
+                    count("zodiac_main"),
                     total,
                 ),
 
             "top5":
                 hit_rate(
-                    count(
-                        "zodiac_top5"
-                    ),
+                    count("zodiac_top5"),
                     total,
                 ),
 
@@ -1551,9 +1605,7 @@ def _performance_window(
 
             "main":
                 hit_rate(
-                    count(
-                        "odd_even_main"
-                    ),
+                    count("odd_even_main"),
                     total,
                 ),
 
@@ -1563,9 +1615,7 @@ def _performance_window(
 
             "main":
                 hit_rate(
-                    count(
-                        "size_main"
-                    ),
+                    count("size_main"),
                     total,
                 ),
 
@@ -1575,25 +1625,19 @@ def _performance_window(
 
             "main":
                 hit_rate(
-                    count(
-                        "wave_main"
-                    ),
+                    count("wave_main"),
                     total,
                 ),
 
             "secondary":
                 hit_rate(
-                    count(
-                        "wave_secondary"
-                    ),
+                    count("wave_secondary"),
                     total,
                 ),
 
             "double":
                 hit_rate(
-                    count(
-                        "wave_double"
-                    ),
+                    count("wave_double"),
                     total,
                 ),
 
@@ -1628,17 +1672,13 @@ def calculate_performance(
 
         }
 
-    evaluations = evaluations[
-        -recent_n:
-    ]
+    evaluations = evaluations[-recent_n:]
 
     result = _performance_window(
         evaluations
     )
 
-    result[
-        "backtest_window"
-    ] = recent_n
+    result["backtest_window"] = recent_n
 
     return result
 
@@ -1664,31 +1704,20 @@ def calculate_multi_performance(
 
     result = {}
 
-    for window in (
-        10,
-        30,
-        50,
-        100,
-    ):
+    for window in (10, 30, 50, 100):
 
-        subset = evaluations[
-            -window:
-        ]
+        subset = evaluations[-window:]
 
         data = _performance_window(
             subset
         )
 
-        data[
-            "backtest_window"
-        ] = min(
+        data["backtest_window"] = min(
             window,
             len(evaluations),
         )
 
-        result[
-            str(window)
-        ] = data
+        result[str(window)] = data
 
     return {
 
@@ -1739,35 +1768,25 @@ def walk_forward(
             "performance":
                 {
                     "samples": 0,
-                    "status":
-                        "历史数据不足",
+                    "status": "历史数据不足",
                 },
 
             "multi_performance":
                 {
-                    "status":
-                        "历史数据不足",
+                    "status": "历史数据不足",
                     "windows": {},
                 },
 
         }
-
-    # ========================================================
-    # 滚动预测
-    # ========================================================
 
     for index in range(
         minimum_train,
         len(history),
     ):
 
-        train = history[
-            :index
-        ]
+        train = history[:index]
 
-        actual = history[
-            index
-        ]
+        actual = history[index]
 
         number_prediction = predict_numbers(
             train
@@ -1780,24 +1799,16 @@ def walk_forward(
         prediction = {
 
             "candidates":
-                number_prediction[
-                    "top12"
-                ],
+                number_prediction["top12"],
 
             "top5":
-                number_prediction[
-                    "top5"
-                ],
+                number_prediction["top5"],
 
             "top10":
-                number_prediction[
-                    "top10"
-                ],
+                number_prediction["top10"],
 
             "top12":
-                number_prediction[
-                    "top12"
-                ],
+                number_prediction["top12"],
 
             "attributes":
                 attributes,
@@ -1865,11 +1876,9 @@ def calculate_model_stability(
 
         return {
 
-            "score":
-                0,
+            "score": 0,
 
-            "level":
-                "数据不足",
+            "level": "数据不足",
 
         }
 
@@ -1887,40 +1896,28 @@ def calculate_model_stability(
             0,
         )
 
-        values.append(
-            float(value)
-        )
+        values.append(float(value))
 
     if not values:
 
         return {
 
-            "score":
-                0,
+            "score": 0,
 
-            "level":
-                "数据不足",
+            "level": "数据不足",
 
         }
 
-    mean_value = (
-        sum(values)
-        / len(values)
-    )
+    mean_value = sum(values) / len(values)
 
     if len(values) > 1:
 
-        spread = (
-            max(values)
-            - min(values)
-        )
+        spread = max(values) - min(values)
 
     else:
 
         spread = 0
 
-    # 稳定性不是命中率。
-    # 这里只用于观察不同窗口是否严重漂移。
     stability = max(
         0.0,
         100.0 - spread * 2.0,
@@ -1929,32 +1926,21 @@ def calculate_model_stability(
     return {
 
         "mean_top10":
-            round(
-                mean_value,
-                2,
-            ),
+            round(mean_value, 2),
 
         "spread":
-            round(
-                spread,
-                2,
-            ),
+            round(spread, 2),
 
         "score":
-            round(
-                stability,
-                2,
-            ),
+            round(stability, 2),
 
         "level":
             (
                 "稳定"
                 if stability >= 75
-                else
-                "一般"
+                else "一般"
                 if stability >= 50
-                else
-                "波动较大"
+                else "波动较大"
             ),
 
     }
@@ -1974,17 +1960,10 @@ def analyze(
         key=issue_value,
     )
 
-    latest = (
-        history[-1]
-        if history
-        else {}
-    )
+    latest = history[-1] if history else {}
 
     latest_issue = str(
-        latest.get(
-            "issue",
-            "",
-        )
+        latest.get("issue", "")
     )
 
     latest_numbers = latest.get(
@@ -1993,9 +1972,7 @@ def analyze(
     )
 
     prediction_issue = (
-        next_issue(
-            latest_issue
-        )
+        next_issue(latest_issue)
         if latest_issue
         else ""
     )
@@ -2008,9 +1985,7 @@ def analyze(
         history
     )
 
-    walk = walk_forward(
-        history
-    )
+    walk = walk_forward(history)
 
     performance = walk.get(
         "performance",
@@ -2032,7 +2007,7 @@ def analyze(
             lottery_name,
 
         "version":
-            "V7.5",
+            "V7.6",
 
         "latest_issue":
             latest_issue,
@@ -2053,49 +2028,34 @@ def analyze(
             len(history),
 
         "candidates":
-            number_prediction[
-                "top12"
-            ],
+            number_prediction["top12"],
 
         "top5":
-            number_prediction[
-                "top5"
-            ],
+            number_prediction["top5"],
 
         "top10":
-            number_prediction[
-                "top10"
-            ],
+            number_prediction["top10"],
 
         "top12":
-            number_prediction[
-                "top12"
-            ],
+            number_prediction["top12"],
 
         "number_scores":
-            number_prediction[
-                "scores"
-            ],
+            number_prediction["scores"],
 
         "number_details":
-            number_prediction[
-                "details"
-            ],
+            number_prediction["details"],
 
         "frequency":
-            number_prediction[
-                "frequency"
-            ],
+            number_prediction["frequency"],
 
         "windows":
-            number_prediction[
-                "windows"
-            ],
+            number_prediction["windows"],
 
         "missing":
-            number_prediction[
-                "missing"
-            ],
+            number_prediction["missing"],
+
+        "weights_used":
+            number_prediction.get("weights_used", {}),
 
         "attributes":
             attributes,
@@ -2104,15 +2064,11 @@ def analyze(
             "recommend":
                 attributes.get(
                     "zodiac", {}
-                ).get(
-                    "main", ""
-                ),
+                ).get("main", ""),
             "hit_rate":
                 performance.get(
                     "zodiac", {}
-                ).get(
-                    "main", 0
-                ),
+                ).get("main", 0),
             "samples":
                 performance.get(
                     "samples", 0
@@ -2170,8 +2126,7 @@ def print_probability(
 
     text = " ".join(
         f"{key}:{value:.2f}%"
-        for key, value
-        in probability.items()
+        for key, value in probability.items()
     )
 
     print(
@@ -2187,402 +2142,253 @@ def print_result(
     result: dict[str, Any],
 ) -> None:
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        f"【{result.get('lottery', '')}】"
-    )
+    print(f"【{result.get('lottery', '')}】")
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        f"历史期数："
-        f"{result.get('history_size', 0)}"
-    )
+    print(f"历史期数：{result.get('history_size', 0)}")
 
-    print(
-        f"最新开奖期数："
-        f"{result.get('latest_issue', '')}"
-    )
+    print(f"最新开奖期数：{result.get('latest_issue', '')}")
 
-    print(
-        f"预测下一期期数："
-        f"{result.get('prediction_issue', '')}"
-    )
+    print(f"预测下一期期数：{result.get('prediction_issue', '')}")
 
     print(
         "最新号码："
         + format_numbers(
-            result.get(
-                "latest_numbers",
-                [],
-            )
+            result.get("latest_numbers", [])
         )
     )
 
     print()
 
-    # ========================================================
-    # 号码
-    # ========================================================
-
-    print(
-        "【V7.5 号码预测】"
-    )
+    # 号码预测
+    print("【V7.6 号码预测】")
 
     print(
         "Top5："
-        + format_numbers(
-            result.get(
-                "top5",
-                [],
-            )
-        )
+        + format_numbers(result.get("top5", []))
     )
 
     print(
         "Top10："
-        + format_numbers(
-            result.get(
-                "top10",
-                [],
-            )
-        )
+        + format_numbers(result.get("top10", []))
     )
 
     print(
         "Top12："
-        + format_numbers(
-            result.get(
-                "top12",
-                [],
-            )
-        )
+        + format_numbers(result.get("top12", []))
     )
 
     print()
 
-    # ========================================================
-    # 分数
-    # ========================================================
+    # 权重信息
+    weights = result.get("weights_used", {})
 
-    scores = result.get(
-        "number_scores",
-        {},
-    )
+    if weights:
+
+        print("【动态权重】")
+
+        print(
+            f"10期:{weights.get('w10', 0)} "
+            f"30期:{weights.get('w30', 0)} "
+            f"100期:{weights.get('w100', 0)} "
+            f"遗漏:{weights.get('missing', 0)} "
+            f"趋势:{weights.get('trend', 0)}"
+        )
+
+        print()
+
+    # 分数
+    scores = result.get("number_scores", {})
 
     if scores:
 
         ranking = sorted(
             scores,
-            key=lambda x: (
-                -scores[x],
-                x,
-            ),
+            key=lambda x: (-scores[x], x),
         )
 
-        print(
-            "【号码综合评分 Top12】"
-        )
+        print("【号码综合评分 Top12】")
 
         for number in ranking[:12]:
 
             print(
-                f"{int(number):02d}"
-                f" = "
+                f"{int(number):02d} = "
                 f"{scores[number]:.4f}"
             )
 
         print()
 
-    # ========================================================
     # 属性
-    # ========================================================
+    attrs = result.get("attributes", {})
 
-    attrs = result.get(
-        "attributes",
-        {},
-    )
+    print("【下一期属性预测】")
 
-    print(
-        "【下一期属性预测】"
-    )
-
-    zodiac = attrs.get(
-        "zodiac",
-        {},
-    )
+    zodiac = attrs.get("zodiac", {})
 
     print(
-        "生肖："
-        f"主推 {zodiac.get('main', '')} "
+        f"生肖：主推 {zodiac.get('main', '')} "
         f"次推 {zodiac.get('secondary', '')} "
-        f"Top5 "
-        f"{' + '.join(zodiac.get('top5', []))}"
+        f"Top5 {' + '.join(zodiac.get('top5', []))}"
     )
 
     print_probability(
         "生肖",
-        zodiac.get(
-            "probability",
-            {},
-        ),
+        zodiac.get("probability", {}),
     )
 
-    odd_even = attrs.get(
-        "odd_even",
-        {},
-    )
+    odd_even = attrs.get("odd_even", {})
 
-    print(
-        "单双："
-        f"主推 {odd_even.get('main', '')}"
-    )
+    print(f"单双：主推 {odd_even.get('main', '')}")
 
     print_probability(
         "单双",
-        odd_even.get(
-            "probability",
-            {},
-        ),
+        odd_even.get("probability", {}),
     )
 
-    size = attrs.get(
-        "size",
-        {},
-    )
+    size = attrs.get("size", {})
 
-    print(
-        "大小："
-        f"主推 {size.get('main', '')}"
-    )
+    print(f"大小：主推 {size.get('main', '')}")
 
     print_probability(
         "大小",
-        size.get(
-            "probability",
-            {},
-        ),
+        size.get("probability", {}),
     )
 
-    wave = attrs.get(
-        "wave",
-        {},
-    )
+    wave = attrs.get("wave", {})
 
     print(
-        "波色："
-        f"主推 {wave.get('main', '')} "
+        f"波色：主推 {wave.get('main', '')} "
         f"次推 {wave.get('secondary', '')} "
-        f"双色 "
-        f"{' + '.join(wave.get('double', []))}"
+        f"双色 {' + '.join(wave.get('double', []))}"
     )
 
     print_probability(
         "波色",
-        wave.get(
-            "probability",
-            {},
-        ),
+        wave.get("probability", {}),
     )
 
     print()
 
-    # ========================================================
     # 平特一肖
-    # ========================================================
+    pingte = result.get("pingte_zodiac", {})
 
-    pingte = result.get(
-        "pingte_zodiac",
-        {},
-    )
+    print("【平特一肖】")
 
-    print(
-        "【平特一肖】"
-    )
-
-    print(
-        f"推荐："
-        f"{pingte.get('recommend', '')}"
-    )
+    print(f"推荐：{pingte.get('recommend', '')}")
 
     if pingte.get("samples", 0) > 0:
 
         print(
-            f"历史命中率："
-            f"{pingte.get('hit_rate', 0)}% "
+            f"历史命中率：{pingte.get('hit_rate', 0)}% "
             f"（验证{pingte.get('samples', 0)}期，"
             f"随机基准约8.33%）"
         )
 
     else:
 
-        print(
-            "历史数据不足，暂无命中率统计"
-        )
+        print("历史数据不足，暂无命中率统计")
 
     print()
 
-    # ========================================================
-    # 最近10期
-    # ========================================================
+    # Walk-Forward 最近10期
+    performance = result.get("performance", {})
 
-    performance = result.get(
-        "performance",
-        {},
-    )
+    if performance.get("status") == "正常":
 
-    if performance.get(
-        "status"
-    ) == "正常":
+        print("【Walk-Forward 最近10期】")
+
+        print(f"验证期数：{performance.get('samples', 0)}")
+
+        numbers = performance.get("numbers", {})
 
         print(
-            "【Walk-Forward 最近10期】"
+            f"Top5：{numbers.get('top5', 0)}% "
+            f"| Top10：{numbers.get('top10', 0)}% "
+            f"| Top12：{numbers.get('top12', 0)}%"
         )
+
+        # 置信区间
+        ci_lower = numbers.get("top10_ci_lower", 0)
+        ci_upper = numbers.get("top10_ci_upper", 0)
+
+        if ci_lower > 0 or ci_upper > 0:
+
+            print(
+                f"Top10 95%置信区间："
+                f"{ci_lower}% - {ci_upper}%"
+            )
 
         print(
-            f"验证期数："
-            f"{performance.get('samples', 0)}"
+            f"Top5平均命中：{numbers.get('average_top5_hits', 0)} "
+            f"| Top10平均命中：{numbers.get('average_top10_hits', 0)} "
+            f"| Top12平均命中：{numbers.get('average_top12_hits', 0)}"
         )
 
-        numbers = performance.get(
-            "numbers",
-            {},
-        )
+        zodiac_perf = performance.get("zodiac", {})
 
         print(
-            f"Top5："
-            f"{numbers.get('top5', 0)}%"
-            f" | Top10："
-            f"{numbers.get('top10', 0)}%"
-            f" | Top12："
-            f"{numbers.get('top12', 0)}%"
-        )
-
-        print(
-            f"Top5平均命中："
-            f"{numbers.get('average_top5_hits', 0)}"
-            f" | Top10平均命中："
-            f"{numbers.get('average_top10_hits', 0)}"
-            f" | Top12平均命中："
-            f"{numbers.get('average_top12_hits', 0)}"
-        )
-
-        zodiac_perf = performance.get(
-            "zodiac",
-            {},
+            f"生肖主推：{zodiac_perf.get('main', 0)}% "
+            f"| 生肖Top5：{zodiac_perf.get('top5', 0)}%"
         )
 
         print(
-            f"生肖主推："
-            f"{zodiac_perf.get('main', 0)}%"
-            f" | 生肖Top5："
-            f"{zodiac_perf.get('top5', 0)}%"
+            f"单双主推：{performance.get('odd_even', {}).get('main', 0)}% "
+            f"| 大小主推：{performance.get('size', {}).get('main', 0)}%"
         )
+
+        wave_perf = performance.get("wave", {})
 
         print(
-            f"单双主推："
-            f"{performance.get('odd_even', {}).get('main', 0)}%"
-            f" | 大小主推："
-            f"{performance.get('size', {}).get('main', 0)}%"
-        )
-
-        wave_perf = performance.get(
-            "wave",
-            {},
-        )
-
-        print(
-            f"波色主推："
-            f"{wave_perf.get('main', 0)}%"
-            f" | 次推："
-            f"{wave_perf.get('secondary', 0)}%"
-            f" | 双色："
-            f"{wave_perf.get('double', 0)}%"
+            f"波色主推：{wave_perf.get('main', 0)}% "
+            f"| 次推：{wave_perf.get('secondary', 0)}% "
+            f"| 双色：{wave_perf.get('double', 0)}%"
         )
 
     else:
 
-        print(
-            "【Walk-Forward】"
-        )
+        print("【Walk-Forward】")
 
-        print(
-            "历史数据不足"
-        )
+        print("历史数据不足")
 
     print()
 
-    # ========================================================
     # 多窗口表现
-    # ========================================================
+    multi = result.get("multi_performance", {})
 
-    multi = result.get(
-        "multi_performance",
-        {},
-    )
-
-    windows = multi.get(
-        "windows",
-        {},
-    )
+    windows = multi.get("windows", {})
 
     if windows:
 
-        print(
-            "【多窗口 Walk-Forward】"
-        )
+        print("【多窗口 Walk-Forward】")
 
-        for window in (
-            "10",
-            "30",
-            "50",
-            "100",
-        ):
+        for window in ("10", "30", "50", "100"):
 
-            item = windows.get(
-                window
-            )
+            item = windows.get(window)
 
             if not item:
 
                 continue
 
-            nums = item.get(
-                "numbers",
-                {},
-            )
+            nums = item.get("numbers", {})
 
             print(
                 f"{window}期："
-                f"Top5 "
-                f"{nums.get('top5', 0)}% | "
-                f"Top10 "
-                f"{nums.get('top10', 0)}% | "
-                f"Top12 "
-                f"{nums.get('top12', 0)}%"
+                f"Top5 {nums.get('top5', 0)}% | "
+                f"Top10 {nums.get('top10', 0)}% | "
+                f"Top12 {nums.get('top12', 0)}%"
             )
 
         print()
 
-    # ========================================================
     # 稳定性
-    # ========================================================
-
-    stability = result.get(
-        "model_stability",
-        {},
-    )
+    stability = result.get("model_stability", {})
 
     if stability:
 
-        print(
-            "【模型稳定性】"
-        )
+        print("【模型稳定性】")
 
         print(
             f"Top10多窗口平均："
@@ -2649,100 +2455,56 @@ def build_summary(
 
     for name, result in all_results.items():
 
-        if not result.get(
-            "success"
-        ):
+        if not result.get("success"):
 
             summary[name] = {
 
-                "success":
-                    False,
+                "success": False,
 
-                "error":
-                    result.get(
-                        "error",
-                        "",
-                    ),
+                "error": result.get("error", ""),
 
             }
 
             continue
 
-        attrs = result.get(
-            "attributes",
-            {},
-        )
+        attrs = result.get("attributes", {})
 
         summary[name] = {
 
-            "success":
-                True,
+            "success": True,
 
             "latest_issue":
-                result.get(
-                    "latest_issue",
-                    "",
-                ),
+                result.get("latest_issue", ""),
 
             "prediction_issue":
-                result.get(
-                    "prediction_issue",
-                    "",
-                ),
+                result.get("prediction_issue", ""),
 
             "top5":
-                result.get(
-                    "top5",
-                    [],
-                ),
+                result.get("top5", []),
 
             "top10":
-                result.get(
-                    "top10",
-                    [],
-                ),
+                result.get("top10", []),
 
             "top12":
-                result.get(
-                    "top12",
-                    [],
-                ),
+                result.get("top12", []),
 
             "zodiac":
-                attrs.get(
-                    "zodiac",
-                    {},
-                ),
+                attrs.get("zodiac", {}),
 
             "odd_even":
-                attrs.get(
-                    "odd_even",
-                    {},
-                ),
+                attrs.get("odd_even", {}),
 
             "size":
-                attrs.get(
-                    "size",
-                    {},
-                ),
+                attrs.get("size", {}),
 
             "wave":
-                attrs.get(
-                    "wave",
-                    {},
-                ),
+                attrs.get("wave", {}),
 
             "pingte_zodiac":
-                result.get(
-                    "pingte_zodiac",
-                    {},
-                ),
+                result.get("pingte_zodiac", {}),
 
             "model_stability":
-                result.get(
-                    "model_stability",
-                    {},
-                ),
+                result.get("model_stability", {}),
 
         }
 
@@ -2757,226 +2519,116 @@ def run_system() -> None:
 
     """
     main.py 调用的核心入口。
-
-    例如：
-
-        from core.engine import run_system
-
-        run_system()
     """
 
     ensure_dirs()
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        "开始运行六合彩综合预测系统 V7.5"
-    )
+    print("开始运行六合彩综合预测系统 V7.6")
 
-    print(
-        f"启动时间："
-        f"{datetime.now().isoformat()}"
-    )
+    print(f"启动时间：{datetime.now().isoformat()}")
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    # ========================================================
     # SQLite初始化
-    # ========================================================
-
     try:
 
         init_db()
 
-        print(
-            "[OK] SQLite 初始化完成"
-        )
+        print("[OK] SQLite 初始化完成")
 
     except Exception as exc:
 
-        print(
-            "[ERROR] SQLite 初始化失败："
-            f"{exc}"
-        )
+        print(f"[ERROR] SQLite 初始化失败：{exc}")
 
         raise
 
     all_results: dict[str, Any] = {}
 
-    # ========================================================
     # 三彩种
-    # ========================================================
-
     for lottery in LOTTERIES:
 
         print()
-        print(
-            "=" * 70
-        )
+        print("=" * 70)
 
-        print(
-            f"正在更新：{lottery}"
-        )
+        print(f"正在更新：{lottery}")
 
-        print(
-            "=" * 70
-        )
+        print("=" * 70)
 
         try:
 
-            # =================================================
-            # API
-            # =================================================
-
-            records = fetch_lottery(
-                lottery
-            )
+            records = fetch_lottery(lottery)
 
             if records is None:
 
                 records = []
 
-            print(
-                f"[{lottery}] "
-                f"API返回："
-                f"{len(records)} 期"
-            )
+            print(f"[{lottery}] API返回：{len(records)} 期")
 
-            # =================================================
-            # SQLite
-            # =================================================
+            added = save_records(lottery, records)
 
-            added = save_records(
-                lottery,
-                records,
-            )
+            print(f"[{lottery}] 本次新增：{added} 期")
 
-            print(
-                f"[{lottery}] "
-                f"本次新增："
-                f"{added} 期"
-            )
+            history = load_records(lottery)
 
-            # =================================================
-            # 重新读取数据库
-            # =================================================
+            total = count_records(lottery)
 
-            history = load_records(
-                lottery
-            )
+            print(f"[{lottery}] 当前数据库：{total} 期")
 
-            total = count_records(
-                lottery
-            )
+            result = analyze(lottery, history)
 
-            print(
-                f"[{lottery}] "
-                f"当前数据库："
-                f"{total} 期"
-            )
+            print_result(result)
 
-            # =================================================
-            # 分析
-            # =================================================
-
-            result = analyze(
-                lottery,
-                history,
-            )
-
-            print_result(
-                result
-            )
-
-            all_results[
-                lottery
-            ] = result
+            all_results[lottery] = result
 
         except Exception as exc:
 
-            print(
-                f"[ERROR] "
-                f"{lottery}: "
-                f"{exc}"
-            )
+            print(f"[ERROR] {lottery}: {exc}")
 
-            all_results[
-                lottery
-            ] = {
+            all_results[lottery] = {
 
-                "lottery":
-                    lottery,
+                "lottery": lottery,
 
-                "version":
-                    "V7.5",
+                "version": "V7.6",
 
-                "success":
-                    False,
+                "success": False,
 
-                "error":
-                    str(exc),
+                "error": str(exc),
 
             }
 
-    # ========================================================
-    # 总预测文件
-    # ========================================================
-
+    # 保存输出文件
     prediction = {
 
-        "version":
-            "V7.5",
+        "version": "V7.6",
 
-        "generated_at":
-            datetime.now().isoformat(),
+        "generated_at": datetime.now().isoformat(),
 
-        "model":
-            {
+        "model": {
 
-                "type":
-                    "Multi-Window + Missing + Trend",
+            "type": "Multi-Window + Missing + Trend + Hot/Cold",
 
-                "target":
-                    "特别号码",
+            "target": "特别号码",
 
-                "windows":
-                    [
-                        10,
-                        30,
-                        100,
-                    ],
+            "windows": [10, 30, 100],
 
-                "weights":
-                    {
+            "weights": {
 
-                        "window10":
-                            WEIGHT_10,
-
-                        "window30":
-                            WEIGHT_30,
-
-                        "window100":
-                            WEIGHT_100,
-
-                        "missing":
-                            WEIGHT_MISSING,
-
-                        "trend":
-                            WEIGHT_TREND,
-
-                    },
-
+                "window10": "动态",
+                "window30": "动态",
+                "window100": "动态",
+                "missing": WEIGHT_MISSING,
+                "trend": WEIGHT_TREND,
+                "hot": WEIGHT_HOT,
+                "cold": WEIGHT_COLD,
             },
 
-        "note":
-            "历史统计和Walk-Forward模型实验，不代表未来实际中奖概率。",
+        },
 
-        "lotteries":
-            all_results,
+        "note": "历史统计和Walk-Forward模型实验，不代表未来实际中奖概率。",
+
+        "lotteries": all_results,
 
     }
 
@@ -2985,29 +2637,16 @@ def run_system() -> None:
         prediction,
     )
 
-    # ========================================================
-    # 回测
-    # ========================================================
-
     backtest = {
 
-        "version":
-            "V7.5",
+        "version": "V7.6",
 
-        "generated_at":
-            datetime.now().isoformat(),
+        "generated_at": datetime.now().isoformat(),
 
         "lotteries": {
 
-            name:
-                result.get(
-                    "backtest",
-                    {},
-                )
-
-            for name, result
-            in all_results.items()
-
+            name: result.get("backtest", {})
+            for name, result in all_results.items()
         },
 
     }
@@ -3017,46 +2656,28 @@ def run_system() -> None:
         backtest,
     )
 
-    # ========================================================
-    # 模块表现
-    # ========================================================
-
     module_performance = {
 
-        "version":
-            "V7.5",
+        "version": "V7.6",
 
-        "generated_at":
-            datetime.now().isoformat(),
+        "generated_at": datetime.now().isoformat(),
 
         "lotteries": {
 
-            name:
-                {
+            name: {
 
-                    "performance":
-                        result.get(
-                            "performance",
-                            {},
-                        ),
+                "performance":
+                    result.get("performance", {}),
 
-                    "multi_performance":
-                        result.get(
-                            "multi_performance",
-                            {},
-                        ),
+                "multi_performance":
+                    result.get("multi_performance", {}),
 
-                    "model_stability":
-                        result.get(
-                            "model_stability",
-                            {},
-                        ),
+                "model_stability":
+                    result.get("model_stability", {}),
 
-                }
+            }
 
-            for name, result
-            in all_results.items()
-
+            for name, result in all_results.items()
         },
 
     }
@@ -3066,22 +2687,13 @@ def run_system() -> None:
         module_performance,
     )
 
-    # ========================================================
-    # 简版结果
-    # ========================================================
-
     summary = {
 
-        "version":
-            "V7.5",
+        "version": "V7.6",
 
-        "generated_at":
-            datetime.now().isoformat(),
+        "generated_at": datetime.now().isoformat(),
 
-        "summary":
-            build_summary(
-                all_results
-            ),
+        "summary": build_summary(all_results),
 
     }
 
@@ -3090,216 +2702,110 @@ def run_system() -> None:
         summary,
     )
 
-    # ========================================================
     # 最终输出
-    # ========================================================
-
     print()
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        "预测结果已保存："
-        f"{prediction_path}"
-    )
+    print(f"预测结果已保存：{prediction_path}")
 
-    print(
-        "回测结果已保存："
-        f"{backtest_path}"
-    )
+    print(f"回测结果已保存：{backtest_path}")
 
-    print(
-        "模块表现已保存："
-        f"{performance_path}"
-    )
+    print(f"模块表现已保存：{performance_path}")
 
-    print(
-        "简版预测已保存："
-        f"{summary_path}"
-    )
+    print(f"简版预测已保存：{summary_path}")
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        "【三彩种最终预测】"
-    )
+    print("【三彩种最终预测】")
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    for name, result in (
-        all_results.items()
-    ):
+    for name, result in all_results.items():
 
-        if not result.get(
-            "success"
-        ):
+        if not result.get("success"):
 
-            print(
-                f"{name}：运行失败"
-                f" → "
-                f"{result.get('error', '')}"
-            )
+            print(f"{name}：运行失败 → {result.get('error', '')}")
 
             continue
 
         print()
 
-        print(
-            f"{name}"
-        )
+        print(f"{name}")
+
+        print(f"最新：{result.get('latest_issue', '')}")
+
+        print(f"下一期：{result.get('prediction_issue', '')}")
+
+        print(f"Top5：{format_numbers(result.get('top5', []))}")
+
+        print(f"Top10：{format_numbers(result.get('top10', []))}")
+
+        print(f"Top12：{format_numbers(result.get('top12', []))}")
+
+        attrs = result.get("attributes", {})
+
+        zodiac = attrs.get("zodiac", {})
+
+        odd_even = attrs.get("odd_even", {})
+
+        size = attrs.get("size", {})
+
+        wave = attrs.get("wave", {})
+
+        print(f"生肖：{' / '.join(zodiac.get('top5', []))}")
+
+        print(f"单双主推：{odd_even.get('main', '')}")
+
+        print(f"大小主推：{size.get('main', '')}")
 
         print(
-            f"最新："
-            f"{result.get('latest_issue', '')}"
-        )
-
-        print(
-            f"下一期："
-            f"{result.get('prediction_issue', '')}"
-        )
-
-        print(
-            f"Top5："
-            f"{format_numbers(result.get('top5', []))}"
-        )
-
-        print(
-            f"Top10："
-            f"{format_numbers(result.get('top10', []))}"
-        )
-
-        print(
-            f"Top12："
-            f"{format_numbers(result.get('top12', []))}"
-        )
-
-        attrs = result.get(
-            "attributes",
-            {},
-        )
-
-        zodiac = attrs.get(
-            "zodiac",
-            {},
-        )
-
-        odd_even = attrs.get(
-            "odd_even",
-            {},
-        )
-
-        size = attrs.get(
-            "size",
-            {},
-        )
-
-        wave = attrs.get(
-            "wave",
-            {},
-        )
-
-        print(
-            f"生肖："
-            f"{' / '.join(zodiac.get('top5', []))}"
-        )
-
-        print(
-            f"单双主推："
-            f"{odd_even.get('main', '')}"
-        )
-
-        print(
-            f"大小主推："
-            f"{size.get('main', '')}"
-        )
-
-        print(
-            f"波色："
-            f"{wave.get('main', '')}"
-            f" / "
-            f"{wave.get('secondary', '')}"
-            f" / "
+            f"波色：{wave.get('main', '')} / "
+            f"{wave.get('secondary', '')} / "
             f"{' + '.join(wave.get('double', []))}"
         )
 
-        pingte = result.get(
-            "pingte_zodiac",
-            {},
-        )
+        pingte = result.get("pingte_zodiac", {})
 
         if pingte.get("recommend"):
 
             print(
-                f"平特一肖："
-                f"{pingte.get('recommend', '')}"
-                f"（历史命中率 "
-                f"{pingte.get('hit_rate', 0)}%）"
+                f"平特一肖：{pingte.get('recommend', '')}"
+                f"（历史命中率 {pingte.get('hit_rate', 0)}%）"
             )
 
-        stability = result.get(
-            "model_stability",
-            {},
-        )
+        stability = result.get("model_stability", {})
 
         print(
-            f"模型稳定性："
-            f"{stability.get('score', 0)}/100"
-            f" "
+            f"模型稳定性：{stability.get('score', 0)}/100 "
             f"{stability.get('level', '')}"
         )
 
-        performance = result.get(
-            "performance",
-            {},
-        )
+        performance = result.get("performance", {})
 
-        if performance.get(
-            "status"
-        ) == "正常":
+        if performance.get("status") == "正常":
 
-            numbers = performance.get(
-                "numbers",
-                {},
-            )
+            numbers = performance.get("numbers", {})
 
             print(
-                f"最近10期："
-                f"Top5 "
-                f"{numbers.get('top5', 0)}% / "
-                f"Top10 "
-                f"{numbers.get('top10', 0)}% / "
-                f"Top12 "
-                f"{numbers.get('top12', 0)}%"
+                f"最近10期：Top5 {numbers.get('top5', 0)}% / "
+                f"Top10 {numbers.get('top10', 0)}% / "
+                f"Top12 {numbers.get('top12', 0)}%"
             )
 
         print()
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
     print(
-        "说明："
-        "模型输出来自历史数据统计与Walk-Forward验证，"
+        "说明：模型输出来自历史数据统计与Walk-Forward验证，"
         "不等于未来实际中奖概率。"
     )
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
-    print(
-        "系统运行结束"
-    )
+    print("系统运行结束")
 
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
 
 
 # ============================================================
