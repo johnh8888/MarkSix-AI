@@ -2,9 +2,21 @@
 
 """
 ============================================================
-六合彩统计分析系统 V8.1
-自适应权重版本（ADAPTIVE WEIGHTS）
+六合彩统计分析系统 V8.2
+自适应权重 + 自适应短期窗口选择（调参/验证分离）
 ============================================================
+
+相较 V8.1 的核心变化：
+1. 新增"短期窗口自动选择"机制：不再固定用最近10期作为短期窗口，
+   而是从 1~10 期候选窗口中，通过【调参阶段】+【样本外验证阶段】
+   两段完全不重叠的数据，挑出真正在未见过数据上也跑赢随机基准的窗口；
+   如果验证不通过，自动回退到默认10期窗口，不会因为过拟合而瞎选。
+2. 该窗口选择只应用于"对下一期的实际推荐"（Top5/10/12），
+   不应用于 walk_forward 历史回测——回测继续用固定10期窗口作为
+   稳定基准，避免和历史版本失去可比性，也避免逐步回测时重复做
+   窗口选择导致运行时间暴涨。
+3. 保留 V8.1 的自适应分量权重机制（号码/生肖/单双/大小/波色）。
+4. 保留 V8.1 修复后的正确蒙特卡洛验证逻辑。
 
 相较 V8.0 的核心变化：
 1. 所有模块的打分权重（号码/生肖/单双/大小/波色）不再是写死的常量，
@@ -112,7 +124,7 @@ MISSING_CAP = 40
 # ============================================================
 
 DEFAULT_NUMBER_WEIGHTS: dict[str, float] = {
-    "window10": 2.50,
+    "window_short": 2.50,   # 原 window10，现由自适应窗口选择决定具体看多少期
     "window30": 1.30,
     "window100": 0.80,
     "missing": 0.20,
@@ -123,6 +135,16 @@ DEFAULT_NUMBER_WEIGHTS: dict[str, float] = {
     "tail": 0.30,
     "consecutive": 0.50,
 }
+
+# ============================================================
+# 自适应短期窗口选择参数
+# ============================================================
+
+SHORT_WINDOW_CANDIDATES: list[int] = list(range(1, 11))  # 候选窗口：1~10期
+SHORT_WINDOW_TUNE_PERIODS = 20     # 调参阶段样本数
+SHORT_WINDOW_VALIDATE_PERIODS = 20  # 样本外验证阶段样本数
+SHORT_WINDOW_MIN_TRAIN = 30        # 调参起点前至少要有多少期训练数据
+DEFAULT_SHORT_WINDOW = 10          # 验证不通过时的回退窗口
 
 DEFAULT_ZODIAC_WEIGHTS: dict[str, float] = {
     "frequency": 1.00,
@@ -413,12 +435,16 @@ def cold_flag(number: int, recent30: Counter, recent100: Counter) -> int:
 
 def compute_raw_number_components(
     history: list[dict[str, Any]],
+    short_window: int = DEFAULT_SHORT_WINDOW,
 ) -> dict[int, dict[str, float]]:
     """
     计算 1~49 每个号码在各个分量上的原始（未加权）分数。
     这是自适应引擎和最终打分共用的核心函数。
+
+    short_window: "短期窗口"分量看多少期，默认10期；
+    可由 select_adaptive_short_window 选出的最优窗口覆盖。
     """
-    recent10 = Counter(special_history(history, WINDOW_10))
+    recent_short = Counter(special_history(history, short_window))
     recent30 = Counter(special_history(history, WINDOW_30))
     recent100 = Counter(special_history(history, WINDOW_100))
     missing_map = missing_periods_all(history)
@@ -433,7 +459,7 @@ def compute_raw_number_components(
         tail = number % 10
 
         raw[number] = {
-            "window10": float(recent10.get(number, 0)),
+            "window_short": float(recent_short.get(number, 0)),
             "window30": float(recent30.get(number, 0)),
             "window100": float(recent100.get(number, 0)),
             "missing": float(missing),
@@ -446,6 +472,121 @@ def compute_raw_number_components(
         }
 
     return raw
+
+
+# ============================================================
+# 自适应短期窗口选择（调参 / 样本外验证 两段分离）
+# ============================================================
+
+def _rank_by_single_window(train: list[dict[str, Any]], window: int, top_k: int) -> set[int]:
+    counts = Counter(special_history(train, window))
+    ranking = sorted(range(1, 50), key=lambda x: (-counts.get(x, 0), x))
+    return set(ranking[:top_k])
+
+
+def select_adaptive_short_window(
+    history: list[dict[str, Any]],
+    lottery_name: str,
+    candidate_windows: list[int] | None = None,
+    tune_periods: int = SHORT_WINDOW_TUNE_PERIODS,
+    validate_periods: int = SHORT_WINDOW_VALIDATE_PERIODS,
+    top_k: int = 10,
+    min_train: int = SHORT_WINDOW_MIN_TRAIN,
+    default_window: int = DEFAULT_SHORT_WINDOW,
+) -> dict[str, Any]:
+    """
+    从候选窗口（默认1~10期）中挑选"只用该窗口内出现次数排名"预测效果最好的窗口。
+
+    关键设计：调参和验证使用两段完全不重叠的历史数据。
+    - 调参段（更早）：只用来比较候选窗口谁的命中率更高。
+    - 验证段（更近、调参时完全没用过）：只用来检验调参选出的窗口
+      是否真的跑赢随机基准。验证不通过就回退默认窗口，
+      避免"矮子里面拔将军"式的过拟合选择被当真。
+    """
+    history = sorted(history, key=issue_value)
+    n = len(history)
+    candidates = candidate_windows if candidate_windows is not None else SHORT_WINDOW_CANDIDATES
+    baseline = top_k / 49.0
+    needed = min_train + tune_periods + validate_periods
+
+    fallback = {
+        "selected_window": default_window,
+        "best_candidate_from_tuning": default_window,
+        "tune_hit_rates": {},
+        "tune_samples": 0,
+        "validate_hit_rate": 0.0,
+        "validate_samples": 0,
+        "baseline": round(baseline, 4),
+        "status": "历史数据不足，使用默认窗口",
+    }
+
+    if n <= needed:
+        save_weights(lottery_name, "short_window", fallback)
+        return fallback
+
+    validate_start = n - validate_periods
+    tune_start = max(min_train, validate_start - tune_periods)
+
+    # === 调参阶段：只看 [tune_start, validate_start) 这一段 ===
+    tune_hits = {w: 0 for w in candidates}
+    tune_samples = 0
+
+    for i in range(tune_start, validate_start):
+        train = history[:i]
+        actual = history[i]
+        actual_special = get_special_number(actual)
+        if actual_special is None:
+            continue
+        tune_samples += 1
+        for w in candidates:
+            top = _rank_by_single_window(train, w, top_k)
+            if actual_special in top:
+                tune_hits[w] += 1
+
+    if tune_samples == 0:
+        save_weights(lottery_name, "short_window", fallback)
+        return fallback
+
+    tune_rates = {w: tune_hits[w] / tune_samples for w in candidates}
+    # 命中率并列时优先选更短的窗口（更贴近"短期"目标）
+    best_window = max(candidates, key=lambda w: (tune_rates[w], -w))
+
+    # === 验证阶段：只看 [validate_start, n) 这一段，调参时完全没碰过 ===
+    validate_hits = 0
+    validate_samples = 0
+
+    for i in range(validate_start, n):
+        train = history[:i]
+        actual = history[i]
+        actual_special = get_special_number(actual)
+        if actual_special is None:
+            continue
+        validate_samples += 1
+        top = _rank_by_single_window(train, best_window, top_k)
+        if actual_special in top:
+            validate_hits += 1
+
+    validate_rate = validate_hits / validate_samples if validate_samples > 0 else 0.0
+
+    if validate_samples > 0 and validate_rate > baseline:
+        selected = best_window
+        status = "正常（样本外验证通过）"
+    else:
+        selected = default_window
+        status = "样本外验证未通过，回退默认窗口"
+
+    result = {
+        "selected_window": selected,
+        "best_candidate_from_tuning": best_window,
+        "tune_hit_rates": {str(w): round(r, 4) for w, r in tune_rates.items()},
+        "tune_samples": tune_samples,
+        "validate_hit_rate": round(validate_rate, 4),
+        "validate_samples": validate_samples,
+        "baseline": round(baseline, 4),
+        "status": status,
+    }
+    save_weights(lottery_name, "short_window", result)
+    return result
 
 
 # ============================================================
@@ -527,6 +668,7 @@ def _smooth_weights(
 def adaptive_number_weights(
     history: list[dict[str, Any]],
     lottery_name: str,
+    short_window: int = DEFAULT_SHORT_WINDOW,
     lookback_steps: int = ADAPTIVE_LOOKBACK,
     top_k: int = 10,
     min_train: int = ADAPTIVE_MIN_TRAIN,
@@ -559,7 +701,7 @@ def adaptive_number_weights(
         actual_special = get_special_number(actual)
         if actual_special is None:
             continue
-        raw = compute_raw_number_components(train)
+        raw = compute_raw_number_components(train, short_window=short_window)
         samples += 1
         for name in component_names:
             ranking = sorted(range(1, 50), key=lambda x: (-raw[x][name], x))
@@ -600,18 +742,34 @@ def adaptive_number_weights(
 def predict_numbers(
     history: list[dict[str, Any]],
     lottery_name: str = "default",
+    short_window: int | None = None,
 ) -> dict[str, Any]:
+    """
+    short_window:
+      - None（默认）：会调用 select_adaptive_short_window 自动选窗口。
+        用于"对下一期的实际推荐"（analyze() 的头部调用）。
+      - 指定具体数值：跳过窗口选择，直接使用该窗口。
+        用于 walk_forward 历史回测，保持固定10期窗口的基准可比性，
+        同时避免每一步都重新做一次窗口选择导致运行时间暴涨。
+    """
     if not history:
         return {
             "top5": [], "top10": [], "top12": [],
             "scores": {}, "details": {}, "frequency": {},
-            "adaptive_weights": {},
+            "adaptive_weights": {}, "window_selection": {},
         }
 
-    weight_result = adaptive_number_weights(history, lottery_name)
+    window_selection: dict[str, Any] = {}
+    if short_window is None:
+        window_selection = select_adaptive_short_window(history, lottery_name)
+        effective_window = window_selection["selected_window"]
+    else:
+        effective_window = short_window
+
+    weight_result = adaptive_number_weights(history, lottery_name, short_window=effective_window)
     weights = weight_result["weights"]
 
-    raw = compute_raw_number_components(history)
+    raw = compute_raw_number_components(history, short_window=effective_window)
 
     scores: dict[int, float] = {}
     details: dict[int, dict[str, float]] = {}
@@ -644,6 +802,8 @@ def predict_numbers(
         },
         "missing": missing_periods_all(history),
         "adaptive_weights": weight_result,
+        "window_selection": window_selection,
+        "effective_short_window": effective_window,
     }
 
 
@@ -1246,7 +1406,9 @@ def walk_forward(
         train = history[:index]
         actual = history[index]
 
-        number_prediction = predict_numbers(train, lottery_name)
+        # 回测固定用默认短期窗口(10期)，不做样本外窗口选择：
+        # 既保持和历史版本的可比性，也避免每一步都重新调参/验证导致运行时间暴涨。
+        number_prediction = predict_numbers(train, lottery_name, short_window=DEFAULT_SHORT_WINDOW)
         attributes = predict_attributes(train, lottery_name)
 
         prediction = {
@@ -1409,7 +1571,7 @@ def analyze(
 
     return {
         "lottery": lottery_name,
-        "version": "V8.1",
+        "version": "V8.2",
         "latest_issue": latest_issue,
         "latest_draw_issue": latest_issue,
         "prediction_issue": prediction_issue,
@@ -1425,6 +1587,7 @@ def analyze(
         "windows": number_prediction["windows"],
         "missing": number_prediction["missing"],
         "number_adaptive_weights": number_prediction.get("adaptive_weights", {}),
+        "number_window_selection": number_prediction.get("window_selection", {}),
         "attributes": attributes,
         "pingte_zodiac": {
             "recommend": attributes.get("zodiac", {}).get("main", ""),
@@ -1451,6 +1614,28 @@ def format_numbers(numbers: list[int]) -> str:
     return " ".join(f"{int(x):02d}" for x in numbers)
 
 
+def _print_window_selection_block(window_selection: dict[str, Any]) -> None:
+    if not window_selection:
+        return
+    print("【号码｜自适应短期窗口选择】")
+    status = window_selection.get("status", "")
+    selected = window_selection.get("selected_window", DEFAULT_SHORT_WINDOW)
+    best_tune = window_selection.get("best_candidate_from_tuning", "-")
+    tune_samples = window_selection.get("tune_samples", 0)
+    validate_samples = window_selection.get("validate_samples", 0)
+    validate_rate = window_selection.get("validate_hit_rate", 0.0)
+    baseline = window_selection.get("baseline", 0.0)
+    print(f"  状态：{status}")
+    print(f"  调参段最优候选：{best_tune}期（样本数={tune_samples}）")
+    print(f"  样本外验证命中率：{validate_rate*100:.2f}%（样本数={validate_samples}，基准={baseline*100:.2f}%）")
+    print(f"  最终采用窗口：{selected}期")
+    tune_rates = window_selection.get("tune_hit_rates", {})
+    if tune_rates:
+        rates_str = "  ".join(f"{w}期={r*100:.1f}%" for w, r in tune_rates.items())
+        print(f"  调参段各候选命中率：{rates_str}")
+    print()
+
+
 def _print_weight_block(title: str, weight_result: dict[str, Any]) -> None:
     print(f"【{title}｜自适应权重】")
     status = weight_result.get("status", "")
@@ -1468,7 +1653,7 @@ def _print_weight_block(title: str, weight_result: dict[str, Any]) -> None:
 
 def print_result(result: dict[str, Any]) -> None:
     print("=" * 70)
-    print(f"【{result.get('lottery', '')}】 V8.1（自适应权重）")
+    print(f"【{result.get('lottery', '')}】 V8.2（自适应权重+自适应短期窗口）")
     print("=" * 70)
     print(f"历史期数：{result.get('history_size', 0)}")
     print(f"最新开奖期数：{result.get('latest_issue', '')}")
@@ -1494,6 +1679,9 @@ def print_result(result: dict[str, Any]) -> None:
     wave = attrs.get("wave", {})
     print(f"波色主推：{wave.get('main', '')} / 次推：{wave.get('secondary', '')}")
     print()
+
+    # 短期窗口选择展示
+    _print_window_selection_block(result.get("number_window_selection", {}))
 
     # 自适应权重展示
     _print_weight_block("号码", result.get("number_adaptive_weights", {}))
@@ -1609,6 +1797,7 @@ def build_summary(all_results: dict[str, Any]) -> dict[str, Any]:
             "model_stability": result.get("model_stability", {}),
             "monte_carlo": result.get("monte_carlo", {}),
             "number_adaptive_weights": result.get("number_adaptive_weights", {}),
+            "number_window_selection": result.get("number_window_selection", {}),
         }
     return summary
 
@@ -1621,7 +1810,7 @@ def run_system() -> None:
     ensure_dirs()
 
     print("=" * 70)
-    print("六合彩统计分析系统 V8.1 - 全模块自适应权重")
+    print("六合彩统计分析系统 V8.2 - 自适应权重+自适应短期窗口")
     print("=" * 70)
     print()
     print("【系统声明】")
@@ -1668,13 +1857,13 @@ def run_system() -> None:
             print(f"[ERROR] {lottery}: {exc}")
             all_results[lottery] = {
                 "lottery": lottery,
-                "version": "V8.1",
+                "version": "V8.2",
                 "success": False,
                 "error": str(exc),
             }
 
     prediction = {
-        "version": "V8.1",
+        "version": "V8.2",
         "generated_at": datetime.now().isoformat(),
         "disclaimer": "本系统输出仅供统计分析参考，不构成任何投注建议。短期高命中率可能是统计波动。",
         "lotteries": all_results,
@@ -1682,7 +1871,7 @@ def run_system() -> None:
     prediction_path = save_json("prediction.json", prediction)
 
     backtest = {
-        "version": "V8.1",
+        "version": "V8.2",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: result.get("backtest", {})
@@ -1692,7 +1881,7 @@ def run_system() -> None:
     backtest_path = save_json("backtest.json", backtest)
 
     module_performance = {
-        "version": "V8.1",
+        "version": "V8.2",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: {
@@ -1701,6 +1890,7 @@ def run_system() -> None:
                 "model_stability": result.get("model_stability", {}),
                 "monte_carlo": result.get("monte_carlo", {}),
                 "number_adaptive_weights": result.get("number_adaptive_weights", {}),
+                "number_window_selection": result.get("number_window_selection", {}),
             }
             for name, result in all_results.items()
         },
@@ -1708,7 +1898,7 @@ def run_system() -> None:
     performance_path = save_json("module_performance.json", module_performance)
 
     summary = {
-        "version": "V8.1",
+        "version": "V8.2",
         "generated_at": datetime.now().isoformat(),
         "summary": build_summary(all_results),
     }
