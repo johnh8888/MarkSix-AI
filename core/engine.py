@@ -2,22 +2,27 @@
 
 """
 ============================================================
-六合彩统计分析系统 V8.0
-ENHANCED MODULES + SCIENTIFIC EVALUATION
+六合彩统计分析系统 V8.1
+ENHANCED MODULES + SCIENTIFIC EVALUATION + FIXED ATTRIBUTE LOGIC
 ============================================================
+
+V8.1 相对 V8.0 的修复：
+1. 修复单双/大小/波色 trend 计算的基准错误
+   （原来用 recent10 计数直接减 50 或 33.3，量纲不匹配）
+   现在改为：期望值 = 该窗口实际抽取次数 × 理论概率
+2. 大小/单双/波色不再假设均匀分布，改用真实理论概率
+   （大25/小24，单25/双24，红17/蓝16/绿16，均基于1-49的真实分布）
+3. 新增单双/大小/波色的"遗漏期数"统计（此前只有号码和生肖有）
+4. 新增"延续 vs 交替"模式检测并纳入评分
+   （原来 alternation 只是算出来展示，没有参与打分）
+5. trend 项加入置信度收缩（历史不足10期时按比例收缩，避免小样本噪声主导）
+6. 单双/大小/波色三个预测函数合并为统一实现，避免重复逻辑和后续再次出现基准错误
 
 特点：
 1. 保留V7.9的增强独立模块（短期预测能力强）
 2. 保留V7.7的科学评估体系（统计检验+置信区间）
 3. 同时显示短期和长期视角
 4. 明确标注短期高命中率可能是统计波动
-
-每个独立模块增强：
-- 号码预测：+间隔分析+尾数分析+连号分析
-- 生肖预测：+趋势+遗漏+周期分析
-- 单双预测：+连续趋势+交替模式
-- 大小预测：+近期趋势
-- 波色预测：+近期趋势+综合评分
 
 重要声明：
 本系统是【统计分析工具】，不是【预测工具】。
@@ -118,10 +123,16 @@ WEIGHT_TREND = 0.80
 WEIGHT_HOT = 1.50
 WEIGHT_COLD = 1.00
 
-# 新增权重
+# 号码增强权重
 WEIGHT_INTERVAL = 0.50
 WEIGHT_TAIL = 0.30
 WEIGHT_CONSECUTIVE = 0.50
+
+# 单双/大小/波色（分类属性）权重
+# V8.1: 新增，替代原来写死在函数内部、量纲错误的 0.5 / 50 等魔数
+WEIGHT_ATTR_TREND = 0.60
+WEIGHT_ATTR_MISSING = 0.15
+WEIGHT_ATTR_CONTINUATION = 0.60
 
 
 # ============================================================
@@ -246,7 +257,7 @@ def special_history(
 
 
 # ============================================================
-# 遗漏统计
+# 遗漏统计（号码）
 # ============================================================
 
 def missing_periods_all(
@@ -327,7 +338,128 @@ def probability_scores(
 
 
 # ============================================================
-# 趋势评分
+# 分类属性的真实理论概率
+# ============================================================
+# V8.1 新增：此前大小/单双/波色都被当成均匀分布处理（50/50 或 33.3/33.3/33.3），
+# 但 1-49 里大小/单双并非严格对半，波色也不是严格三等分。
+# 这里给出基于 1-49 真实号码分布算出的理论概率，供 trend 计算使用期望值。
+
+def theoretical_category_probability(field: str) -> dict[str, float]:
+    if field == "odd_even":
+        odd_count = sum(1 for n in range(1, 50) if n % 2 == 1)
+        even_count = 49 - odd_count
+        return {"单": odd_count / 49, "双": even_count / 49}
+    if field == "size":
+        big_count = sum(1 for n in range(1, 50) if n >= 25)
+        small_count = 49 - big_count
+        return {"大": big_count / 49, "小": small_count / 49}
+    if field == "wave":
+        return {
+            "红": len(RED) / 49,
+            "蓝": len(BLUE) / 49,
+            "绿": len(GREEN) / 49,
+        }
+    return {}
+
+
+# ============================================================
+# 遗漏统计（分类属性：单双/大小/波色）
+# ============================================================
+# V8.1 新增：此前只有号码(missing_periods_all)和生肖(calculate_zodiac_missing)
+# 有遗漏统计，单双/大小/波色没有。逻辑与生肖版本一致，只是换了属性提取函数。
+
+def attribute_missing_periods(
+    history: list[dict[str, Any]],
+    field: str,
+    categories: list[str],
+) -> dict[str, int]:
+    missing = {cat: 0 for cat in categories}
+    found: set[str] = set()
+    count = 0
+
+    for row in reversed(history):
+        special = get_special_number(row)
+        if special is None:
+            continue
+
+        if field == "odd_even":
+            value = get_odd_even(special)
+        elif field == "size":
+            value = get_size(special)
+        elif field == "wave":
+            value = get_wave(special)
+        else:
+            continue
+
+        if value not in found:
+            missing[value] = count
+            found.add(value)
+
+        count += 1
+        if len(found) >= len(categories):
+            break
+
+    return missing
+
+
+# ============================================================
+# 延续 / 交替模式检测
+# ============================================================
+# V8.1 新增：原来 calculate_alternation 只统计了单双的交替比例，算出来但没有
+# 参与打分。现在泛化到单双/大小/波色，且真正纳入评分（见
+# _predict_categorical_attribute）。
+
+def calculate_continuation_pattern(
+    history: list[dict[str, Any]],
+    field: str,
+    window: int = 20,
+) -> dict[str, Any]:
+    recent: list[str] = []
+    for row in history[-window:]:
+        special = get_special_number(row)
+        if special is None:
+            continue
+        if field == "odd_even":
+            recent.append(get_odd_even(special))
+        elif field == "size":
+            recent.append(get_size(special))
+        elif field == "wave":
+            recent.append(get_wave(special))
+
+    if len(recent) < 2:
+        return {
+            "mode": "neutral",
+            "ratio": 0.0,
+            "last_value": recent[-1] if recent else "",
+        }
+
+    same = 0
+    changed = 0
+    for i in range(1, len(recent)):
+        if recent[i] == recent[i - 1]:
+            same += 1
+        else:
+            changed += 1
+
+    total = same + changed
+    change_ratio = round(changed / total * 100, 2) if total > 0 else 0.0
+
+    if change_ratio >= 60:
+        mode = "alternating"   # 倾向于换类别
+    elif change_ratio <= 40:
+        mode = "stable"        # 倾向于延续上期类别
+    else:
+        mode = "neutral"
+
+    return {
+        "mode": mode,
+        "ratio": change_ratio,
+        "last_value": recent[-1],
+    }
+
+
+# ============================================================
+# 趋势评分（号码）
 # ============================================================
 
 def trend_score(
@@ -386,7 +518,7 @@ def get_dynamic_weights(
 def calculate_intervals(history: list[dict[str, Any]]) -> dict[int, float]:
     intervals: dict[int, list[int]] = {}
     last_seen: dict[int, int] = {}
-    
+
     for i, row in enumerate(history):
         special = get_special_number(row)
         if special is not None:
@@ -396,11 +528,11 @@ def calculate_intervals(history: list[dict[str, Any]]) -> dict[int, float]:
                     intervals[special] = []
                 intervals[special].append(interval)
             last_seen[special] = i
-    
+
     avg_intervals: dict[int, float] = {}
     for num, int_list in intervals.items():
         avg_intervals[num] = sum(int_list) / len(int_list) if int_list else 0.0
-    
+
     return avg_intervals
 
 
@@ -436,12 +568,12 @@ def calculate_consecutive_bonus(
 ) -> dict[int, float]:
     recent = special_history(history, window)
     bonus: dict[int, float] = {}
-    
+
     for num in recent:
         for neighbor in [num - 1, num + 1]:
             if 1 <= neighbor <= 49:
                 bonus[neighbor] = bonus.get(neighbor, 0.0) + WEIGHT_CONSECUTIVE
-    
+
     return bonus
 
 
@@ -457,47 +589,47 @@ def predict_numbers(
             "top5": [], "top10": [], "top12": [],
             "scores": {}, "details": {}, "frequency": {},
         }
-    
+
     w10, w30, w100 = get_dynamic_weights(len(history))
-    
+
     recent10 = Counter(special_history(history, WINDOW_10))
     recent30 = Counter(special_history(history, WINDOW_30))
     recent100 = Counter(special_history(history, WINDOW_100))
     missing_map = missing_periods_all(history)
-    
+
     interval_map = calculate_intervals(history)
     tail_counter = calculate_tail_frequency(history)
     consecutive_bonus = calculate_consecutive_bonus(history)
-    
+
     scores: dict[int, float] = {}
     details: dict[int, dict[str, float]] = {}
-    
+
     for number in range(1, 50):
         score10 = recent10.get(number, 0) * w10
         score30 = recent30.get(number, 0) * w30
         score100 = recent100.get(number, 0) * w100
-        
+
         missing = min(missing_map.get(number, MISSING_CAP), MISSING_CAP)
         missing_score = missing * WEIGHT_MISSING
-        
+
         trend = trend_score(number, history)
         hot_cold = hot_cold_bonus(number, recent30, recent100)
-        
+
         interval = interval_map.get(number, 0.0)
         interval_score = calculate_interval_score(interval) * WEIGHT_INTERVAL
-        
+
         tail = number % 10
         tail_freq = tail_counter.get(tail, 0)
         tail_score = tail_freq * WEIGHT_TAIL
-        
+
         consec = consecutive_bonus.get(number, 0.0)
-        
+
         total_score = (
             score10 + score30 + score100 +
             missing_score + trend + hot_cold +
             interval_score + tail_score + consec
         )
-        
+
         scores[number] = round(total_score, 4)
         details[number] = {
             "window10": round(score10, 4),
@@ -511,9 +643,9 @@ def predict_numbers(
             "consecutive": round(consec, 4),
             "total": round(total_score, 4),
         }
-    
+
     ranking = sorted(range(1, 50), key=lambda x: (-scores[x], x))
-    
+
     return {
         "top5": ranking[:5],
         "top10": ranking[:10],
@@ -549,22 +681,22 @@ def calculate_zodiac_missing(
     missing = {animal: 0 for animal in ANIMALS}
     found: set[str] = set()
     count = 0
-    
+
     for row in reversed(history):
         special = get_special_number(row)
         if special is None:
             continue
         issue = str(row.get("issue", ""))
         animal = get_zodiac(special, issue)
-        
+
         if animal not in found:
             missing[animal] = count
             found.add(animal)
-        
+
         count += 1
         if len(found) >= 12:
             break
-    
+
     return missing
 
 
@@ -572,18 +704,18 @@ def calculate_zodiac_cycle(
     history: list[dict[str, Any]],
 ) -> dict[str, float]:
     cycle = {animal: 0.0 for animal in ANIMALS}
-    
+
     if len(history) < 12:
         return cycle
-    
+
     target_row = history[-12]
     target_special = get_special_number(target_row)
-    
+
     if target_special is not None:
         issue = str(target_row.get("issue", ""))
         target_animal = get_zodiac(target_special, issue)
         cycle[target_animal] = 1.0
-    
+
     return cycle
 
 
@@ -597,32 +729,32 @@ def predict_zodiac(
 ) -> dict[str, Any]:
     counter = special_attribute_counter(history, "zodiac", limit)
     probability = probability_scores(counter, ANIMALS)
-    
+
     recent10 = special_attribute_counter(history, "zodiac", 10)
     recent30 = special_attribute_counter(history, "zodiac", 30)
-    
+
     zodiac_missing = calculate_zodiac_missing(history)
     zodiac_cycle = calculate_zodiac_cycle(history)
-    
+
     zodiac_scores: dict[str, float] = {}
     details: dict[str, dict[str, float]] = {}
-    
+
     for animal in ANIMALS:
         base = probability.get(animal, 0)
-        
+
         n10 = recent10.get(animal, 0)
         n30 = recent30.get(animal, 0)
         trend = (n10 - n30 / 3.0) * 2.0
-        
+
         missing = zodiac_missing.get(animal, 0)
         missing_score = min(missing, 12) * 0.5
-        
+
         cycle = zodiac_cycle.get(animal, 0.0)
         cycle_score = cycle * 0.3
-        
+
         total = base + trend + missing_score + cycle_score
         zodiac_scores[animal] = round(total, 4)
-        
+
         details[animal] = {
             "frequency": round(base, 4),
             "trend": round(trend, 4),
@@ -630,10 +762,10 @@ def predict_zodiac(
             "cycle": round(cycle_score, 4),
             "total": round(total, 4),
         }
-    
+
     ranking = sorted(ANIMALS, key=lambda x: -zodiac_scores[x])
     top5 = ranking[:5]
-    
+
     return {
         "main": top5[0] if top5 else "",
         "secondary": top5[1] if len(top5) > 1 else "",
@@ -646,52 +778,91 @@ def predict_zodiac(
 
 
 # ============================================================
-# 单双连续趋势
+# 单双/大小/波色 统一预测实现
 # ============================================================
+# V8.1: 原来单双/大小/波色各自写了一份，且各自的 trend 计算基准是错的
+# （用 recent10 计数直接减 50 / 33.3，量纲对不上）。现在统一成一份实现：
+#   - trend：与"该窗口实际抽取次数 × 真实理论概率"比较，而不是与固定常数比较
+#   - 加入置信度收缩：recent10 抽取次数不足10期时，trend 的权重按比例收缩
+#   - 加入遗漏期数（此前单双/大小/波色没有，只有号码和生肖有）
+#   - 加入延续/交替模式加成（此前 alternation 只是算出来展示，没有参与打分）
 
-def calculate_consecutive_odd_even(
+def _predict_categorical_attribute(
     history: list[dict[str, Any]],
-) -> dict[str, int]:
-    result = {"单": 0, "双": 0}
-    
-    for row in reversed(history):
-        special = get_special_number(row)
-        if special is None:
-            continue
-        oe = get_odd_even(special)
-        result[oe] += 1
-        if result[oe] >= 3:
-            break
-    
-    return result
-
-
-def calculate_alternation(
-    history: list[dict[str, Any]],
+    field: str,
+    categories: list[str],
+    limit: int = 100,
 ) -> dict[str, Any]:
-    recent = special_history(history, 20)
-    if len(recent) < 2:
-        return {"alternating": 0, "stable": 0, "ratio": 0.0}
-    
-    alternating = 0
-    stable = 0
-    
-    for i in range(1, len(recent)):
-        if get_odd_even(recent[i]) != get_odd_even(recent[i-1]):
-            alternating += 1
-        else:
-            stable += 1
-    
-    total = alternating + stable
+    counter = special_attribute_counter(history, field, limit)
+    probability = probability_scores(counter, categories)
+    theoretical = theoretical_category_probability(field)
+
+    recent10_counter = special_attribute_counter(history, field, 10)
+    n10_total = sum(recent10_counter.get(cat, 0) for cat in categories)
+    # 置信度收缩：历史不足10期时，trend信号按实际样本比例打折，避免小样本噪声被放大
+    confidence = min(1.0, n10_total / 10.0) if n10_total > 0 else 0.0
+
+    missing = attribute_missing_periods(history, field, categories)
+    continuation = calculate_continuation_pattern(history, field)
+    # 交替/延续信号的强度：偏离50%越远，信号越强
+    continuation_strength = abs(continuation["ratio"] - 50.0) / 50.0
+
+    scores: dict[str, float] = {}
+    per_category_details: dict[str, dict[str, Any]] = {}
+
+    for cat in categories:
+        base = probability.get(cat, 0)
+
+        expected_share = theoretical.get(cat, 1.0 / len(categories))
+        expected10 = n10_total * expected_share
+        trend_raw = recent10_counter.get(cat, 0) - expected10
+        trend = trend_raw * WEIGHT_ATTR_TREND * confidence
+
+        miss = min(missing.get(cat, 0), MISSING_CAP) * WEIGHT_ATTR_MISSING
+
+        continuation_bonus = 0.0
+        if continuation["mode"] == "alternating" and cat != continuation["last_value"]:
+            continuation_bonus = continuation_strength * WEIGHT_ATTR_CONTINUATION
+        elif continuation["mode"] == "stable" and cat == continuation["last_value"]:
+            continuation_bonus = continuation_strength * WEIGHT_ATTR_CONTINUATION
+
+        total = base + trend + miss + continuation_bonus
+        scores[cat] = round(total, 4)
+
+        per_category_details[cat] = {
+            "frequency": round(base, 4),
+            "theoretical_probability": round(expected_share * 100, 2),
+            "trend": round(trend, 4),
+            "missing": missing.get(cat, 0),
+            "missing_score": round(miss, 4),
+            "continuation_bonus": round(continuation_bonus, 4),
+            "total": round(total, 4),
+        }
+
+    ranking = sorted(categories, key=lambda x: -scores[x])
+    main = ranking[0] if ranking else ""
+    secondary = ranking[1] if len(ranking) > 1 else ""
+
     return {
-        "alternating": alternating,
-        "stable": stable,
-        "ratio": round(alternating / total * 100, 2) if total > 0 else 0.0,
+        "main": main,
+        "secondary": secondary,
+        "double": ranking[:2],
+        "probability": probability,
+        "theoretical_probability": {
+            cat: round(theoretical.get(cat, 0) * 100, 2) for cat in categories
+        },
+        "scores": scores,
+        "details": {
+            "per_category": per_category_details,
+            "missing": missing,
+            "continuation": continuation,
+            "confidence": round(confidence, 4),
+        },
     }
 
 
 # ============================================================
-# 单属性预测（增强版）
+# 单属性预测（对外接口保持不变）
 # ============================================================
 
 def predict_single_attribute(
@@ -699,96 +870,29 @@ def predict_single_attribute(
     field: str,
     limit: int = 100,
 ) -> dict[str, Any]:
-    counter = special_attribute_counter(history, field, limit)
-    
     if field == "odd_even":
-        categories = ["单", "双"]
-        probability = probability_scores(counter, categories)
-        
-        consecutive = calculate_consecutive_odd_even(history)
-        alternation = calculate_alternation(history)
-        recent10 = special_attribute_counter(history, field, 10)
-        
-        scores = {}
-        for cat in categories:
-            base = probability.get(cat, 0)
-            trend = recent10.get(cat, 0) - 50
-            consec = consecutive.get(cat, 0)
-            scores[cat] = round(base + trend * 0.5 + consec * 0.3, 4)
-        
-        main = max(scores, key=scores.get) if scores else ""
-        
-        return {
-            "main": main,
-            "secondary": "双" if main == "单" else "单",
-            "double": [main] if main else [],
-            "probability": probability,
-            "scores": scores,
-            "details": {
-                "consecutive": consecutive,
-                "alternation": alternation,
-            },
-        }
-    
-    elif field == "size":
-        categories = ["小", "大"]
-        probability = probability_scores(counter, categories)
-        recent10 = special_attribute_counter(history, field, 10)
-        
-        scores = {}
-        for cat in categories:
-            base = probability.get(cat, 0)
-            trend = recent10.get(cat, 0) - 50
-            scores[cat] = round(base + trend * 0.5, 4)
-        
-        main = max(scores, key=scores.get) if scores else ""
-        
-        return {
-            "main": main,
-            "secondary": "大" if main == "小" else "小",
-            "double": [main] if main else [],
-            "probability": probability,
-            "scores": scores,
-            "details": {},
-        }
-    
-    elif field == "wave":
-        categories = ["红", "蓝", "绿"]
-        probability = probability_scores(counter, categories)
-        recent10 = special_attribute_counter(history, field, 10)
-        
-        scores = {}
-        for cat in categories:
-            base = probability.get(cat, 0)
-            trend = recent10.get(cat, 0) - 100/3
-            scores[cat] = round(base + trend * 0.5, 4)
-        
-        ranking = sorted(categories, key=lambda x: -scores[x])
-        main = ranking[0] if ranking else ""
-        secondary = ranking[1] if len(ranking) > 1 else ""
-        
-        return {
-            "main": main,
-            "secondary": secondary,
-            "double": ranking[:2],
-            "probability": probability,
-            "scores": scores,
-            "details": {},
-        }
-    
-    else:
-        probability = probability_scores(counter, list(counter.keys()))
-        ranking = sorted(counter.keys(), key=lambda x: -counter[x])
-        main = ranking[0] if ranking else ""
-        
-        return {
-            "main": main,
-            "secondary": "",
-            "double": [main] if main else [],
-            "probability": probability,
-            "scores": {},
-            "details": {},
-        }
+        return _predict_categorical_attribute(history, field, ["单", "双"], limit)
+
+    if field == "size":
+        return _predict_categorical_attribute(history, field, ["小", "大"], limit)
+
+    if field == "wave":
+        return _predict_categorical_attribute(history, field, ["红", "蓝", "绿"], limit)
+
+    # 兜底：未知字段，退回到简单频率排序
+    counter = special_attribute_counter(history, field, limit)
+    probability = probability_scores(counter, list(counter.keys()))
+    ranking = sorted(counter.keys(), key=lambda x: -counter[x])
+    main = ranking[0] if ranking else ""
+
+    return {
+        "main": main,
+        "secondary": "",
+        "double": [main] if main else [],
+        "probability": probability,
+        "scores": {},
+        "details": {},
+    }
 
 
 # ============================================================
@@ -802,7 +906,7 @@ def predict_attributes(
     odd_even = predict_single_attribute(history, "odd_even")
     size = predict_single_attribute(history, "size")
     wave = predict_single_attribute(history, "wave")
-    
+
     return {
         "zodiac": {
             "main": zodiac["main"],
@@ -818,6 +922,7 @@ def predict_attributes(
             "secondary": odd_even["secondary"],
             "double": odd_even["double"],
             "probability": odd_even["probability"],
+            "theoretical_probability": odd_even.get("theoretical_probability", {}),
             "scores": odd_even.get("scores", {}),
             "details": odd_even.get("details", {}),
         },
@@ -826,6 +931,7 @@ def predict_attributes(
             "secondary": size["secondary"],
             "double": size["double"],
             "probability": size["probability"],
+            "theoretical_probability": size.get("theoretical_probability", {}),
             "scores": size.get("scores", {}),
             "details": size.get("details", {}),
         },
@@ -834,6 +940,7 @@ def predict_attributes(
             "secondary": wave["secondary"],
             "double": wave["double"],
             "probability": wave["probability"],
+            "theoretical_probability": wave.get("theoretical_probability", {}),
             "scores": wave.get("scores", {}),
             "details": wave.get("details", {}),
         },
@@ -861,40 +968,40 @@ def _evaluate_prediction_core(
     actual_special = get_special_number(actual)
     if actual_special is None:
         return {}
-    
+
     issue = str(actual.get("issue", ""))
     result: dict[str, Any] = {}
-    
+
     top5 = prediction.get("top5", [])
     top10 = prediction.get("top10", [])
     top12 = prediction.get("top12", [])
-    
+
     result["number_top5"] = actual_special in set(top5)
     result["number_top10"] = actual_special in set(top10)
     result["number_top12"] = actual_special in set(top12)
-    
+
     actual_zodiac = get_zodiac(actual_special, issue)
     actual_wave = get_wave(actual_special)
     actual_size = get_size(actual_special)
     actual_odd_even = get_odd_even(actual_special)
-    
+
     attrs = prediction.get("attributes", {})
-    
+
     zodiac = attrs.get("zodiac", {})
     result["zodiac_main"] = actual_zodiac == zodiac.get("main", "")
     result["zodiac_top5"] = actual_zodiac in set(zodiac.get("top5", []))
-    
+
     odd_even = attrs.get("odd_even", {})
     result["odd_even_main"] = actual_odd_even == odd_even.get("main", "")
-    
+
     size = attrs.get("size", {})
     result["size_main"] = actual_size == size.get("main", "")
-    
+
     wave = attrs.get("wave", {})
     result["wave_main"] = actual_wave == wave.get("main", "")
     result["wave_secondary"] = actual_wave == wave.get("secondary", "")
     result["wave_double"] = actual_wave in set(wave.get("double", [])[:2])
-    
+
     return result
 
 
@@ -982,19 +1089,28 @@ def _performance_window(evaluations: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(evaluations)
     if total <= 0:
         return {"samples": 0, "status": "历史数据不足"}
-    
+
     def count(key: str) -> int:
         return sum(1 for item in evaluations if item.get(key))
-    
+
     top10_hits = count("number_top10")
     top10_rate = hit_rate(top10_hits, total)
     top10_ci = confidence_interval(top10_rate, total)
     top10_test = statistical_test(top10_hits, total, 10/49)
-    
+
     zodiac_hits = count("zodiac_main")
     zodiac_rate = hit_rate(zodiac_hits, total)
     zodiac_test = statistical_test(zodiac_hits, total, 1/12)
-    
+
+    odd_even_hits = count("odd_even_main")
+    odd_even_test = statistical_test(odd_even_hits, total, 25/49)
+
+    size_hits = count("size_main")
+    size_test = statistical_test(size_hits, total, 25/49)
+
+    wave_hits = count("wave_main")
+    wave_test = statistical_test(wave_hits, total, len(RED)/49)
+
     return {
         "samples": total,
         "numbers": {
@@ -1014,13 +1130,16 @@ def _performance_window(evaluations: list[dict[str, Any]]) -> dict[str, Any]:
             "top5": hit_rate(count("zodiac_top5"), total),
         },
         "odd_even": {
-            "main": hit_rate(count("odd_even_main"), total),
+            "main": hit_rate(odd_even_hits, total),
+            "main_statistical_test": odd_even_test,
         },
         "size": {
-            "main": hit_rate(count("size_main"), total),
+            "main": hit_rate(size_hits, total),
+            "main_statistical_test": size_test,
         },
         "wave": {
-            "main": hit_rate(count("wave_main"), total),
+            "main": hit_rate(wave_hits, total),
+            "main_statistical_test": wave_test,
             "secondary": hit_rate(count("wave_secondary"), total),
             "double": hit_rate(count("wave_double"), total),
         },
@@ -1069,7 +1188,7 @@ def walk_forward(
     history = sorted(history, key=issue_value)
     evaluations = []
     detailed_evaluations = []
-    
+
     if len(history) <= minimum_train:
         return {
             "method": "Walk-Forward",
@@ -1080,23 +1199,23 @@ def walk_forward(
             "multi_performance": {"status": "历史数据不足", "windows": {}},
             "evaluations": [],
         }
-    
+
     for index in range(minimum_train, len(history)):
         train = history[:index]
         actual = history[index]
-        
+
         number_prediction = predict_numbers(train)
         attributes = predict_attributes(train)
-        
+
         prediction = {
             "top5": number_prediction["top5"],
             "top10": number_prediction["top10"],
             "top12": number_prediction["top12"],
             "attributes": attributes,
         }
-        
+
         evaluation = evaluate_prediction(prediction, actual, train)
-        
+
         if evaluation:
             evaluations.append(evaluation)
             detailed_evaluations.append({
@@ -1113,10 +1232,10 @@ def walk_forward(
                 "wave_secondary": evaluation.get("wave_secondary", False),
                 "wave_double": evaluation.get("wave_double", False),
             })
-    
+
     performance = calculate_performance(evaluations, 10)
     multi_performance = calculate_multi_performance(evaluations)
-    
+
     return {
         "method": "Walk-Forward",
         "minimum_train": minimum_train,
@@ -1169,17 +1288,17 @@ def monte_carlo_simulation(
     performance = walk.get("performance", {})
     numbers = performance.get("numbers", {})
     actual_top10_rate = numbers.get("top10", 0) / 100.0
-    
+
     random_hits = []
     for _ in range(n_simulations):
         random_pick = set(random.sample(range(1, 50), 10))
         actual = random.randint(1, 49)
         random_hits.append(actual in random_pick)
-    
+
     sim_hit_rate = sum(random_hits) / n_simulations
     percentile = sum(1 for h in random_hits if h <= actual_top10_rate) / n_simulations * 100
     p_value = sum(1 for h in random_hits if h >= actual_top10_rate) / n_simulations
-    
+
     return {
         "n_simulations": n_simulations,
         "actual_top10_rate": round(actual_top10_rate * 100, 2),
@@ -1216,6 +1335,73 @@ def expected_value_analysis() -> dict[str, Any]:
 
 
 # ============================================================
+# 可选：分类属性权重网格搜索（不在 run_system 中自动调用）
+# ============================================================
+# V8.1 新增，供手动调参使用。因为完整跑一遍网格搜索需要对每个候选权重组合
+# 重新执行一次 walk_forward（本身就是 O(history) 次预测），组合数一多会很慢，
+# 不适合放进每次 GitHub Actions 运行的主流程。需要重新校准时手动调用即可：
+#
+#   from core.main import calibrate_attribute_weights
+#   calibrate_attribute_weights(history)
+#
+# 它会临时覆盖模块级权重常量，跑几组组合的 walk_forward，
+# 按 odd_even/size/wave 在多窗口下相对理论基准的 z-score 均值挑出最优组合，
+# 然后打印建议值（不会自动写回代码，需要你手动把打印出的值填进权重常量）。
+
+def calibrate_attribute_weights(
+    history: list[dict[str, Any]],
+    trend_candidates: tuple[float, ...] = (0.3, 0.6, 0.9),
+    missing_candidates: tuple[float, ...] = (0.05, 0.15, 0.30),
+    continuation_candidates: tuple[float, ...] = (0.3, 0.6, 0.9),
+) -> dict[str, Any]:
+    global WEIGHT_ATTR_TREND, WEIGHT_ATTR_MISSING, WEIGHT_ATTR_CONTINUATION
+
+    original = (WEIGHT_ATTR_TREND, WEIGHT_ATTR_MISSING, WEIGHT_ATTR_CONTINUATION)
+    best_score = float("-inf")
+    best_combo = original
+
+    try:
+        for trend_w in trend_candidates:
+            for missing_w in missing_candidates:
+                for cont_w in continuation_candidates:
+                    WEIGHT_ATTR_TREND = trend_w
+                    WEIGHT_ATTR_MISSING = missing_w
+                    WEIGHT_ATTR_CONTINUATION = cont_w
+
+                    walk = walk_forward(history)
+                    multi = walk.get("multi_performance", {})
+                    windows = multi.get("windows", {})
+                    if not windows:
+                        continue
+
+                    z_scores = []
+                    for window_data in windows.values():
+                        for field in ("odd_even", "size", "wave"):
+                            test = window_data.get(field, {}).get("main_statistical_test", {})
+                            z_scores.append(abs(test.get("z_score", 0)))
+
+                    if not z_scores:
+                        continue
+
+                    avg_z = sum(z_scores) / len(z_scores)
+                    if avg_z > best_score:
+                        best_score = avg_z
+                        best_combo = (trend_w, missing_w, cont_w)
+    finally:
+        WEIGHT_ATTR_TREND, WEIGHT_ATTR_MISSING, WEIGHT_ATTR_CONTINUATION = original
+
+    result = {
+        "best_weight_attr_trend": best_combo[0],
+        "best_weight_attr_missing": best_combo[1],
+        "best_weight_attr_continuation": best_combo[2],
+        "best_avg_abs_z_score": round(best_score, 4) if best_score != float("-inf") else 0.0,
+        "note": "此结果仅供参考，需要手动更新模块顶部的 WEIGHT_ATTR_* 常量才会生效。",
+    }
+    print(f"[校准建议] {result}")
+    return result
+
+
+# ============================================================
 # 分析一个彩种
 # ============================================================
 
@@ -1228,7 +1414,7 @@ def analyze(
     latest_issue = str(latest.get("issue", ""))
     latest_numbers = latest.get("numbers", [])
     prediction_issue = next_issue(latest_issue) if latest_issue else ""
-    
+
     number_prediction = predict_numbers(history)
     attributes = predict_attributes(history)
     walk = walk_forward(history)
@@ -1237,10 +1423,10 @@ def analyze(
     stability = calculate_model_stability(multi_performance)
     monte_carlo = monte_carlo_simulation(history)
     expected_value = expected_value_analysis()
-    
+
     return {
         "lottery": lottery_name,
-        "version": "V8.0",
+        "version": "V8.1",
         "latest_issue": latest_issue,
         "latest_draw_issue": latest_issue,
         "prediction_issue": prediction_issue,
@@ -1290,51 +1476,51 @@ def format_numbers(numbers: list[int]) -> str:
 
 def print_result(result: dict[str, Any]) -> None:
     print("=" * 70)
-    print(f"【{result.get('lottery', '')}】 V8.0")
+    print(f"【{result.get('lottery', '')}】 V8.1")
     print("=" * 70)
     print(f"历史期数：{result.get('history_size', 0)}")
     print(f"最新开奖期数：{result.get('latest_issue', '')}")
     print(f"下一期期数：{result.get('prediction_issue', '')}")
     print("最新号码：" + format_numbers(result.get("latest_numbers", [])))
     print()
-    
+
     # 号码排名
     print("【号码预测（增强版）】")
     print("Top5：" + format_numbers(result.get("top5", [])))
     print("Top10：" + format_numbers(result.get("top10", [])))
     print("Top12：" + format_numbers(result.get("top12", [])))
     print()
-    
+
     # 属性预测
     attrs = result.get("attributes", {})
-    print("【属性预测（增强版）】")
-    
+    print("【属性预测（增强版，V8.1 修复版）】")
+
     zodiac = attrs.get("zodiac", {})
     print(f"生肖主推：{zodiac.get('main', '')}")
     print(f"生肖Top5：{' / '.join(zodiac.get('top5', []))}")
-    
+
     odd_even = attrs.get("odd_even", {})
     print(f"单双主推：{odd_even.get('main', '')}")
-    
+
     size = attrs.get("size", {})
     print(f"大小主推：{size.get('main', '')}")
-    
+
     wave = attrs.get("wave", {})
     print(f"波色主推：{wave.get('main', '')} / 次推：{wave.get('secondary', '')}")
     print()
-    
+
     # 最近10期对错
     print("【最近10期预测对错情况】")
     print("-" * 70)
-    
+
     backtest = result.get("backtest", {})
     evaluations = backtest.get("evaluations", [])
-    
+
     if evaluations:
         recent_evals = evaluations[-10:]
         print(f"{'期数':<10} {'特别号':<8} {'Top5':<6} {'Top10':<6} {'Top12':<6} {'生肖':<6} {'单双':<6} {'大小':<6} {'波色':<6}")
         print("-" * 70)
-        
+
         for eval_item in recent_evals:
             issue = eval_item.get("issue", "")
             actual = eval_item.get("actual_special", "")
@@ -1346,7 +1532,7 @@ def print_result(result: dict[str, Any]) -> None:
             size_hit = "✓" if eval_item.get("size_main") else "✗"
             wave_hit = "✓" if eval_item.get("wave_main") else "✗"
             print(f"{issue:<10} {actual:<8} {top5:<6} {top10:<6} {top12:<6} {zodiac_hit:<6} {odd_even_hit:<6} {size_hit:<6} {wave_hit:<6}")
-        
+
         print("-" * 70)
         total = len(recent_evals)
         hits = {
@@ -1363,17 +1549,25 @@ def print_result(result: dict[str, Any]) -> None:
     else:
         print("历史数据不足")
     print()
-    
+
     # 短期vs长期
     performance = result.get("performance", {})
     multi = result.get("multi_performance", {})
-    
+
     if performance.get("status") == "正常":
         print("【短期表现（最近10期）】")
         numbers = performance.get("numbers", {})
         print(f"Top5：{numbers.get('top5', 0)}% | Top10：{numbers.get('top10', 0)}% | Top12：{numbers.get('top12', 0)}%")
+        odd_even_perf = performance.get("odd_even", {})
+        size_perf = performance.get("size", {})
+        wave_perf = performance.get("wave", {})
+        print(
+            f"单双：{odd_even_perf.get('main', 0)}%（基准约51.0%）| "
+            f"大小：{size_perf.get('main', 0)}%（基准约51.0%）| "
+            f"波色：{wave_perf.get('main', 0)}%（基准约34.7%）"
+        )
         print()
-    
+
     windows = multi.get("windows", {})
     if windows:
         print("【长期表现（多窗口）】")
@@ -1383,19 +1577,19 @@ def print_result(result: dict[str, Any]) -> None:
                 nums = item.get("numbers", {})
                 print(f"{window}期：Top10 {nums.get('top10', 0)}% (基准20.41%)")
         print()
-    
+
     # 蒙特卡洛
     monte_carlo = result.get("monte_carlo", {})
     if monte_carlo:
         print(f"【蒙特卡洛验证】p值：{monte_carlo.get('p_value', 1.0)} - {monte_carlo.get('interpretation', '')}")
         print()
-    
+
     # 稳定性
     stability = result.get("model_stability", {})
     if stability:
         print(f"【模型稳定性】{stability.get('score', 0)}/100 {stability.get('level', '')}")
         print()
-    
+
     # 声明
     print("=" * 70)
     print("⚠️ 短期高命中率可能是统计波动，不代表真实预测能力")
@@ -1451,9 +1645,9 @@ def build_summary(all_results: dict[str, Any]) -> dict[str, Any]:
 
 def run_system() -> None:
     ensure_dirs()
-    
+
     print("=" * 70)
-    print("六合彩统计分析系统 V8.0 - 增强模块+科学评估")
+    print("六合彩统计分析系统 V8.1 - 修复单双/大小/波色评分逻辑")
     print("=" * 70)
     print()
     print("【系统声明】")
@@ -1462,59 +1656,59 @@ def run_system() -> None:
     print("短期高命中率可能是统计波动，不代表真实预测能力。")
     print("=" * 70)
     print()
-    
+
     try:
         init_db()
         print("[OK] SQLite 初始化完成")
     except Exception as exc:
         print(f"[ERROR] SQLite 初始化失败：{exc}")
         raise
-    
+
     all_results: dict[str, Any] = {}
-    
+
     for lottery in LOTTERIES:
         print()
         print("=" * 70)
         print(f"正在分析：{lottery}")
         print("=" * 70)
-        
+
         try:
             records = fetch_lottery(lottery)
             if records is None:
                 records = []
             print(f"[{lottery}] API返回：{len(records)} 期")
-            
+
             added = save_records(lottery, records)
             print(f"[{lottery}] 本次新增：{added} 期")
-            
+
             history = load_records(lottery)
             total = count_records(lottery)
             print(f"[{lottery}] 当前数据库：{total} 期")
-            
+
             result = analyze(lottery, history)
             print_result(result)
             all_results[lottery] = result
-            
+
         except Exception as exc:
             print(f"[ERROR] {lottery}: {exc}")
             all_results[lottery] = {
                 "lottery": lottery,
-                "version": "V8.0",
+                "version": "V8.1",
                 "success": False,
                 "error": str(exc),
             }
-    
+
     # 保存输出
     prediction = {
-        "version": "V8.0",
+        "version": "V8.1",
         "generated_at": datetime.now().isoformat(),
         "disclaimer": "本系统输出仅供统计分析参考，不构成任何投注建议。短期高命中率可能是统计波动。",
         "lotteries": all_results,
     }
     prediction_path = save_json("prediction.json", prediction)
-    
+
     backtest = {
-        "version": "V8.0",
+        "version": "V8.1",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: result.get("backtest", {})
@@ -1522,9 +1716,9 @@ def run_system() -> None:
         },
     }
     backtest_path = save_json("backtest.json", backtest)
-    
+
     module_performance = {
-        "version": "V8.0",
+        "version": "V8.1",
         "generated_at": datetime.now().isoformat(),
         "lotteries": {
             name: {
@@ -1537,14 +1731,14 @@ def run_system() -> None:
         },
     }
     performance_path = save_json("module_performance.json", module_performance)
-    
+
     summary = {
-        "version": "V8.0",
+        "version": "V8.1",
         "generated_at": datetime.now().isoformat(),
         "summary": build_summary(all_results),
     }
     summary_path = save_json("summary.json", summary)
-    
+
     print()
     print("=" * 70)
     print("分析结果已保存：")
